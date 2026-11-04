@@ -17,8 +17,15 @@ function packItem(id) {
   if (S.pack[slot]) S.inv[S.pack[slot]] = (S.inv[S.pack[slot]] || 0) + 1;
   S.inv[id]--; S.pack[slot] = id;
   // he decides when to go: the player never does
-  if (slot === 'food' && !S.leaveAt) S.leaveAt = Clock.now() + rnd(TRIP.decideMinutes) * 60000;
+  if (slot === 'food' && !S.leaveAt) S.leaveAt = notAtBedtime(Clock.now() + rnd(TRIP.decideMinutes) * 60000);
   writeSave(S);
+}
+// he never sets off while he's asleep: a time in his bedtime moves to the next morning, 06:00–08:00
+function notAtBedtime(t) {
+  const d = new Date(t), h = d.getHours(), [a, b] = HABITS.bedtime;
+  if (!(h >= a || h < b)) return t;
+  if (h >= a) d.setDate(d.getDate() + 1);
+  d.setHours(6, 0, 0, 0); return d.getTime() + Math.random() * 2 * 3600000;
 }
 function unpack(slot) {
   const id = S.pack[slot]; if (!id || S.trip) return;

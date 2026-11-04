@@ -16,6 +16,7 @@ const HABITS = {
     day:     { sit: 3, trot: 3, sniff: 2, look: 2, lie: 2, nap: 1, sigh: 1 },
     dusk:    { sit: 4, trot: 2, sniff: 1, look: 2, lie: 3, nap: 1, sigh: 1.5 },
     evening: { sit: 3, lie: 3, look: 2, sniff: 1, trot: 1, sigh: 2, nap: 1 },   // 19:00–22:00: night sky, but he's still up
+    company: { sit: 3, lie: 3, sigh: 2, look: 1 },                   // woken up at night to keep you company: stays close
     night:   { sleep: 1 },            // from bedtime he goes to his door and sleeps
   },
   bedtime: [22, 5],                    // he sleeps from 22:00 to 05:00 (real time)
@@ -36,4 +37,6 @@ const HABITS = {
   expectTime: 6,                       // sitting in front of you after hearing the bag
   // tapped while asleep: he stirs, sighs, and keeps sleeping
   stirTime: 1.4,
+  wakeTaps: 3,                         // tap him this many times quickly while he sleeps and he gets up to keep you company
+  companyTime: 150,                    // …for this many seconds, then back to bed
 };

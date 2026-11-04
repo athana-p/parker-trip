@@ -119,7 +119,8 @@ function randomSpot() {
 }
 const BED = [70, 226];
 function pickNext() {
-  const tod = currentTod(), asleep = sleepTime(), w = { ...HABITS.idle[asleep ? 'night' : tod === 'night' ? 'evening' : tod] };
+  const tod = currentTod(), company = TT < (P.awakeUntil || 0), asleep = sleepTime() && !company;
+  const w = { ...HABITS.idle[company && sleepTime() ? 'company' : asleep ? 'night' : tod === 'night' ? 'evening' : tod] };
   if (!asleep) { for (const t of S.toys) w[t] = HABITS.toys[t]; w.eat = HABITS.eat; }
   const k = P.want && S.toys.includes(P.want) && !asleep ? P.want : pickWeighted(w); P.want = null;
   if (k === 'ball') return playBall(0);
@@ -146,6 +147,7 @@ function updateParker(dt) {
   else if (P.mode === 'watch') P.data.next();
   else if (P.mode === 'stir') setMode(P.data.back, P.data.left);
   else if (P.mode === 'packup') setMode('departLook', 1.7);
+  else if (P.mode === 'drowsy') { setMode('wag', HABITS.reactionTime.wag); SFX.pop(); }
   else if (P.mode === 'departLook') goTo(480, P.d, () => { P.present = false; P.pack = false; setMode('away'); });
   else if (P.mode === 'arrive') { P.pack = false; setMode('sigh', HABITS.sighTime, { lie: false }); }
   else if (P.mode === 'nudge') kickBall();
@@ -194,8 +196,13 @@ function bagRustle() {          // the sound of a plastic bag: he comes running
 }
 function tapParker() {
   if (/packup|departLook|arrive/.test(P.mode) || P.pack) return;
-  if (P.mode === 'sleep' || P.mode === 'nap') { setMode('stir', HABITS.stirTime, { back: P.mode, left: Math.max(10, P.until - TT) }); return; }
-  if (P.mode === 'stir') return;
+  if (/^(sleep|nap|stir)$/.test(P.mode)) {
+    // a few quick taps wake him up; one tap just makes him stir
+    P.wakeTaps = TT - (P.lastTap || -9) < 1.5 ? (P.wakeTaps || 0) + 1 : 1; P.lastTap = TT;
+    if (P.wakeTaps >= HABITS.wakeTaps) { P.wakeTaps = 0; P.awakeUntil = TT + HABITS.companyTime; setMode('drowsy', 1.8); const [hx, hy] = parkerCenter(); fx({ type: 'glow', x: hx, y: hy, life: 0.8, r: 70, rgb: '255,240,200' }); return; }
+    if (P.mode !== 'stir') setMode('stir', HABITS.stirTime, { back: P.mode, left: Math.max(10, P.until - TT) });
+    return;
+  }
   const opts = HABITS.reactions.filter(r => r !== P.lastReact), r = opts[Math.floor(Math.random() * opts.length)];
   P.lastReact = r; setMode(r, HABITS.reactionTime[r]); SFX.pop();
   const [hx, hy] = parkerCenter();
@@ -220,6 +227,7 @@ function parkerDrawing() {
     case 'tilt': key = f < 2 ? `sit|calm|0|0` : `sit|calm|0|-0.3`; break;
     case 'sigh': { const inhale = (TT - P.t0) < HABITS.sighTime * 0.45; key = P.data.lie ? `lie|content|${inhale ? 2.4 : 0}` : (inhale ? 'sit|content|0|-0.05|-2.5' : 'sit|content|0|0.07|2'); break; }
     case 'belly': key = P.data.ending ? 'belly|0' : `belly|${Math.floor(f / 3) % 2}`; break;
+    case 'drowsy': key = (TT - P.t0) < 0.9 ? 'sit|sleepy|0|0.08' : 'sit|blink|0|-0.05'; break;
     case 'packup': key = `sit|calm|0|0|0|pack`; break;
     case 'departLook': key = `look|${Math.floor(f / 6) % 2}|pack`; break;
     case 'arrive': key = `sit|happy|${f % 2 ? 0.3 : -0.25}|0|0|pack`; break;
@@ -396,7 +404,12 @@ function hideToast() { document.getElementById('toast').classList.add('hidden');
 function boot() {
   LANG = loadLang(); applyLang();
   for (const ev of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) addEventListener(ev, () => SFX.unlock(), true);   // iPhone only unlocks sound on touchend / click
-  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => { });   // offline play (not available inside the preview frame)
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {           // offline play (not available inside the preview frame)
+    const hadOld = !!navigator.serviceWorker.controller; let reloading = false;
+    navigator.serviceWorker.register('sw.js').then(reg => addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => { }); })).catch(() => { });
+    // a new version finished downloading: reload once so the player sees it (not on the very first visit)
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadOld && !reloading) { reloading = true; writeSave(S); location.reload(); } });
+  }
   buildTextures(512);
   buildBar();
   const now = Clock.now();
