@@ -65,6 +65,8 @@ function buildStatic(tod) {
   LAY = L;
 }
 function currentTod() { return DEV.get('tod') || timeOfDay(new Date(Clock.now())); }
+// is it his bedtime? (the sky turns to night at 19:00, but he stays up until 22:00)
+function sleepTime() { const h = new Date(Clock.now()).getHours(), [a, b] = HABITS.bedtime; return h >= a || h < b; }
 
 // ---------- dandelions ----------
 function spotFree(x, d) {
@@ -117,9 +119,9 @@ function randomSpot() {
 }
 const BED = [70, 226];
 function pickNext() {
-  const tod = currentTod(), w = { ...HABITS.idle[tod] };
-  if (tod !== 'night') { for (const t of S.toys) w[t] = HABITS.toys[t]; w.eat = HABITS.eat; }
-  const k = P.want && S.toys.includes(P.want) && tod !== 'night' ? P.want : pickWeighted(w); P.want = null;
+  const tod = currentTod(), asleep = sleepTime(), w = { ...HABITS.idle[asleep ? 'night' : tod === 'night' ? 'evening' : tod] };
+  if (!asleep) { for (const t of S.toys) w[t] = HABITS.toys[t]; w.eat = HABITS.eat; }
+  const k = P.want && S.toys.includes(P.want) && !asleep ? P.want : pickWeighted(w); P.want = null;
   if (k === 'ball') return playBall(0);
   if (k === 'duck') { const t = S.toyPos.duck, side = Math.sign(t.x - P.x) || 1; return goTo(clamp(t.x - 36 * side, 40, 360), t.d, () => faceThen(side, () => { P.hold = 'duck'; setMode('shake', HABITS.shakeTime); })); }
   if (k === 'bone') { const t = S.toyPos.bone, side = Math.sign(t.x - P.x) || 1; return goTo(clamp(t.x - 64 * side, 40, 360), clamp(t.d, 100, 224), () => faceThen(side, () => { P.hold = 'bone'; setMode('chew', rand(HABITS.duration.chew)); })); }
@@ -410,7 +412,7 @@ function boot() {
   buildDebug(); wireDebugTaps();
   const pose = DEV.get('pose');
   if (pose) { if (pose === 'sleep') { P.x = BED[0]; P.d = BED[1]; P.face = 1; } setMode(pose, 9999); }
-  else if (P.present && TOD === 'night') { P.x = BED[0]; P.d = BED[1]; P.face = 1; setMode('sleep', rand(HABITS.duration.sleep)); }
+  else if (P.present && sleepTime()) { P.x = BED[0]; P.d = BED[1]; P.face = 1; setMode('sleep', rand(HABITS.duration.sleep)); }
   let t0 = performance.now(), last = t0, saveAt = 0, todAt = 0, rz = 0;
   addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(layout, 200); });
   addEventListener('visibilitychange', () => { if (document.hidden) writeSave(S); else tickSpawns(); });

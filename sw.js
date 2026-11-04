@@ -1,6 +1,6 @@
 // Offline play: cache the game's own files; serve from cache first, refresh in the background.
 // Bump CACHE when files change so players get the new version.
-const CACHE = 'parker-trip-v2';
+const CACHE = 'parker-trip-v3';
 const ASSETS = ['./', 'index.html', 'manifest.webmanifest', 'css/style.css',
   'js/paper.js', 'js/bg.js', 'js/parker.js', 'js/strings.js', 'js/postcards.js', 'js/items.js', 'js/props.js', 'js/yard.js',
   'js/habits.js', 'js/audio.js', 'js/save.js', 'js/world.js', 'js/ui.js', 'js/game.js',

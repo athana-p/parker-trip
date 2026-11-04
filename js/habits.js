@@ -15,8 +15,10 @@ const HABITS = {
     morning: { sit: 3, trot: 4, sniff: 2, look: 2, lie: 1, nap: 0.5, sigh: 1 },
     day:     { sit: 3, trot: 3, sniff: 2, look: 2, lie: 2, nap: 1, sigh: 1 },
     dusk:    { sit: 4, trot: 2, sniff: 1, look: 2, lie: 3, nap: 1, sigh: 1.5 },
-    night:   { sleep: 1 },            // at night he goes to his door and sleeps
+    evening: { sit: 3, lie: 3, look: 2, sniff: 1, trot: 1, sigh: 2, nap: 1 },   // 19:00–22:00: night sky, but he's still up
+    night:   { sleep: 1 },            // from bedtime he goes to his door and sleeps
   },
+  bedtime: [22, 5],                    // he sleeps from 22:00 to 05:00 (real time)
   duration: { sit: [5, 10], sniff: [2, 4], look: [2.5, 4], lie: [8, 16], nap: [15, 30], sleep: [60, 120], chew: [8, 14], eat: [3, 5] },
   trotSpeed: 62,                       // scene units per second
   blinkEvery: [2.5, 5],                // a blink now and then while his eyes are open
