@@ -4,10 +4,12 @@ const MUTE_KEY = 'parker-trip-mute';
 const SFX = {
   ctx: null, master: null, muted: false, amb: null,
   init() { try { this.muted = localStorage.getItem(MUTE_KEY) === '1'; } catch (e) { } },
+  // must run inside a real tap (iPhone only counts the finger lifting: touchend / click), so it is called on several events
   unlock() {
-    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    this.mediaSession();
+    if (this.ctx) { if (this.ctx.state !== 'running') this.ctx.resume().catch(() => { }); return; }
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
-    this.ctx = new AC(); this.master = this.ctx.createGain(); this.master.gain.value = this.muted ? 0 : 0.9; this.master.connect(this.ctx.destination);
+    this.ctx = new AC(); this.ctx.resume().catch(() => { }); this.master = this.ctx.createGain(); this.master.gain.value = this.muted ? 0 : 0.9; this.master.connect(this.ctx.destination);
     this.noiseBuf = this.makeNoise(); this.startAmbient();
   },
   setMuted(m) {
@@ -15,6 +17,18 @@ const SFX = {
     if (this.master) this.master.gain.setTargetAtTime(m ? 0 : 0.9, this.ctx.currentTime, 0.08);
   },
   ok() { return this.ctx && !this.muted && this.ctx.state === 'running'; },
+  // iPhone: Web Audio is silenced by the ring/silent switch unless the page counts as media playback.
+  // Newer Safari has navigator.audioSession; older ones need a (code-generated, silent) <audio> element playing.
+  mediaSession() {
+    if (this.sessionSet) return; this.sessionSet = true;
+    try { if (navigator.audioSession) { navigator.audioSession.type = 'playback'; return; } } catch (e) { }
+    if (!/iPhone|iPad|iPod/.test(navigator.userAgent) && !(navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) return;
+    const sr = 8000, n = sr / 2, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf), w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+    const a = new Audio(URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }))); a.loop = true; a.setAttribute('playsinline', ''); a.play().catch(() => { this.sessionSet = false; });
+    this.silent = a;
+  },
   makeNoise() { const n = this.ctx.sampleRate * 2, b = this.ctx.createBuffer(1, n, this.ctx.sampleRate), d = b.getChannelData(0); let last = 0; for (let i = 0; i < n; i++) { last = 0.97 * last + 0.03 * (Math.random() * 2 - 1); d[i] = last * 6; } return b; },   // soft brown-ish noise
   // a single soft voice: type, frequency, start time, attack, decay, volume, optional glide
   tone(f, t, { type = 'sine', a = 0.01, d = 0.4, v = 0.2, to = null, out = this.master } = {}) {

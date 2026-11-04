@@ -393,7 +393,7 @@ function hideToast() { document.getElementById('toast').classList.add('hidden');
 // ---------- boot ----------
 function boot() {
   LANG = loadLang(); applyLang();
-  addEventListener('pointerdown', () => SFX.unlock(), true);
+  for (const ev of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) addEventListener(ev, () => SFX.unlock(), true);   // iPhone only unlocks sound on touchend / click
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => { });   // offline play (not available inside the preview frame)
   buildTextures(512);
   buildBar();
