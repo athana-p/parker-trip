@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#a6d878">
+<title>帕克的旅行</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="帕克的旅行">
+</head>
+<body>
+<div id="game">
+  <canvas id="scene" data-i18n-aria="aria.scene"></canvas>
+  <div id="hud">
+    <div id="coins" class="pill" data-i18n-aria="aria.coins" role="status"><canvas id="coinIcon"></canvas><span id="coinCount">0</span></div>
+    <div class="hud-right"><button id="muteBtn" class="pill btn icon"></button><button id="langBtn" class="pill btn" data-i18n="lang.switch">EN</button><button id="setBtn" class="pill btn icon" data-i18n-aria="ui.settings"></button></div>
+  </div>
+  <div id="toast" class="pill toast hidden"></div>
+  <nav id="bar">
+    <button id="btnShop" class="pill btn barbtn"><span data-i18n="ui.shop">商店</span></button>
+    <button id="btnPack" class="pill btn barbtn"><span data-i18n="ui.pack">背包</span></button>
+    <button id="btnAlbum" class="pill btn barbtn"><span data-i18n="ui.album">相册</span></button>
+  </nav>
+  <section id="panel" class="sheet hidden" role="dialog" aria-labelledby="panelTitle">
+    <div class="sheet-head"><h2 id="panelTitle"></h2><button id="panelClose" class="pill btn" data-i18n="ui.close">关上</button></div>
+    <div id="panelBody"></div>
+  </section>
+  <div id="dbg" hidden></div>
+</div>
+<script>
+// if anything fails while loading, say so on screen instead of leaving a blank yard
+window.addEventListener('error', e => {
+  let b = document.getElementById('bootError');
+  if (!b) { b = document.createElement('div'); b.id = 'bootError'; b.style.cssText = 'position:fixed;left:12px;right:12px;top:40%;z-index:99;background:#fffaf0;color:#5b3f37;border:3px solid #fff;border-radius:16px;padding:12px 14px;font:14px/1.5 system-ui,sans-serif;box-shadow:0 8px 24px rgba(60,30,40,.3)'; document.body.appendChild(b); }
+  b.textContent = '加载出了点问题，请刷新一下页面。Something went wrong while loading — please reload. (' + (e.message || e) + ' @ ' + String(e.filename || '').split('/').slice(-1)[0] + ':' + (e.lineno || '') + ')';
+});
+</script>
+<script src="js/paper.js"></script>
+<script src="js/bg.js"></script>
+<script src="js/parker.js"></script>
+<script src="js/strings.js"></script>
+<script src="js/postcards.js"></script>
+<script src="js/items.js"></script>
+<script src="js/props.js"></script>
+<script src="js/yard.js"></script>
+<script src="js/habits.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/save.js"></script>
+<script src="js/world.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
