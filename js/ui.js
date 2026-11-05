@@ -185,8 +185,8 @@ function renderAlbum(body) {
     for (const f of FESTIVALS) {
       const years = (S.festAlbum[f.id] || []).slice().sort(), got = years.length > 0, cell = el('button', 'album-cell' + (got ? '' : ' empty'));
       if (got) { thumb(cell, festCard(f.id), years[years.length - 1]); cell.onclick = () => { UI.view = festCard(f.id); UI.viewYear = years[years.length - 1]; UI.side = 'front'; renderPanel(); }; }
-      if (!got && f.secret) cell.append(el('span', 'album-q', '?'));            // a surprise: no name until its card has come
-      else cell.append(el('span', got ? 'album-name' : 'album-q album-fest', T('fest.' + f.id) + (got ? ' · ' + years.join(' ') : '')));
+      if (!got) cell.append(el('span', 'album-q', '?'));                          // a surprise: no name until its first card has come
+      else cell.append(el('span', 'album-name', T('fest.' + f.id) + ' · ' + years.join(' ')));
       grid.append(cell);
     }
   } else {
