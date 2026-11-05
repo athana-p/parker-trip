@@ -24,6 +24,7 @@ const SPRITES = {
   item: a => [c => drawItem(c, a[0], +a[1]), { w: 44, h: 44, ox: 22, oy: 22 }, 1, false],
   bow: a => [c => drawPlayBowB(c, a[0], { wag: +(a[1] || 0) }), BOX_BOW, K_DOG],
   dust: a => [c => tornPiece(c, ellipsePts(0, 0, 3 + (+a[1]), 2 + (+a[1]) * 0.6, 10), a[0], { amp: 0.5, seed: 30 + (+a[1]), rim: 0, shadow: 0.15, mul: 0.3 }), { w: 14, h: 12, ox: 7, oy: 6 }, 1, false],
+  confetti: a => [c => tornPiece(c, [[-3, -1.6], [3, -2], [2.6, 1.8], [-2.8, 1.4]], a[0], { amp: 0.4, seed: 3, rim: 0, shadow: 0.12, mul: 0.3 }), { w: 10, h: 8, ox: 5, oy: 4 }, 1, false],
   bird: a => [c => drawBird(c, +a[0]), { w: 60, h: 60, ox: 30, oy: 48 }, 1, false],
   ncat: a => [c => drawNeighborCat(c, a[0]), BOX_NCAT, 0.62],
   sq: a => [c => drawSquirrel(c, a[0]), BOX_SQ, 0.66],
@@ -137,7 +138,7 @@ const BED = [70, 226];
 function pickNext() {
   const tod = currentTod(), company = TT < (P.awakeUntil || 0), asleep = sleepTime() && !company;
   const w = { ...HABITS.idle[company && sleepTime() ? 'company' : asleep ? 'night' : tod === 'night' ? 'evening' : tod] };
-  if (!asleep) { for (const t of S.toys) w[t] = HABITS.toys[t]; w.eat = HABITS.eat; }
+  if (!asleep) { for (const t of S.toys) if (HABITS.toys[t]) w[t] = HABITS.toys[t]; w.eat = HABITS.eat; }
   if (P.wet) return shakeOff();
   if (!asleep && S.gifts.length) w.sniffgift = HABITS.giftSniff;
   const rule = !asleep && !company && HABITS.weather[WX.hot ? 'hot' : WX.kind];
@@ -166,7 +167,17 @@ function playToy(id) {
   if (TOY_START[id]) return TOY_START[id]();
   wakeThen(() => { P.want = id; pickNext(); });
 }
-const TOY_START = {};                    // toys that start with a tap of yours (filled in by each toy below)
+const TOY_START = {};
+const TOY_K = { ball: 0.6, duck: 0.55, bone: 0.55, bubbles: 0.95 };      // how big each toy is drawn on the grass
+// toys you tap in the yard (bubble machine, kite, sprinkler…): toy id → what happens
+const TOY_TAP = {};
+function toyTapAt(x, y) {
+  for (const id of S.toys) {
+    const f = TOY_TAP[id], t = S.toyPos[id]; if (!f || !t) continue;
+    const s = depthScale(t.d); if (Math.abs(x - t.x) < 26 * s && y > Y(t.d) - 44 * s && y < Y(t.d) + 6) { f(); return true; }
+  }
+  return false;
+}                    // toys that start with a tap of yours (filled in by each toy below)
 // asleep when you want to play: he wakes slowly first (stretchy blink), then joins in. Returns true if he had to wake.
 function wakeThen(fn) {
   if (!/^(sleep|nap|stir|sunnap|sunbelly)$/.test(P.mode)) { fn(); return false; }
@@ -242,6 +253,8 @@ function updateParker(dt) {
     return;
   }
   if (P.mode === 'fetch') return fetchUpdate(dt);
+  if (P.mode === 'bubblego') return bubbleUpdate(dt);
+  if (P.mode === 'bubblehop') bubbleHopTick();
   if (P.mode === 'chase') {
     const tx = CHASE.x - 52 * P.data.dir, step = HABITS.chaseSpeed * dt;
     P.x += clamp(tx - P.x, -step, step);
@@ -263,6 +276,7 @@ function updateParker(dt) {
   else if (P.mode === 'chew') { S.toyPos.bone = { x: clamp(P.x + 64 * P.face, 30, 370), d: P.d }; P.hold = null; writeSave(S); setMode('sigh', HABITS.sighTime, { lie: true }); }
   else if (P.mode === 'belly') setMode('sigh', HABITS.sighTime, { lie: true });
   else if (/^cat(boop|bow|side)$/.test(P.mode)) catPlayEnd();
+  else if (P.mode === 'bubblehop' || P.mode === 'bubblewait') bubbleNext();
   else if (P.mode === 'pickup') fetchReturn();
   else if (P.mode === 'present') fetchDrop();
   else if (P.mode === 'pant') { setMode('wag', HABITS.reactionTime.wag); SFX.pop(); }       // rested: ready to play again
@@ -384,7 +398,7 @@ function bagRustle() {          // the sound of a plastic bag: he comes running
   P.hold = null; goTo(200, 104, () => setMode('expect', HABITS.expectTime));
 }
 function tapParker() {
-  if (/packup|departLook|arrive|fetch|pickup|present/.test(P.mode) || P.pack) return;
+  if (/packup|departLook|arrive|fetch|pickup|present|bubble/.test(P.mode) || P.pack) return;
   if (P.mode === 'gift') return receiveGift();
   if (/^(sleep|nap|stir)$/.test(P.mode)) {
     // a few quick taps wake him up; one tap just makes him stir
@@ -407,7 +421,9 @@ function parkerDrawing() {
   let key, sx = P.face, lift = 0;
   switch (P.mode) {
     case 'trot': key = `trot|${(P.data.slow ? Math.floor(f / 2) : f) % 6}${pk}`; break;
-    case 'chase': case 'fetch': key = `trot|${f % 6}`; break;
+    case 'chase': case 'fetch': case 'bubblego': key = `trot|${f % 6}`; break;
+    case 'bubblewait': key = `sit|happy|${f % 4 < 2 ? 0.2 : -0.15}|-0.32`; break;
+    case 'bubblehop': { const u = clamp((TT - P.t0) / 0.62); lift = 30 * Math.sin(Math.PI * u); key = lift > 6 ? 'sit|happy|0|-0.36' : 'sit|calm|0|-0.24'; break; }
     case 'pickup': key = 'sniff|1'; break;
     case 'present': key = (TT - P.t0) < 0.35 ? 'sit|happy|0|0.1|0|ball' : 'sit|happy|0|0.05'; break;
     case 'waitthrow': key = `sit|${f % 12 < 6 ? 'happy' : open}|${f % 4 < 2 ? 0.26 : -0.2}|-0.08`; break;   // wagging, looking up at you
@@ -536,7 +552,7 @@ function drawScene() {
       if (S.giftNew) glow(ctx, GIFTBOX.x, Y(GIFTBOX.d) - 14, 34, '255,236,170', 0.35 + 0.1 * Math.sin(TT * 2));
       drawSprite(sprite('giftbox'), GIFTBOX.x, Y(GIFTBOX.d), { scale: depthScale(GIFTBOX.d) });
     } else if (it.toy) {
-      const t = S.toyPos[it.toy], s = depthScale(t.d), k = { ball: 0.6, duck: 0.55, bone: 0.55 }[it.toy];
+      const t = S.toyPos[it.toy], s = depthScale(t.d), k = TOY_K[it.toy] || 0.6;
       if (it.toy === 'ball') {                     // a paper shadow on the grass that shrinks as the ball flies higher
         const hk = 1 / (1 + BALL.z / 40);
         ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = `rgba(110,100,115,${0.32 * hk})`; ctx.beginPath(); ctx.ellipse(t.x + 2, Y(t.d) + 1, 13 * s * (0.5 + 0.5 * hk), 4 * s * (0.5 + 0.5 * hk), 0, 0, TAU); ctx.fill(); ctx.restore();
@@ -560,6 +576,7 @@ function drawScene() {
       if (/^sun/.test(P.mode)) glow(ctx, P.x + 14 * P.face * s, Y(P.d) - 30 * s, 84, '255,232,170', 0.3 + 0.05 * Math.sin(TT * 1.3));   // warm in the sun
     }
   }
+  drawBubbles();
   if (CHASE.on) drawBit(ctx, CHASE.season, CHASE.i, CHASE.x, CHASE.y, CHASE.rot, 1.9);
   drawVisitor();
   if (L.old && L.old.fore !== L.fore) { drawLayer(ctx, L.old.fore); ctx.save(); ctx.globalAlpha = fade; drawLayer(ctx, L.fore); ctx.restore(); }
@@ -586,9 +603,11 @@ cv.addEventListener('pointerdown', e => {
   // dandelions first (nearest head within reach), front-most wins
   let best = null, bd = 30;
   for (const f of S.field) { const s = depthScale(f.d), hx = f.x, hy = Y(f.d) - 36 * s, dd = Math.hypot(x - hx, y - hy); if (dd < bd && Clock.now() - f.born > 600) { bd = dd; best = f; } }
+  if (tapBubble(x, y)) return;
   const g = giftAt(x, y); if (g) return pickGift(g);
   if (Math.abs(x - GIFTBOX.x) < 24 && y > Y(GIFTBOX.d) - 38 && y < Y(GIFTBOX.d) + 6) { S.giftNew = false; return openPanel('gifts'); }
   if (best) return collect(best);
+  if (toyTapAt(x, y)) return;
   if (ballGrab(x, y, e.pointerId)) { try { cv.setPointerCapture(e.pointerId); } catch (err) { } return; }
   if (P.present && onParker(x, y)) { press = { id: e.pointerId, t0: TT, x, y, dist: 0, rub: false }; try { cv.setPointerCapture(e.pointerId); } catch (err) { } return; }
   if (tapVisitor(x, y)) return;
@@ -686,7 +705,7 @@ function boot() {
     Clock.tick(dt);
     if (TT > todAt) { todAt = TT + 1; worldTick(); wxCheck(); }
     if (TT > saveAt) { saveAt = TT + 15; writeSave(S); }
-    checkRub(); updateParker(dt); updateBall(dt); updateVisitor(dt); updateChase(dt); updateWeather(dt, WX, V.H, TT); parkerExtras(); catPlayTick(); sayTick(); sleepZ(); updateFX(dt); drawScene();
+    checkRub(); updateParker(dt); updateBall(dt); updateVisitor(dt); updateBubbles(dt); updateChase(dt); updateWeather(dt, WX, V.H, TT); parkerExtras(); catPlayTick(); sayTick(); sleepZ(); updateFX(dt); drawScene();
     if (!window.READY) window.READY = true;
     requestAnimationFrame(loop);
   };
@@ -698,7 +717,7 @@ function boot() {
   idle(step);
 }
 // test hook (screenshots): advance the simulation deterministically
-window.__advance = secs => { for (let i = 0; i < secs * 30; i++) { TT += 1 / 30; checkRub(); updateParker(1 / 30); updateBall(1 / 30); updateVisitor(1 / 30); updateChase(1 / 30); updateWeather(1 / 30, WX, V.H, TT); parkerExtras(); catPlayTick(); sayTick(); updateFX(1 / 30); } drawScene(); };
+window.__advance = secs => { for (let i = 0; i < secs * 30; i++) { TT += 1 / 30; checkRub(); updateParker(1 / 30); updateBall(1 / 30); updateVisitor(1 / 30); updateBubbles(1 / 30); updateChase(1 / 30); updateWeather(1 / 30, WX, V.H, TT); parkerExtras(); catPlayTick(); sayTick(); updateFX(1 / 30); } drawScene(); };
 // time of day or weather changed: rebuild the backdrop (it cross-fades), switch the weather sounds
 function wxCheck() {
   const tod = currentTod(), wx = weatherNow();
@@ -742,6 +761,74 @@ function receiveGift() {
   setMode('sigh', HABITS.sighTime, { lie: false }); showToast('toast.giftGot', 3000);
   UI.tab = 'fests'; openPanel('album'); UI.view = festCard(f.id); UI.viewYear = f.year; renderPanel();
 }
+// ---------- 2. the bubble machine: tap it, 5–8 bubbles drift up; he jumps to bite them, you can pop them too ----------
+const BUBBLES = [];
+function blowBubbles() {
+  const m = S.toyPos.bubbles, n = 5 + Math.floor(Math.random() * 4); SFX.blow();
+  for (let i = 0; i < n; i++) BUBBLES.push({ x: m.x + 6, d: m.d + (Math.random() - 0.5) * 30, z: 28, vx: (Math.random() - 0.35) * 44, vz: 9 + Math.random() * 9, r: 9 + Math.random() * 6, ph: Math.random() * TAU, born: TT + i * 0.16, life: 8 + Math.random() * 5 });
+  fx({ type: 'glow', x: m.x + 6, y: Y(m.d) - 30, life: 0.5, r: 26, rgb: '230,245,255' });
+  if (P.present && !P.pack && !/packup|departLook|arrive|gift|fetch|pickup|present/.test(P.mode)) wakeThen(() => bubbleNext());
+}
+TOY_TAP.bubbles = blowBubbles; TOY_START.bubbles = blowBubbles;
+function bubblePos(b) { return [b.x + Math.sin((TT - b.born) * 1.4 + b.ph) * 6, Y(b.d) - b.z]; }
+function popBubble(b, byHim) {
+  const i = BUBBLES.indexOf(b); if (i < 0) return; BUBBLES.splice(i, 1);
+  const [x, y] = bubblePos(b); SFX.bubblePop();
+  const cols = ['#bfe3f7', '#f7cfe0', '#fff1b8', '#cdeccd'];
+  for (let k = 0; k < 8; k++) { const a = k / 8 * TAU; fx({ type: 'spr', key: `confetti|${cols[k % 4]}`, x: x + Math.cos(a) * b.r * 0.6, y: y + Math.sin(a) * b.r * 0.6, vx: Math.cos(a) * 46, vy: Math.sin(a) * 46 - 10, g: 60, life: 0.6, rot: a, vr: 5 }); }
+  if (byHim) fx({ type: 'glow', x, y, life: 0.4, r: 22, rgb: '230,245,255' });
+}
+function updateBubbles(dt) {
+  for (let i = BUBBLES.length - 1; i >= 0; i--) {
+    const b = BUBBLES[i]; if (TT < b.born) continue;
+    b.x += b.vx * dt; b.z += b.vz * dt; b.vx *= 1 - 0.3 * dt; b.vz = Math.max(4, b.vz - 1.2 * dt);
+    if (TT - b.born > b.life || b.z > V.H - 40 || b.x < -20 || b.x > SCENE_W + 20) popBubble(b, false);
+  }
+}
+function bubbleNext() {                  // pick the lowest bubble he can reach and go jump under it
+  const ok = BUBBLES.filter(b => TT >= b.born && b.z < 185);
+  if (!ok.length) { if (/^bubble/.test(P.mode)) setMode('wag', HABITS.reactionTime.wag); return; }
+  const b = ok.reduce((a, c) => c.z < a.z ? c : a);
+  setMode('bubblego', null, { b });
+}
+function bubbleUpdate(dt) {
+  const b = P.data.b; if (!BUBBLES.includes(b)) return bubbleNext();
+  const side = Math.sign(b.x - P.x) || P.face, tx = b.x - 30 * side, dx = tx - P.x, dd = clamp(b.d, 100, 224) - P.d, L = Math.hypot(dx, dd);
+  if (Math.abs(b.x - P.x) > 8) P.face = side;
+  if (L < 8) {                           // underneath: jump when it's in reach, otherwise wait looking up at it
+    const reach = 118 * depthScale(P.d);
+    return b.z > reach - 40 ? setMode('bubblehop', 0.62, { b, popped: false }) : setMode('bubblewait', 0.25, { b });
+  }
+  const step = Math.min(L, 96 * dt); if (L > 0.01) { P.x += dx / L * step; P.d += dd / L * step; }
+}
+function bubbleHopTick() {
+  const u = (TT - P.t0) / 0.62, b = P.data.b;
+  if (!P.data.popped && u > 0.45 && BUBBLES.includes(b)) {
+    const s = depthScale(P.d), mx = P.x + 36 * P.face * s, my = Y(P.d) - 118 * s - 30, [bx, by] = bubblePos(b);
+    if (Math.hypot(bx - mx, by - my) < 64) { P.data.popped = true; popBubble(b, true); }
+  }
+}
+function drawBubbles() {
+  if (!BUBBLES.length) return;
+  const im = bubbleImg();
+  for (const b of BUBBLES) {
+    if (TT < b.born) continue;
+    const [x, y] = bubblePos(b), w = 1 + 0.06 * Math.sin((TT - b.born) * 5 + b.ph), age = (TT - b.born) / b.life, a = age > 0.85 ? (1 - age) / 0.15 : Math.min(1, (TT - b.born) * 4);
+    ctx.save(); ctx.globalAlpha = a; ctx.drawImage(im, x - b.r * w, y - b.r / w, b.r * 2 * w, b.r * 2 / w); ctx.restore();
+  }
+}
+let _bub = null;
+function bubbleImg() {                   // a disc of tracing paper with a little highlight
+  if (_bub && _bub.res === V.res) return _bub.cv;
+  const R = 16, res = V.res, cv = mk(R * 2 * res, R * 2 * res), c = cv.getContext('2d'); c.scale(res, res); c.translate(R, R);
+  c.globalAlpha = 0.5; piece(c, circ(0, 0, R - 1.5), '#dceefa', { mul: 0.15, scr: 0.2 }); c.globalAlpha = 1;
+  c.strokeStyle = 'rgba(110,150,190,0.55)'; c.lineWidth = 1.1; c.beginPath(); c.arc(0, 0, R - 1, 0, TAU); c.stroke();      // a thin blue-grey edge so it reads on white fur
+  c.strokeStyle = 'rgba(255,255,255,0.95)'; c.lineWidth = 1.5; c.beginPath(); c.arc(0, 0, R - 2.3, 0, TAU); c.stroke();
+  c.lineWidth = 1.6; for (const [a0, a1, col] of [[0.2, 1.1, 'rgba(246,170,200,0.7)'], [1.1, 1.9, 'rgba(250,220,130,0.7)'], [1.9, 2.6, 'rgba(150,210,170,0.7)']]) { c.strokeStyle = col; c.beginPath(); c.arc(0, 0, R - 4, a0, a1); c.stroke(); }   // a hint of rainbow
+  piece(c, ell(-5, -6, 4.5, 2.2, -0.7), '#ffffff', { mul: 0.1 }); piece(c, circ(5, 6, 1.4), '#ffffff', { mul: 0.1 });
+  _bub = { res, cv }; return cv;
+}
+function tapBubble(x, y) { for (const b of BUBBLES) { if (TT < b.born) continue; const [bx, by] = bubblePos(b); if (Math.hypot(x - bx, y - by) < b.r + 10) { popBubble(b, false); return true; } } return false; }
 // ---------- home from a trip: one short line in a little paper speech bubble above his head ----------
 const SAY = { on: false };
 function sayKey(h) {

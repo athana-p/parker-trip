@@ -9,6 +9,7 @@ const ITEMS = [
   { id: 'ball', cat: 'toy', price: 10 },
   { id: 'duck', cat: 'toy', price: 16 },
   { id: 'bone', cat: 'toy', price: 12 },
+  { id: 'bubbles', cat: 'toy', price: 14 },
 ];
 const ITEM = Object.fromEntries(ITEMS.map(i => [i.id, i]));
 const CATS = ['food', 'charm', 'toy'];

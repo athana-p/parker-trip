@@ -9,7 +9,7 @@ function buy(id) {
   else S.inv[id] = (S.inv[id] || 0) + 1;
   writeSave(S); return true;
 }
-const TOY_SPOTS = { ball: { x: 300, d: 118 }, duck: { x: 140, d: 112 }, bone: { x: 240, d: 214 } };
+const TOY_SPOTS = { ball: { x: 300, d: 118 }, duck: { x: 140, d: 112 }, bone: { x: 240, d: 214 }, bubbles: { x: 150, d: 206 } };
 
 // put an item in its slot (food / charm); whatever was there goes back to the bag
 function packItem(id) {

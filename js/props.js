@@ -83,6 +83,15 @@ function drawItem(c, id, s = 1) {
       pp(c, rectP(10, -12, 9, 10), '#e2574a', 0); for (let k = 0; k < 3; k++) piece(c, rectP(9, 2 + k * 4, 11, 1.4), '#c9b49a', { mul: 0.3 });
       break;
     }
+    case 'bubbles': {                      // a little bubble machine: mint box, a dotted fan grille, a wand ring on top
+      P(rectP(-20, -6, 40, 22), '#7cc8b4'); piece(c, rectP(-20, -6, 40, 4), '#a6dccb', { mul: 0.3 });
+      P(circ(-6, 5, 7.5), '#f6fbf8', 0.08); c.fillStyle = 'rgba(70,120,110,0.55)'; for (let i = 0; i < 7; i++) { const a = i / 7 * TAU; c.beginPath(); c.arc(-6 + Math.cos(a) * 4, 5 + Math.sin(a) * 4, 1, 0, TAU); c.fill(); }
+      P(rectP(8, 0, 8, 6), '#f5c04a', 0.06); P(circ(12, 12, 2.4), '#e2574a', 0.05);
+      P(limb([4, -6], [6, -16], 2.4, 2), '#e98a8a', 0.08);
+      c.save(); c.strokeStyle = '#e98a8a'; c.lineWidth = 2.6; c.beginPath(); c.arc(7, -23, 7, 0, TAU); c.stroke(); c.restore();
+      c.save(); c.globalAlpha = 0.45; piece(c, circ(7, -23, 5.6), '#dff3ff', { mul: 0.2 }); c.restore();
+      break;
+    }
     case 'bone':
       P(union(limb([-14, 0], [14, 0], 9, 9), circ(-16, -5, 6), circ(-16, 5, 6), circ(16, -5, 6), circ(16, 5, 6)), '#fbf4e6');
       break;

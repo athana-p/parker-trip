@@ -77,6 +77,15 @@ const SFX = {
     if (!this.ok()) return; const t = this.ctx.currentTime;
     this.tone(150 + 60 * k, t, { a: 0.004, d: 0.13, v: 0.05 + 0.08 * k, to: 85 }); this.noise(t, { dur: 0.06, v: 0.03 * k, type: 'lowpass', f: 600, a: 0.003 });
   },
+  blow() {                           // the bubble machine: a breathy hum and a few soft blips
+    if (!this.ok()) return; const t = this.ctx.currentTime;
+    this.noise(t, { dur: 0.9, v: 0.035, f: 1100, q: 0.8, a: 0.15 });
+    for (let i = 0; i < 4; i++) { const f = 900 + Math.random() * 700; this.tone(f, t + 0.15 + i * 0.16, { a: 0.01, d: 0.12, v: 0.025, to: f * 1.5 }); }
+  },
+  bubblePop() {                      // a bubble popping: a tiny wet pluck
+    if (!this.ok()) return; const t = this.ctx.currentTime, f = 1100 + Math.random() * 500;
+    this.tone(f, t, { a: 0.002, d: 0.07, v: 0.05, to: f * 1.6 }); this.noise(t, { dur: 0.04, v: 0.025, f: 3000, q: 1, a: 0.002 });
+  },
   // ---- visitors (stage 4) ----
   chirp() {                          // the sparrow arrives: two quick cheeps
     if (!this.ok()) return; const t = this.ctx.currentTime;
