@@ -20,7 +20,7 @@ function makeSprite(fn, box, k, stick = true) {
   return { img, sh, ox: bx.ox + PAD, oy: bx.oy + PAD, w, h, stick };
 }
 const SPRITES = {
-  sit: a => [c => drawSitB(c, a[0], +a[1], { headRot: +a[2], headDy: +(a[3] || 0), pack: a[4] === 'pack', mouth: ['duck', 'card', 'simit'].includes(a[4]) ? a[4] : null }), BOX_SIT, K_DOG],
+  sit: a => [c => drawSitB(c, a[0], +a[1], { headRot: +a[2], headDy: +(a[3] || 0), pack: a[4] === 'pack', mouth: ['duck', 'card', 'simit', 'ball'].includes(a[4]) ? a[4] : null }), BOX_SIT, K_DOG],
   item: a => [c => drawItem(c, a[0], +a[1]), { w: 44, h: 44, ox: 22, oy: 22 }, 1, false],
   bow: a => [c => drawPlayBowB(c, a[0], { wag: +(a[1] || 0) }), BOX_BOW, K_DOG],
   dust: a => [c => tornPiece(c, ellipsePts(0, 0, 3 + (+a[1]), 2 + (+a[1]) * 0.6, 10), a[0], { amp: 0.5, seed: 30 + (+a[1]), rim: 0, shadow: 0.15, mul: 0.3 }), { w: 14, h: 12, ox: 7, oy: 6 }, 1, false],
@@ -181,7 +181,7 @@ function dustPuff(x, y, n = 6) {
 }
 // ---- weather behaviours (stage 3) ----
 const SHELTER = [118, 244], SHADE = [100, 238];
-const isLying = () => /lie|sleep|nap|stir|belly|chew|flat/.test(P.mode) || (P.mode === 'sigh' && P.data.lie);
+const isLying = () => /lie|sleep|nap|stir|belly|chew|flat|pant/.test(P.mode) || (P.mode === 'sigh' && P.data.lie);
 const WX_ACTS = {
   shelter: () => goTo(SHELTER[0], SHELTER[1], () => faceThen(1, () => setMode('shelter', rand(HABITS.wxTime.shelter)))),
   splash: () => { const [x, d] = randomSpot(); goTo(clamp(x, 170, 350), Math.min(d, 190), () => { P.wet = true; setMode('wet', rand(HABITS.wxTime.wet)); }); },
@@ -241,6 +241,7 @@ function updateParker(dt) {
     else { P.x += dx / L * step; P.d += dd / L * step; }
     return;
   }
+  if (P.mode === 'fetch') return fetchUpdate(dt);
   if (P.mode === 'chase') {
     const tx = CHASE.x - 52 * P.data.dir, step = HABITS.chaseSpeed * dt;
     P.x += clamp(tx - P.x, -step, step);
@@ -262,6 +263,9 @@ function updateParker(dt) {
   else if (P.mode === 'chew') { S.toyPos.bone = { x: clamp(P.x + 64 * P.face, 30, 370), d: P.d }; P.hold = null; writeSave(S); setMode('sigh', HABITS.sighTime, { lie: true }); }
   else if (P.mode === 'belly') setMode('sigh', HABITS.sighTime, { lie: true });
   else if (/^cat(boop|bow|side)$/.test(P.mode)) catPlayEnd();
+  else if (P.mode === 'pickup') fetchReturn();
+  else if (P.mode === 'present') fetchDrop();
+  else if (P.mode === 'pant') { setMode('wag', HABITS.reactionTime.wag); SFX.pop(); }       // rested: ready to play again
   else if (P.mode === 'wet') shakeOff();
   else if (P.mode === 'shakeoff') { P.wet = false; setMode('sigh', HABITS.sighTime, { lie: false }); }
   else if (P.mode === 'sunnap') { setMode('sunbelly', HABITS.wxTime.sunbelly); fx({ type: 'glow', x: P.x, y: Y(P.d) - 30, life: 0.8, r: 70, rgb: '255,236,180' }); }
@@ -274,7 +278,7 @@ function updateParker(dt) {
   else pickNext();
 }
 // ---- toys, departure, arrival, the bag rustle ----
-const BALL = { vx: 0, vd: 0, rot: 0 }, BALL_X = [36, 364], BALL_D = [96, 228], BALL_DRAG = 110;
+const BALL = { vx: 0, vd: 0, rot: 0, z: 0, vz: 0 }, BALL_X = [36, 364], BALL_D = [96, 228], BALL_DRAG = 110, BALL_G = 900;
 // each push aims the ball at an open spot somewhere else in the yard: he walks round to the far side and
 // nudges it that way (before, he always pushed it away from himself, so it drifted into a corner and stayed there)
 function playBall(n) {
@@ -294,12 +298,75 @@ function kickBall() {
 }
 function updateBall(dt) {
   const t = S.toyPos.ball; if (!t) return;
-  const v = Math.hypot(BALL.vx, BALL.vd); if (v < 1) { BALL.vx = BALL.vd = 0; return; }
-  const k = Math.max(0, v - BALL_DRAG * dt) / v; BALL.vx *= k; BALL.vd *= k;
-  t.x += BALL.vx * dt; t.d += BALL.vd * dt; BALL.rot += BALL.vx * dt / 9;
+  if (P.hold === 'ball') { const s = depthScale(P.d); t.x = clamp(P.x + 40 * P.face * s, ...BALL_X); t.d = clamp(P.d - 2, ...BALL_D); BALL.vx = BALL.vd = BALL.vz = BALL.z = 0; return; }   // in his mouth
+  if (FETCH.drag) return;
+  if (BALL.z > 0 || BALL.vz > 0) {                      // in the air: gravity, then a bounce that loses some height and speed
+    BALL.vz -= BALL_G * dt; BALL.z += BALL.vz * dt;
+    if (BALL.z <= 0) {
+      BALL.z = 0;
+      if (BALL.vz < -70) { const k = clamp(-BALL.vz / 500); SFX.bounce(k); if (k > 0.25) dustPuff(t.x, Y(t.d), 4); BALL.vz = -BALL.vz * 0.45; BALL.vx *= 0.78; BALL.vd *= 0.78; }
+      else BALL.vz = 0;
+    }
+  }
+  const v = Math.hypot(BALL.vx, BALL.vd);
+  if (v < 1) { BALL.vx = BALL.vd = 0; }
+  else {
+    if (BALL.z <= 0) { const k = Math.max(0, v - BALL_DRAG * dt) / v; BALL.vx *= k; BALL.vd *= k; }      // rolling on the grass
+    t.x += BALL.vx * dt; t.d += BALL.vd * dt; BALL.rot += BALL.vx * dt / 9;
+  }
   if (t.x < BALL_X[0] || t.x > BALL_X[1]) { BALL.vx *= -0.6; t.x = clamp(t.x, ...BALL_X); }
   if (t.d < BALL_D[0] || t.d > BALL_D[1]) { BALL.vd *= -0.6; t.d = clamp(t.d, ...BALL_D); }
 }
+// ---- 1. throw and fetch: drag the ball and let go; he runs after it, brings it back and waits for the next throw ----
+const FETCH = { drag: null, throws: 0 }, FETCH_SPOT = [200, 104];
+function ballScreen() { const t = S.toyPos.ball, s = depthScale(t.d); return [t.x, Y(t.d) - 11 * s - BALL.z]; }
+function ballGrab(x, y, id) {
+  if (!S.toys.includes('ball') || P.hold === 'ball') return false;
+  const [bx, by] = ballScreen(); if (Math.hypot(x - bx, y - by) > 30) return false;
+  FETCH.drag = { id, pts: [[x, y, performance.now()]] }; BALL.vx = BALL.vd = BALL.vz = 0;
+  if (P.mode === 'fetch') setMode('waitthrow', 30);
+  ballFollow(x, y); return true;
+}
+function ballFollow(x, y) {                // the ball sits under your finger; above the yard it is lifted into the air
+  const t = S.toyPos.ball, g = V.H - y - 11; t.x = clamp(x, ...BALL_X); t.d = clamp(g, ...BALL_D); BALL.z = Math.max(0, g - t.d);
+  const P_ = FETCH.drag.pts; P_.push([x, y, performance.now()]); if (P_.length > 8) P_.shift();
+}
+function ballThrow() {
+  const P_ = FETCH.drag.pts, now = performance.now(); FETCH.drag = null;
+  let a = P_[0]; for (const p of P_) if (now - p[2] < 110) { a = p; break; }
+  const b = P_[P_.length - 1], dt = Math.max(0.016, (b[2] - a[2]) / 1000);
+  let vx = (b[0] - a[0]) / dt, vy = (b[1] - a[1]) / dt; const sp = Math.hypot(vx, vy);
+  if (sp > 700) { vx *= 700 / sp; vy *= 700 / sp; }
+  if (sp < 60) { BALL.vz = 0; return; }                  // just put down: it drops where it is
+  BALL.vx = vx * 0.75; BALL.vd = clamp(-vy * 0.5, -260, 300); BALL.vz = clamp(110 + Math.min(sp, 700) * 0.42, 140, 400);
+  SFX.whoosh(); FETCH.throws++;
+  if (!P.present || P.pack || /packup|departLook|arrive|gift/.test(P.mode)) return;
+  if (P.hold && P.hold !== 'ball') dropHeld();
+  wakeThen(() => setMode('fetch', null, {}));
+}
+function dropHeld() {
+  if (P.hold === 'duck') S.toyPos.duck = { x: clamp(P.x + 30 * P.face, 30, 370), d: P.d };
+  if (P.hold === 'bone') S.toyPos.bone = { x: clamp(P.x + 60 * P.face, 30, 370), d: P.d };
+  P.hold = null;
+}
+function fetchUpdate(dt) {                 // running after the ball, following it while it still moves
+  const t = S.toyPos.ball, side = Math.sign(t.x - P.x) || P.face, tx = t.x - 34 * side, dx = tx - P.x, dd = t.d - P.d, L = Math.hypot(dx, dd);
+  if (Math.abs(t.x - P.x) > 6) P.face = side;
+  const still = Math.hypot(BALL.vx, BALL.vd) < 30 && BALL.z < 4;
+  if (L < 6 && still) {                    // got it
+    P.face = side; P.hold = 'ball'; SFX.pop(); setMode('pickup', 0.35);
+    return;
+  }
+  const step = Math.min(L, HABITS.fetchSpeed * dt); if (L > 0.01) { P.x += dx / L * step; P.d += dd / L * step; }
+  if (WX.look === 'snow' && (P.walked = (P.walked || 0) + step) > HABITS.printEvery) leavePrint();
+}
+function fetchReturn() { goTo(FETCH_SPOT[0], FETCH_SPOT[1], () => faceThen(P.x < 200 ? 1 : -1, () => setMode('present', 0.7)), { speed: HABITS.fetchSpeed * 0.8 }); }
+function fetchDrop() {
+  const s = depthScale(P.d); P.hold = null; S.toyPos.ball = { x: clamp(P.x + 44 * P.face * s, ...BALL_X), d: clamp(P.d - 8, ...BALL_D) }; BALL.z = 0; writeSave(S);
+  if (FETCH.throws >= HABITS.fetchTire) { FETCH.throws = 0; setMode('pant', rand(HABITS.duration.pant)); }   // worn out: a little lie-down
+  else setMode('waitthrow', HABITS.waitThrow);
+}
+TOY_START.ball = () => wakeThen(() => { P.hold && P.hold !== 'ball' && dropHeld(); const t = S.toyPos.ball, side = Math.sign(P.x - t.x) || 1; goTo(clamp(t.x + 40 * side, 30, 370), clamp(t.d, 100, 224), () => faceThen(-side, () => setMode('waitthrow', HABITS.waitThrow))); });
 function startDeparture() {
   press = null; P.hold = null; P.pack = true; P.present = true;
   setMode('packup', 1.5);
@@ -317,7 +384,7 @@ function bagRustle() {          // the sound of a plastic bag: he comes running
   P.hold = null; goTo(200, 104, () => setMode('expect', HABITS.expectTime));
 }
 function tapParker() {
-  if (/packup|departLook|arrive/.test(P.mode) || P.pack) return;
+  if (/packup|departLook|arrive|fetch|pickup|present/.test(P.mode) || P.pack) return;
   if (P.mode === 'gift') return receiveGift();
   if (/^(sleep|nap|stir)$/.test(P.mode)) {
     // a few quick taps wake him up; one tap just makes him stir
@@ -340,7 +407,11 @@ function parkerDrawing() {
   let key, sx = P.face, lift = 0;
   switch (P.mode) {
     case 'trot': key = `trot|${(P.data.slow ? Math.floor(f / 2) : f) % 6}${pk}`; break;
-    case 'chase': key = `trot|${f % 6}`; break;
+    case 'chase': case 'fetch': key = `trot|${f % 6}`; break;
+    case 'pickup': key = 'sniff|1'; break;
+    case 'present': key = (TT - P.t0) < 0.35 ? 'sit|happy|0|0.1|0|ball' : 'sit|happy|0|0.05'; break;
+    case 'waitthrow': key = `sit|${f % 12 < 6 ? 'happy' : open}|${f % 4 < 2 ? 0.26 : -0.2}|-0.08`; break;   // wagging, looking up at you
+    case 'pant': key = `lie|pant|${Math.floor(TT * 4) % 2 ? 1.6 : 0}`; break;
     case 'catboop': { const u = TT - P.t0; key = u > 0.7 && u < 2.1 ? 'sniff|1' : `stand|calm`; break; }   // nose to nose
     case 'catbow': key = `bow|pant|${f % 4 < 2 ? 0.25 : -0.2}`; break;
     case 'catside': key = (TT - P.t0) > 3 && (TT - P.t0) < 5 ? 'sit|content|0|0.07' : `sit|${open}|0|0`; break;
@@ -466,7 +537,11 @@ function drawScene() {
       drawSprite(sprite('giftbox'), GIFTBOX.x, Y(GIFTBOX.d), { scale: depthScale(GIFTBOX.d) });
     } else if (it.toy) {
       const t = S.toyPos[it.toy], s = depthScale(t.d), k = { ball: 0.6, duck: 0.55, bone: 0.55 }[it.toy];
-      drawSprite(sprite(`item|${it.toy}|${k}`), t.x, Y(t.d) - 11 * s, { scale: s, rot: it.toy === 'ball' ? BALL.rot : 0 });
+      if (it.toy === 'ball') {                     // a paper shadow on the grass that shrinks as the ball flies higher
+        const hk = 1 / (1 + BALL.z / 40);
+        ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = `rgba(110,100,115,${0.32 * hk})`; ctx.beginPath(); ctx.ellipse(t.x + 2, Y(t.d) + 1, 13 * s * (0.5 + 0.5 * hk), 4 * s * (0.5 + 0.5 * hk), 0, 0, TAU); ctx.fill(); ctx.restore();
+        drawSprite(sprite(`item|ball|${k}`), t.x, Y(t.d) - 11 * s - BALL.z, { scale: s, rot: BALL.rot, shA: BALL.z > 2 ? 0 : 0.22 });
+      } else drawSprite(sprite(`item|${it.toy}|${k}`), t.x, Y(t.d) - 11 * s, { scale: s });
     } else if (it.f) {
       const f = it.f, s = depthScale(f.d), grow = smooth(clamp((now - f.born) / 1200)), sw = 0.035 * Math.sin(TT * 1.1 + f.id * 1.7);
       if (grow > 0) drawSprite(sprite(`dand|${f.kind}`), f.x, Y(f.d), { scale: s * lerp(0.2, 1, grow), alpha: Math.min(1, grow * 3), rot: sw });
@@ -479,6 +554,7 @@ function drawScene() {
       P.prevLift = dr.lift;
       drawSprite(sprite(dr.key), P.x, Y(P.d) - dr.lift, { sx: dr.sx, scale: s });
       if (P.mode === 'turn') glow(ctx, P.x, Y(P.d) - 50 * s, 46, '255,240,200', 0.5);
+      if (P.hold === 'ball' && !/^(sit|present|wag|tilt|sigh)$/.test(P.mode)) drawSprite(sprite('item|ball|0.42'), P.x + (P.mode === 'pickup' ? 66 : 70) * P.face * s * Math.abs(dr.sx), Y(P.d) - (P.mode === 'pickup' ? 26 : 56) * s - dr.lift, { scale: s, rot: BALL.rot });   // the ball in his mouth
       if (P.carrying && P.mode !== 'gift') drawSprite(sprite('item|card|0.5'), P.x + 64 * P.face * s * Math.abs(dr.sx), Y(P.d) - 72 * s - dr.lift, { scale: s, rot: 0.15 * P.face });   // the card in his mouth on the way
       if (P.mode === 'gift') glow(ctx, P.x, Y(P.d) - 70 * s, 70, '255,236,170', 0.25 + 0.08 * Math.sin(TT * 2.5));
       if (/^sun/.test(P.mode)) glow(ctx, P.x + 14 * P.face * s, Y(P.d) - 30 * s, 84, '255,232,170', 0.3 + 0.05 * Math.sin(TT * 1.3));   // warm in the sun
@@ -513,6 +589,7 @@ cv.addEventListener('pointerdown', e => {
   const g = giftAt(x, y); if (g) return pickGift(g);
   if (Math.abs(x - GIFTBOX.x) < 24 && y > Y(GIFTBOX.d) - 38 && y < Y(GIFTBOX.d) + 6) { S.giftNew = false; return openPanel('gifts'); }
   if (best) return collect(best);
+  if (ballGrab(x, y, e.pointerId)) { try { cv.setPointerCapture(e.pointerId); } catch (err) { } return; }
   if (P.present && onParker(x, y)) { press = { id: e.pointerId, t0: TT, x, y, dist: 0, rub: false }; try { cv.setPointerCapture(e.pointerId); } catch (err) { } return; }
   if (tapVisitor(x, y)) return;
   const mb = Y(MAILBOX.d);
@@ -521,11 +598,12 @@ cv.addEventListener('pointerdown', e => {
   if (x > HOUSE.x - 14 && x < HOUSE.x + 200 && y > hb - 150 && y < hb + 6) return openPanel('shelf');
 });
 cv.addEventListener('pointermove', e => {
+  if (FETCH.drag && e.pointerId === FETCH.drag.id) { const [x, y] = toScene(e); return ballFollow(x, y); }
   if (!press || e.pointerId !== press.id) return;
   const [x, y] = toScene(e); press.dist += Math.hypot(x - press.x, y - press.y); press.x = x; press.y = y;
 });
-cv.addEventListener('pointerup', e => { if (!press || e.pointerId !== press.id) return; press.rub ? endBelly() : tapParker(); press = null; });
-cv.addEventListener('pointercancel', () => { if (press && press.rub) endBelly(); press = null; });
+cv.addEventListener('pointerup', e => { if (FETCH.drag && e.pointerId === FETCH.drag.id) return ballThrow(); if (!press || e.pointerId !== press.id) return; press.rub ? endBelly() : tapParker(); press = null; });
+cv.addEventListener('pointercancel', () => { if (FETCH.drag) { FETCH.drag = null; } if (press && press.rub) endBelly(); press = null; });
 function checkRub() {
   if (!press || press.rub || /sleep|nap|stir|packup|departLook|arrive|gift/.test(P.mode) || P.pack) return;
   if (TT - press.t0 > HABITS.bellyRub.hold || press.dist > HABITS.bellyRub.rubDistance) {
@@ -650,7 +728,7 @@ function festGiftTick() {
   const f = S.festPending; if (!f || S.trip || !P.present || (typeof UI !== 'undefined' && UI.panel)) return;
   if (P.mode === 'gift' || (P.carrying && /trot|turn/.test(P.mode))) return;
   if (/^(sleep|nap|stir)$/.test(P.mode)) { if (!P.giftHinted) { P.giftHinted = true; showToast('toast.giftLater', 4500); } return; }   // he'll give it when he's up
-  if (P.pack || !/^(sit|lie|look|sniff|trot|sigh|eat|expect|watch|wag|tilt|hop|drowsy|shelter|flat|sunnap)$/.test(P.mode)) return;
+  if (P.pack || !/^(sit|lie|look|sniff|trot|sigh|eat|expect|watch|wag|tilt|hop|drowsy|shelter|flat|sunnap|waitthrow|pant)$/.test(P.mode)) return;
   if (P.hold === 'duck') S.toyPos.duck = { x: clamp(P.x + 30 * P.face, 30, 370), d: P.d };
   if (P.hold === 'bone') S.toyPos.bone = { x: clamp(P.x + 60 * P.face, 30, 370), d: P.d };
   P.hold = null; P.carrying = true;

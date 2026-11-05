@@ -69,6 +69,14 @@ const SFX = {
     if (!this.ok()) return; const t = this.ctx.currentTime;
     for (let i = 0; i < 8; i++) this.noise(t + i * 0.075, { dur: 0.07, v: 0.05, f: 900 + (i % 2) * 300, q: 1.3, a: 0.01 });
   },
+  // ---- toys ----
+  whoosh() {                         // a throw: a soft swish of air
+    if (!this.ok()) return; this.noise(this.ctx.currentTime, { dur: 0.28, v: 0.06, f: 700, f2: 2200, q: 1.2, a: 0.04 });
+  },
+  bounce(k = 0.5) {                  // the rubber ball landing on grass: a soft low "dup"
+    if (!this.ok()) return; const t = this.ctx.currentTime;
+    this.tone(150 + 60 * k, t, { a: 0.004, d: 0.13, v: 0.05 + 0.08 * k, to: 85 }); this.noise(t, { dur: 0.06, v: 0.03 * k, type: 'lowpass', f: 600, a: 0.003 });
+  },
   // ---- visitors (stage 4) ----
   chirp() {                          // the sparrow arrives: two quick cheeps
     if (!this.ok()) return; const t = this.ctx.currentTime;

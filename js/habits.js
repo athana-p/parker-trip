@@ -23,7 +23,7 @@ const HABITS = {
     night:   { sleep: 1 },            // from bedtime he goes to his door and sleeps
   },
   bedtime: [22, 5],                    // he sleeps from 22:00 to 05:00 (real time)
-  duration: { sit: [5, 10], sniff: [2, 4], look: [2.5, 4], lie: [8, 16], nap: [15, 30], sleep: [60, 120], chew: [8, 14], eat: [3, 5] },
+  duration: { sit: [5, 10], sniff: [2, 4], look: [2.5, 4], lie: [8, 16], nap: [15, 30], sleep: [60, 120], chew: [8, 14], eat: [3, 5], pant: [14, 22] },
   trotSpeed: 62,                       // scene units per second
   blinkEvery: [2.5, 5],                // a blink now and then while his eyes are open
   // tapped while awake: one of these (never the same twice in a row)
@@ -36,6 +36,10 @@ const HABITS = {
   // toys he owns join his free-time choices (not at night), plus a snack at his bowl
   toys: { ball: 2.5, duck: 2, bone: 1.5 }, eat: 0.8,
   ballRounds: 3,                       // pushes of the ball before he flops down for a sigh
+  // throw and fetch (you drag the ball and let go)
+  fetchSpeed: 112,                     // he runs faster after a thrown ball
+  waitThrow: 12,                       // seconds he sits wagging, waiting for the next throw
+  fetchTire: 6,                        // after this many throws he lies down to catch his breath (pant), then wants to play again
   shakeTime: 2.4,                      // shaking the plush duck side to side
   expectTime: 6,                       // sitting in front of you after hearing the bag
   // tapped while asleep: he stirs, sighs, and keeps sleeping
