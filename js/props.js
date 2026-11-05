@@ -93,6 +93,7 @@ function drawItem(c, id, s = 1) {
       break;
     }
     case 'kite': drawKite(c, true); break;
+    case 'twig': P(union(limb([-20, 4], [20, -4], 3, 2.2), limb([4, 0], [12, -10], 2, 1.4), limb([-8, 2], [-14, -6], 1.8, 1.2)), '#7a5236', 0.15); break;
     case 'rope': {                         // a tug rope: twisted blue-and-cream cotton with a fat knot at each end
       const path = [[-22, 2], [-8, -3], [8, 3], [22, -2]];
       for (let i = 0; i < path.length - 1; i++) P(slab(path[i], path[i + 1], 7), i % 2 ? '#f6efe2' : '#5b8ed1', 0.15);
@@ -135,6 +136,31 @@ function drawKite(c, tail) {
   pawPrint(c, 6, 8, 0.32, '#fff3dc');
 }
 function kiteBow(c, x, y, col, a = 0) { c.save(); c.translate(x, y); c.rotate(a); fp(c, union(poly([[0, 0], [-5, -3], [-5, 3]]), poly([[0, 0], [5, -3], [5, 3]])), col, { sh: 0.12, mul: 0.4 }); c.restore(); }
+
+// the snowman: stage 0 = a little pile of snow, 1 = the rolled base, 2 = + head and face, 3 = + twig arms. melt 0..1 slumps it
+function drawSnowman(c, stage, melt = 0) {
+  const W = '#fbfdff', Sh = '#dfe8f2', sq = 1 - melt * 0.8, wx = 1 - melt * 0.35;
+  if (stage === 0 || melt > 0.92) {                     // a pile (or what's left of one)
+    const r = stage === 0 ? 1 : 1 - (melt - 0.92) * 8;
+    if (r > 0.05) { tornPiece(c, ellipsePts(0, -5 * r, 26 * r, 9 * r, 24), W, { amp: 1.2, seed: 61, rimCol: '#ffffff', shadow: 0.16, mul: 0.2 }); piece(c, ell(4, -2 * r, 18 * r, 3.5 * r), Sh, { mul: 0.2 }); }
+    if (stage === 3) { c.save(); c.translate(10, -1); c.rotate(0.15); drawItem(c, 'twig', 0.85); c.restore(); }
+    return;
+  }
+  c.save(); c.scale(wx, sq);
+  const base = ellipsePts(0, -20, 22, 20, 30);
+  tornPiece(c, base, W, { amp: 1, seed: 62, rimCol: '#ffffff', shadow: 0.2, mul: 0.2 }); piece(c, ell(5, -8, 15, 7), Sh, { mul: 0.2 });
+  if (stage >= 2) {
+    if (stage === 3) for (const d of [-1, 1]) { c.save(); c.translate(d * 18, -48); c.rotate(d > 0 ? -0.5 : Math.PI + 0.5); drawItem(c, 'twig', 0.75); c.restore(); }
+    tornPiece(c, ellipsePts(0, -52, 15, 14, 26), W, { amp: 0.8, seed: 63, rimCol: '#ffffff', shadow: 0.18, mul: 0.2 }); piece(c, ell(4, -45, 10, 4.5), Sh, { mul: 0.2 });
+    pp(c, slab([-15, -40], [15, -40], 6), '#e2574a', 0.12); pp(c, slab([8, -40], [12, -26], 5), '#c7453a', 0.1);      // a little red scarf
+    c.fillStyle = '#3a302c'; for (const [x, y] of [[-5, -56], [5, -56]]) { c.beginPath(); c.arc(x, y, 1.9, 0, TAU); c.fill(); }
+    for (const [x, y] of [[-5, -46], [-1.7, -44.5], [1.7, -44.5], [5, -46]]) { c.beginPath(); c.arc(x, y, 0.9, 0, TAU); c.fill(); }
+    pp(c, poly([[0, -52], [12, -50], [0, -48.5]]), '#f08a3c', 0.08);                                              // carrot nose
+    blush(c, [[-9, -50], [9, -50]], 2.4, 0.4);
+    c.fillStyle = '#3a302c'; for (const y of [-30, -20]) { c.beginPath(); c.arc(0, y, 1.6, 0, TAU); c.fill(); }    // buttons
+  }
+  c.restore();
+}
 
 // souvenirs on the shelf: base of the object at y = 0
 function drawSouvenir(c, id, s = 1) {

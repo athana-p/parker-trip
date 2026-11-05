@@ -20,12 +20,13 @@ function makeSprite(fn, box, k, stick = true) {
   return { img, sh, ox: bx.ox + PAD, oy: bx.oy + PAD, w, h, stick };
 }
 const SPRITES = {
-  sit: a => [c => drawSitB(c, a[0], +a[1], { headRot: +a[2], headDy: +(a[3] || 0), pack: a[4] === 'pack', mouth: ['duck', 'card', 'simit', 'ball', 'rope'].includes(a[4]) ? a[4] : null }), BOX_SIT, K_DOG],
+  sit: a => [c => drawSitB(c, a[0], +a[1], { headRot: +a[2], headDy: +(a[3] || 0), pack: a[4] === 'pack', mouth: ['duck', 'card', 'simit', 'ball', 'rope', 'twig'].includes(a[4]) ? a[4] : null }), BOX_SIT, K_DOG],
   item: a => [c => drawItem(c, a[0], +a[1]), { w: 44, h: 44, ox: 22, oy: 22 }, 1, false],
   bow: a => [c => drawPlayBowB(c, a[0], { wag: +(a[1] || 0) }), BOX_BOW, K_DOG],
   dust: a => [c => tornPiece(c, ellipsePts(0, 0, 3 + (+a[1]), 2 + (+a[1]) * 0.6, 10), a[0], { amp: 0.5, seed: 30 + (+a[1]), rim: 0, shadow: 0.15, mul: 0.3 }), { w: 14, h: 12, ox: 7, oy: 6 }, 1, false],
   kite: () => [c => drawKite(c, false), { w: 50, h: 70, ox: 25, oy: 35 }, 1, false],
   kitebow: a => [c => kiteBow(c, 0, 0, a[0]), { w: 16, h: 12, ox: 8, oy: 6 }, 1, false],
+  snowman: a => [c => drawSnowman(c, +a[0], +a[1] / 10), { w: 90, h: 100, ox: 45, oy: 84 }, 1.4, false],
   confetti: a => [c => tornPiece(c, [[-3, -1.6], [3, -2], [2.6, 1.8], [-2.8, 1.4]], a[0], { amp: 0.4, seed: 3, rim: 0, shadow: 0.12, mul: 0.3 }), { w: 10, h: 8, ox: 5, oy: 4 }, 1, false],
   bird: a => [c => drawBird(c, +a[0]), { w: 60, h: 60, ox: 30, oy: 48 }, 1, false],
   ncat: a => [c => drawNeighborCat(c, a[0]), BOX_NCAT, 0.62],
@@ -146,6 +147,7 @@ function pickNext() {
   if (!asleep) { for (const t of S.toys) if (HABITS.toys[t]) w[t] = HABITS.toys[t]; w.eat = HABITS.eat; }
   if (P.wet) return shakeOff();
   if (!asleep && S.gifts.length) w.sniffgift = HABITS.giftSniff;
+  if (!asleep && S.snowman && !S.snowman.twig && S.snowman.stage >= 1) w.sniffsnowman = HABITS.snowmanSniff;
   const rule = !asleep && !company && HABITS.weather[WX.hot ? 'hot' : WX.kind];
   if (rule && !P.want) {
     for (const k in w) w[k] *= rule.calm;
@@ -162,6 +164,7 @@ function pickNext() {
   if (k === 'trot') { const [x, d] = randomSpot(); return goTo(x, d, Math.random() < 0.45 ? () => setMode('sniff', rand(HABITS.duration.sniff)) : null); }
   if (k === 'sigh') return setMode('sigh', HABITS.sighTime, { lie: false });
   if (WX_ACTS[k]) return WX_ACTS[k]();
+  if (k === 'sniffsnowman') { const m = S.snowman, side = Math.sign(m.x - P.x) || 1; return goTo(clamp(m.x - 62 * side, 30, 370), clamp(m.d - 2, 100, 224), () => faceThen(side, () => setMode('sniff', rand([2.5, 4])))); }
   if (k === 'sniffgift') { const g = S.gifts[Math.floor(Math.random() * S.gifts.length)], side = Math.sign(g.x - P.x) || 1; return goTo(clamp(g.x - 46 * side, 40, 360), clamp(g.d, 100, 224), () => faceThen(side, () => setMode('sniff', rand([2.5, 4])))); }
   if (k === 'sleep') { if (Math.hypot(P.x - BED[0], P.d - BED[1]) > 6) return goTo(BED[0], BED[1], () => faceThen(1, () => setMode('sleep', rand(HABITS.duration.sleep)))); return setMode('sleep', rand(HABITS.duration.sleep)); }
   setMode(k, rand(HABITS.duration[k]));
@@ -292,6 +295,7 @@ function updateParker(dt) {
   else if (P.mode === 'bubblehop' || P.mode === 'bubblewait') bubbleNext();
   else if (P.mode === 'yarnbat') yarnAfter();
   else if (P.mode === 'ropewin') ropeDrop();
+  else if (P.mode === 'twigput') twigPut();
   else if (P.mode === 'temari') setMode('wag', HABITS.reactionTime.wag);
   else if (P.mode === 'pickup') fetchReturn();
   else if (P.mode === 'present') fetchDrop();
@@ -414,7 +418,7 @@ function bagRustle() {          // the sound of a plastic bag: he comes running
   P.hold = null; goTo(200, 104, () => setMode('expect', HABITS.expectTime));
 }
 function tapParker() {
-  if (/packup|departLook|arrive|fetch|pickup|present|bubble|tug|ropewin/.test(P.mode) || P.pack) return;
+  if (/packup|departLook|arrive|fetch|pickup|present|bubble|tug|ropewin|twigput/.test(P.mode) || P.hold === 'twig' || P.pack) return;
   if (P.mode === 'gift') return receiveGift();
   if (/^(sleep|nap|stir)$/.test(P.mode)) {
     // a few quick taps wake him up; one tap just makes him stir
@@ -439,6 +443,7 @@ function parkerDrawing() {
     case 'trot': key = `trot|${(P.data.slow ? Math.floor(f / 2) : f) % 6}${pk}`; break;
     case 'chase': case 'fetch': case 'bubblego': case 'yarnchase': key = `trot|${f % 6}`; break;
     case 'kitechase': { const h = P.data.hopT0 != null ? clamp((TT - P.data.hopT0) / 0.6) : 1; if (h < 1) { lift = 28 * Math.sin(Math.PI * h); key = 'sit|happy|0|-0.36'; } else key = P.data.run ? `trot|${f % 6}` : `sit|happy|${f % 4 < 2 ? 0.22 : -0.16}|-0.3`; break; }
+    case 'twigput': key = (TT - P.t0) < 0.5 ? 'sit|happy|0|0.1|0|twig' : 'sit|happy|0.2|0.05'; break;
     case 'tug': key = `tug|${f % 4 < 2 ? 0 : 1}`; break;
     case 'ropewin': key = `sit|happy|0|${f % 4 < 2 ? -0.24 : 0.24}|0|rope`; break;      // shaking the rope he won
     case 'yarnbat': key = `bat|${(TT - P.t0) > 0.12 && (TT - P.t0) < 0.4 ? 1 : 0}`; break;
@@ -561,6 +566,7 @@ function drawScene() {
   for (const g of S.gifts) items.push({ d: g.d, g });
   if (VIS.on && VIS.kind !== 'sparrow') items.push({ d: VIS.d, vis: true });
   items.push({ d: GIFTBOX.d, box: true });
+  if (S.snowman) items.push({ d: S.snowman.d, snowman: true });
   items.sort((a, b) => b.d - a.d);
   const now = Clock.now();
   for (const it of items) {
@@ -571,6 +577,7 @@ function drawScene() {
     } else if (it.vis) {
       const s = depthScale(VIS.d), dr = visitorDrawing();
       drawSprite(sprite(dr.key), VIS.x, Y(VIS.d) - dr.lift, { sx: VIS.face, scale: s });
+    } else if (it.snowman) { drawSnowmanItem();
     } else if (it.box) {
       if (S.giftNew) glow(ctx, GIFTBOX.x, Y(GIFTBOX.d) - 14, 34, '255,236,170', 0.35 + 0.1 * Math.sin(TT * 2));
       drawSprite(sprite('giftbox'), GIFTBOX.x, Y(GIFTBOX.d), { scale: depthScale(GIFTBOX.d) });
@@ -593,6 +600,7 @@ function drawScene() {
       P.prevLift = dr.lift;
       drawSprite(sprite(dr.key), P.x, Y(P.d) - dr.lift, { sx: dr.sx, scale: s });
       if (P.mode === 'turn') glow(ctx, P.x, Y(P.d) - 50 * s, 46, '255,240,200', 0.5);
+      if (P.hold === 'twig' && !/^(twigput)$/.test(P.mode)) drawSprite(sprite('item|twig|0.55'), P.x + (P.mode === 'sniff' ? 66 : 70) * P.face * s * Math.abs(dr.sx), Y(P.d) - (P.mode === 'sniff' ? 26 : 56) * s - dr.lift, { scale: s, sx: P.face, rot: 0.1 });
       if (P.hold === 'ball' && !/^(sit|present|wag|tilt|sigh)$/.test(P.mode)) drawSprite(sprite('item|ball|0.42'), P.x + (P.mode === 'pickup' ? 66 : 70) * P.face * s * Math.abs(dr.sx), Y(P.d) - (P.mode === 'pickup' ? 26 : 56) * s - dr.lift, { scale: s, rot: BALL.rot });   // the ball in his mouth
       if (P.carrying && P.mode !== 'gift') drawSprite(sprite('item|card|0.5'), P.x + 64 * P.face * s * Math.abs(dr.sx), Y(P.d) - 72 * s - dr.lift, { scale: s, rot: 0.15 * P.face });   // the card in his mouth on the way
       if (P.mode === 'gift') glow(ctx, P.x, Y(P.d) - 70 * s, 70, '255,236,170', 0.25 + 0.08 * Math.sin(TT * 2.5));
@@ -633,6 +641,7 @@ cv.addEventListener('pointerdown', e => {
   const g = giftAt(x, y); if (g) return pickGift(g);
   if (Math.abs(x - GIFTBOX.x) < 24 && y > Y(GIFTBOX.d) - 38 && y < Y(GIFTBOX.d) + 6) { S.giftNew = false; return openPanel('gifts'); }
   if (best) return collect(best);
+  if (snowmanTap(x, y)) return;
   if (toyTapAt(x, y)) return;
   if (ropeGrab(x, y, e.pointerId)) { try { cv.setPointerCapture(e.pointerId); } catch (err) { } return; }
   if (ballGrab(x, y, e.pointerId)) { try { cv.setPointerCapture(e.pointerId); } catch (err) { } return; }
@@ -749,6 +758,7 @@ function boot() {
 window.__advance = secs => { for (let i = 0; i < secs * 30; i++) { TT += 1 / 30; checkRub(); updateParker(1 / 30); updateBall(1 / 30); updateVisitor(1 / 30); updateBubbles(1 / 30); updateYarn(1 / 30); updateKite(1 / 30); updateChase(1 / 30); updateWeather(1 / 30, WX, V.H, TT); parkerExtras(); catPlayTick(); sayTick(); updateFX(1 / 30); } drawScene(); };
 // time of day or weather changed: rebuild the backdrop (it cross-fades), switch the weather sounds
 function wxCheck() {
+  snowmanTick();
   const tod = currentTod(), wx = weatherNow();
   if (tod === TOD && wx.key === WX.key) return;
   if (wx.look !== WX.look) PRINTS.length = 0;
@@ -1020,6 +1030,44 @@ function drawFlyingKite() {
   const cols = ['#f5c04a', '#5b8ed1', '#e2574a'];
   KITE.tail.forEach((p, i) => { const s = sprite(`kitebow|${cols[i % 3]}`); drawSprite(s, p[0], p[1], { rot: Math.sin(TT * 5 + i) * 0.5, shA: 0.12, scale: 1.3 }); });
   drawSprite(sprite('kite'), KITE.x, KITE.y, { rot: KITE.rot, scale: 1.45 });
+}
+// ---------- 6. the snowman (free): a snow pile appears when there's snow on the ground. Three taps: base, head, his twig arms ----------
+const SNOWMAN_SPOT = { x: 300, d: 176 }, MELT_MS = 2 * 3600000, SNOWPOP = { t0: -9 };
+function snowmanTick() {                 // appear with the snow, melt slowly without it (game-clock time, so it melts while closed too)
+  const now = Clock.now(), snowy = WX.look === 'snow', m = S.snowman;
+  if (snowy && (!m || m.twig)) { S.snowman = { stage: 0, x: SNOWMAN_SPOT.x, d: SNOWMAN_SPOT.d, meltFrom: null, melt: 0 }; writeSave(S); return; }
+  if (!m || m.twig) return;
+  if (snowy) { if (m.meltFrom) { m.meltFrom = null; writeSave(S); } return; }
+  if (!m.meltFrom) { m.meltFrom = now - (m.melt || 0) * MELT_MS; writeSave(S); }
+  m.melt = clamp((now - m.meltFrom) / MELT_MS);
+  if (m.melt >= 1) { S.snowman = m.stage === 3 ? { twig: true, x: m.x, d: m.d } : null; writeSave(S); }
+}
+function snowmanTap(x, y) {
+  const m = S.snowman; if (!m || m.twig || m.meltFrom || m.stage >= 3) return false;
+  const s = depthScale(m.d), h = m.stage === 0 ? 28 : m.stage === 1 ? 64 : 110;
+  if (Math.abs(x - m.x) > 40 * s || y < Y(m.d) - h * s || y > Y(m.d) + 8) return false;
+  if (m.stage === 2) {                   // the arms need Parker: he fetches a twig from under the bushes
+    if (!P.present) { showToast('snowman.wait', 2500); return true; }
+    if (P.hold === 'twig' || /^twig/.test(P.mode)) return true;
+    if (P.hold && P.hold !== 'twig') dropHeld();
+    wakeThen(() => goTo(222, 226, () => setMode('sniff', 1.2, { next: () => { P.hold = 'twig'; SFX.pop(); const side = Math.sign(m.x - P.x) || 1; goTo(clamp(m.x - 62 * side, 30, 370), m.d - 2, () => faceThen(side, () => setMode('twigput', 0.9))); } })));
+    return true;
+  }
+  m.stage++; writeSave(S); SNOWPOP.t0 = TT; SFX.crunch();
+  dustPuff(m.x, Y(m.d), 8);
+  return true;
+}
+function twigPut() {
+  const m = S.snowman; P.hold = null; if (m && !m.twig) { m.stage = 3; writeSave(S); SNOWPOP.t0 = TT; SFX.crunch(); }
+  const [hx, hy] = parkerCenter(); fx({ type: 'glow', x: m ? m.x : hx, y: m ? Y(m.d) - 50 : hy, life: 0.8, r: 50, rgb: '255,250,235' });
+  for (let i = 0; i < 2; i++) fx({ type: 'spr', key: 'heart', x: hx + (i - 0.5) * 24, y: hy - 40, vy: -30, delay: i * 0.2, sway: i, life: 1.3 });
+  setMode('wag', HABITS.reactionTime.wag);
+}
+function drawSnowmanItem() {
+  const m = S.snowman, s = depthScale(m.d);
+  if (m.twig) return drawSprite(sprite('item|twig|0.8'), m.x + 6, Y(m.d) - 3, { scale: s, rot: 0.12 });
+  const u = clamp((TT - SNOWPOP.t0) / 0.5), pop = u < 1 ? [0.5, 0.8, 1.08, 0.97, 1, 1][Math.floor(u * 6)] : 1;   // rolls in on twos
+  drawSprite(sprite(`snowman|${m.stage}|${Math.round((m.melt || 0) * 10)}`), m.x, Y(m.d), { scale: s * pop });
 }
 // ---------- home from a trip: one short line in a little paper speech bubble above his head ----------
 const SAY = { on: false };

@@ -88,6 +88,10 @@ const SFX = {
     if (!this.ok()) return; const t = this.ctx.currentTime;
     for (let i = 0; i < 4; i++) this.noise(t + i * 0.06, { dur: 0.05, v: 0.04 * k, f: 1500 + i * 200, q: 1.5, a: 0.005 });
   },
+  crunch() {                         // packing snow: a soft crunchy squeak
+    if (!this.ok()) return; const t = this.ctx.currentTime;
+    for (let i = 0; i < 3; i++) this.noise(t + i * 0.07, { dur: 0.08, v: 0.06, f: 2400 - i * 300, q: 2, a: 0.006 });
+  },
   pat() {                            // a paw patting the yarn: a soft woolly "pff"
     if (!this.ok()) return; const t = this.ctx.currentTime;
     this.noise(t, { dur: 0.09, v: 0.07, type: 'lowpass', f: 700, a: 0.004 }); this.tone(240, t, { a: 0.003, d: 0.07, v: 0.03, to: 160 });
