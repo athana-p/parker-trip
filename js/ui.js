@@ -62,7 +62,7 @@ function renderShop(body) {
   for (const c of CATS) { const b = el('button', 'tab' + (UI.cat === c ? ' on' : ''), T('ui.cat.' + c)); b.onclick = () => { UI.cat = c; renderPanel(); }; tabs.append(b); }
   body.append(tabs);
   const list = el('div', 'items');
-  for (const it of ITEMS.filter(i => i.cat === UI.cat)) {
+  for (const it of ITEMS.filter(i => i.cat === UI.cat && !i.friend)) {
     const row = el('div', 'item'), owned = it.cat === 'toy' && S.toys.includes(it.id), have = S.inv[it.id] || 0;
     const txt = el('div', 'item-text'); txt.append(el('div', 'item-name', T('item.' + it.id)), el('div', 'item-desc', T('item.' + it.id + '.d')));
     if (have) txt.append(el('div', 'item-have', T('ui.have', LANG, { n: have })));
@@ -89,11 +89,28 @@ function renderPack(body) {
     slots.append(b);
   }
   body.append(slots, el('p', 'note', T(S.pack.food ? 'ui.pack.ready' : 'ui.pack.note')));
+  renderToyList(body);
   body.append(el('h3', 'sub', T('ui.inv')));
   const inv = ITEMS.filter(i => i.cat !== 'toy' && S.inv[i.id] > 0);
   if (!inv.length) { body.append(el('p', 'note', T('ui.inv.none'))); return; }
   const grid = el('div', 'inv');
   for (const it of inv) { const b = el('button', 'inv-item'); b.append(itemIcon(it.id, 46), el('div', 'inv-name', T('item.' + it.id)), el('div', 'inv-count', '×' + S.inv[it.id])); b.onclick = () => { packItem(it.id); renderPanel(); }; grid.append(b); }
+  body.append(grid);
+}
+// his toys: tap one and he goes to play with it. Toys from friends wear a little "friend" tag; some wait for the weather.
+function toyStatus(id) { const w = ITEM[id] && ITEM[id].weather; return w && !toyWeatherOk(id) ? T('ui.toy.wait.' + w) : null; }
+function renderToyList(body) {
+  if (!S.toys.length) return;
+  body.append(el('h3', 'sub', T('ui.toys')));
+  const grid = el('div', 'inv');
+  for (const id of S.toys) {
+    const it = ITEM[id] || {}, wait = toyStatus(id), b = el('button', 'inv-item' + (wait ? ' waiting' : ''));
+    b.append(itemIcon(id, 46), el('div', 'inv-name', T('item.' + id)));
+    if (it.friend) b.append(el('div', 'toy-friend', '♥ ' + T('ui.toy.friend')));
+    b.append(el('div', 'inv-count', wait || T('ui.toy.play')));
+    b.onclick = () => { if (wait) { showToast('ui.toy.wait.' + it.weather, 2000); return; } closePanel(); playToy(id); };
+    grid.append(b);
+  }
   body.append(grid);
 }
 function renderMail(body) {
@@ -342,6 +359,7 @@ function buildDebug(force) {
   const fests = el('div', 'dbg-row');
   for (const f of FESTIVALS) { const b = el('button', 'dbg-b', T('fest.' + f.id)); b.onclick = () => { const y = new Date(Clock.now()).getFullYear(); let t = null; for (const yr of [y, y + 1, y + 2]) { t = festFirstDay(f.id, yr); if (t && t + 7 * 864e5 > Clock.now() - 864e5) break; } if (t) jumpTo(t + 18 * 3600000); }; fests.append(b); }
   const mt = el('button', 'dbg-b', T('dbg.meet')); mt.onclick = () => { const f = (S.trip && friendAt(S.trip.dest)) || (FRIENDS.find(f => !(S.friends[f.id] && S.friends[f.id].card)) || FRIENDS[Math.floor(Math.random() * FRIENDS.length)]).id; metFriend(f, Clock.now()).count++; S.mail.push({ dest: 'meet-' + f, meet: f, at: Clock.now() }); writeSave(S); showToast('toast.mail', 3000); }; fests.append(mt);
+  const at = el('button', 'dbg-b', T('dbg.allToys')); at.onclick = () => { for (const it of ITEMS) if (it.cat === 'toy' && !S.toys.includes(it.id)) { S.toys.push(it.id); S.toyPos[it.id] = { ...TOY_SPOTS[it.id] }; } writeSave(S); if (UI.panel) renderPanel(); }; acts.append(at);
   const vr = el('div', 'dbg-row'); vr.append(el('b', '', T('dbg.visit')));
   for (const v of ['sparrow', 'cat', 'squirrel']) { const b = el('button', 'dbg-b', T('vis.' + v)); b.onclick = () => { VIS.on = false; startVisit(v, true); }; vr.append(b); }
   const off = el('button', 'dbg-b', T('dbg.away8')); off.onclick = () => { S.lastGiftAt = 0; const n = offlineVisits(Clock.now() - 8 * 3600000, Clock.now()); showToast(n ? 'toast.giftsWaiting' : 'dbg.noneLeft', 3000); }; vr.append(off);

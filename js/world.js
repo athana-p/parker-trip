@@ -55,6 +55,7 @@ function endTrip(at) {
   const t = S.trip; let got = null;
   if (t.souvenir && !S.shelf.some(s => s.id === t.dest)) { got = t.dest; S.shelf.push({ id: t.dest, at, isNew: true }); }
   if (t.friend) { const f = metFriend(t.friend, at); f.count++; }
+  S.homeSay = { dest: t.dest, friend: t.friend || null };     // he says something about it once he's home and awake
   S.lastDest = t.dest; S.trip = null;
   return got;
 }

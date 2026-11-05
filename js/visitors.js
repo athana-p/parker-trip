@@ -16,14 +16,16 @@ function ncatHead(c, x, y, s, closed) {
   c.restore();
 }
 function ncatCollar(c, a, b) { pp(c, slab(a, b, 5), NCAT.collar, 0.1); const m = [(a[0] + b[0]) / 2 + 2, (a[1] + b[1]) / 2 + 4]; pp(c, circ(m[0], m[1], 3.6), NCAT.bell, 0.12); piece(c, rectP(m[0] - 2.4, m[1] + 0.5, 4.8, 0.9), '#b8862a', { mul: 0.3 }); }
-// pose: 'sit' | 'blink' (sitting, tail round the paws) | 'walk0' / 'walk1' (side view, two drawings held on twos)
+// pose: 'sit' | 'blink' (sitting, tail round the paws) | 'swat' (sitting, one paw up at Parker) | 'walk0' / 'walk1' (side view)
 function drawNeighborCat(c, pose = 'sit') {
-  if (pose === 'sit' || pose === 'blink') {
+  if (pose === 'sit' || pose === 'blink' || pose === 'swat') {
     const tl = new Path2D(); tl.moveTo(-24, -12); tl.quadraticCurveTo(-44, 0, -18, 3); tl.lineTo(22, 3); tl.lineTo(22, -5); tl.lineTo(-16, -5); tl.quadraticCurveTo(-32, -7, -18, -14); tl.closePath(); pp(c, tl, NCAT.fur, 0.15);
     clipped(c, tl, () => { for (const x of [-30, -14, 2, 14]) piece(c, rectP(x, -12, 4, 18), NCAT.dark, { mul: 0.4 }); });
     const body = union(ell(0, -40, 25, 36), ell(-6, -16, 27, 16)); pp(c, body, NCAT.fur, 0.2);
     clipped(c, body, () => { for (const y of [-60, -46, -32]) piece(c, slab([-30, y], [-10, y - 6], 5), NCAT.dark, { mul: 0.4 }); piece(c, ell(14, -44, 13, 26), NCAT.light, { mul: 0.3 }); });
-    for (const dx of [4, 17]) pp(c, union(limb([dx, -38], [dx + 1, -6], 9, 8), ell(dx + 2, -5, 7, 4.5)), NCAT.light, 0.14);
+    pp(c, union(limb([4, -38], [5, -6], 9, 8), ell(6, -5, 7, 4.5)), NCAT.light, 0.14);
+    if (pose === 'swat') pp(c, union(limb([17, -40], [36, -58], 9, 8), circ(38, -60, 6.5)), NCAT.light, 0.14);   // a soft paw-pat
+    else pp(c, union(limb([17, -38], [18, -6], 9, 8), ell(19, -5, 7, 4.5)), NCAT.light, 0.14);
     ncatCollar(c, [-6, -70], [26, -66]);
     ncatHead(c, 8, -90, 0.9, pose === 'blink');
     return;
@@ -38,7 +40,7 @@ function drawNeighborCat(c, pose = 'sit') {
   ncatCollar(c, [20, -52], [34, -40]);
   ncatHead(c, 36, -60, 0.72, false);
 }
-const BOX_NCAT = { w: 130, h: 130, ox: 62, oy: 118 };
+const BOX_NCAT = { w: 140, h: 172, ox: 66, oy: 154 };   // tall enough for her ears when she sits
 
 // ---------- the squirrel: a red squirrel with ear tufts and a big plume of a tail ----------
 const SQ = { fur: '#c8743a', dark: '#9c5428', light: '#f6e2c4', tail: '#d4844a', tip: '#e9a868', nut: '#8a5a2e' };

@@ -56,7 +56,9 @@ const HABITS = {
   slowSpeed: 24,                       // walking in the fog
   chaseSpeed: 108,                     // after a blown leaf
   noseSnow: 9,                         // seconds the snow stays on his nose
-  giftSniff: 1.2,                      // a visitor's gift lying in the yard: he goes over to sniff it (stage 4)
+  giftSniff: 1.2,
+  // the neighbour's cat comes by while he's home: they say hello (nose boop / he play-bows, she pats his nose / sit side by side)
+  catPlay: { boop: 3, bow: 2, side: 2 }, catPlayChance: 0.8,                      // a visitor's gift lying in the yard: he goes over to sniff it (stage 4)
   printEvery: 13,                      // a paw print every this many scene units walked in snow
 };
 
