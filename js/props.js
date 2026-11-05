@@ -92,6 +92,13 @@ function drawItem(c, id, s = 1) {
       c.save(); c.globalAlpha = 0.45; piece(c, circ(7, -23, 5.6), '#dff3ff', { mul: 0.2 }); c.restore();
       break;
     }
+    case 'rope': {                         // a tug rope: twisted blue-and-cream cotton with a fat knot at each end
+      const path = [[-22, 2], [-8, -3], [8, 3], [22, -2]];
+      for (let i = 0; i < path.length - 1; i++) P(slab(path[i], path[i + 1], 7), i % 2 ? '#f6efe2' : '#5b8ed1', 0.15);
+      c.save(); c.strokeStyle = 'rgba(40,60,100,0.35)'; c.lineWidth = 1; for (let x = -18; x < 20; x += 5) { c.beginPath(); c.moveTo(x, -3); c.lineTo(x + 3, 3); c.stroke(); } c.restore();
+      for (const [x, y] of [[-24, 2], [24, -2]]) { P(circ(x, y, 6.5), '#5b8ed1'); piece(c, ell(x, y, 6, 2.2, 0.6), '#f6efe2', { mul: 0.3 }); for (let k = -1; k <= 1; k++) P(limb([x + Math.sign(x) * 5, y + k * 2], [x + Math.sign(x) * 11, y + k * 3.5], 1.6, 1.2), '#f6efe2', 0.05); }
+      break;
+    }
     case 'yarn': {                         // a ball of red yarn from Simit, with a loose end
       const B = circ(0, 0, 17); P(B, '#d9564a', 0.25);
       clipped(c, B, () => { c.strokeStyle = 'rgba(150,40,40,0.55)'; c.lineWidth = 1.3; for (let i = -3; i <= 3; i++) { c.beginPath(); c.ellipse(0, 0, 18, 6 + Math.abs(i) * 2, 0.5 + i * 0.32, 0, TAU); c.stroke(); } piece(c, ell(-6, -7, 6, 3, -0.6), '#f08a7e', { mul: 0.2 }); });

@@ -77,6 +77,13 @@ const SFX = {
     if (!this.ok()) return; const t = this.ctx.currentTime;
     this.tone(150 + 60 * k, t, { a: 0.004, d: 0.13, v: 0.05 + 0.08 * k, to: 85 }); this.noise(t, { dur: 0.06, v: 0.03 * k, type: 'lowpass', f: 600, a: 0.003 });
   },
+  growl() {                          // a playful little tug-of-war growl: low, soft, rumbly
+    if (!this.ok()) return; const c = this.ctx, t = c.currentTime, s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain(), lfo = c.createOscillator(), lg = c.createGain();
+    s.buffer = this.noiseBuf; s.loop = true; f.type = 'lowpass'; f.frequency.value = 340; f.Q.value = 3;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.09, t + 0.08); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+    lfo.frequency.value = 26; lg.gain.value = 0.05; lfo.connect(lg); lg.connect(g.gain);
+    s.connect(f); f.connect(g); g.connect(this.master); s.start(t, Math.random()); lfo.start(t); s.stop(t + 0.65); lfo.stop(t + 0.65);
+  },
   pat() {                            // a paw patting the yarn: a soft woolly "pff"
     if (!this.ok()) return; const t = this.ctx.currentTime;
     this.noise(t, { dur: 0.09, v: 0.07, type: 'lowpass', f: 700, a: 0.004 }); this.tone(240, t, { a: 0.003, d: 0.07, v: 0.03, to: 160 });

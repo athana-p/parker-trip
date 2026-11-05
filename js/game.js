@@ -20,7 +20,7 @@ function makeSprite(fn, box, k, stick = true) {
   return { img, sh, ox: bx.ox + PAD, oy: bx.oy + PAD, w, h, stick };
 }
 const SPRITES = {
-  sit: a => [c => drawSitB(c, a[0], +a[1], { headRot: +a[2], headDy: +(a[3] || 0), pack: a[4] === 'pack', mouth: ['duck', 'card', 'simit', 'ball'].includes(a[4]) ? a[4] : null }), BOX_SIT, K_DOG],
+  sit: a => [c => drawSitB(c, a[0], +a[1], { headRot: +a[2], headDy: +(a[3] || 0), pack: a[4] === 'pack', mouth: ['duck', 'card', 'simit', 'ball', 'rope'].includes(a[4]) ? a[4] : null }), BOX_SIT, K_DOG],
   item: a => [c => drawItem(c, a[0], +a[1]), { w: 44, h: 44, ox: 22, oy: 22 }, 1, false],
   bow: a => [c => drawPlayBowB(c, a[0], { wag: +(a[1] || 0) }), BOX_BOW, K_DOG],
   dust: a => [c => tornPiece(c, ellipsePts(0, 0, 3 + (+a[1]), 2 + (+a[1]) * 0.6, 10), a[0], { amp: 0.5, seed: 30 + (+a[1]), rim: 0, shadow: 0.15, mul: 0.3 }), { w: 14, h: 12, ox: 7, oy: 6 }, 1, false],
@@ -35,6 +35,7 @@ const SPRITES = {
   trot: a => [c => drawStandB(c, { ...trotPose(+a[0]), pack: a[1] === 'pack' }), BOX_STAND, K_DOG],
   stand: a => [c => drawStandB(c, { ...STAND0, expr: a[0], pack: a[1] === 'pack' }), BOX_STAND, K_DOG],
   bat: a => [c => drawStandB(c, { ...STAND0, wag: 0.15, legs: { ...STAND0.legs, fn: +a[0] ? { a: 0.95, lift: 16 } : { a: 0.2, lift: 4 } }, head: { view: 'side', dx: 4, dy: 18, rot: 0.25 }, expr: 'happy' }), BOX_STAND, K_DOG],
+  tug: a => [c => drawStandB(c, { ...STAND0, tilt: -0.1 - (+a[0]) * 0.03, bob: 3, wag: 0.2 * (+a[0] ? 1 : -1), legs: { fn: { a: 0.55, lift: 0 }, ff: { a: 0.45, lift: 0 }, hn: { a: -0.45, lift: 0 }, hf: { a: -0.38, lift: 0 } }, head: { view: 'side', dx: 6, dy: 14, rot: 0.18 + (+a[0]) * 0.06 }, expr: 'happy' }), BOX_STAND, K_DOG],
   nosepush: a => [c => drawStandB(c, { ...trotPose(+a[0]), head: { view: 'side', dx: 8, dy: 30, rot: 0.38 }, expr: 'happy' }), BOX_STAND, K_DOG],
   sniff: a => [c => drawStandB(c, sniffPose(+a[0])), BOX_STAND, K_DOG],
   look: a => [c => drawStandB(c, { ...lookBackPose(+a[0]), pack: a[1] === 'pack' }), BOX_STAND, K_DOG],
@@ -152,6 +153,7 @@ function pickNext() {
   if (k === 'ball') return playBall(0);
   if (k === 'yarn') return yarnGo(0);
   if (k === 'temari') return temariGo();
+  if (k === 'rope') { const t = S.toyPos.rope, side = Math.sign(t.x - P.x) || 1; return goTo(clamp(t.x - 40 * side, 30, 370), clamp(t.d, 100, 224), () => faceThen(side, () => { P.hold = 'rope'; setMode('ropewin', HABITS.ropeShake); })); }
   if (k === 'duck') { const t = S.toyPos.duck, side = Math.sign(t.x - P.x) || 1; return goTo(clamp(t.x - 36 * side, 40, 360), t.d, () => faceThen(side, () => { P.hold = 'duck'; setMode('shake', HABITS.shakeTime); })); }
   if (k === 'bone') { const t = S.toyPos.bone, side = Math.sign(t.x - P.x) || 1; return goTo(clamp(t.x - 64 * side, 40, 360), clamp(t.d, 100, 224), () => faceThen(side, () => { P.hold = 'bone'; setMode('chew', rand(HABITS.duration.chew)); })); }
   if (k === 'eat') return goTo(160, 226, () => faceThen(1, () => setMode('eat', rand(HABITS.duration.eat))));
@@ -172,7 +174,7 @@ function playToy(id) {
   wakeThen(() => { P.want = id; pickNext(); });
 }
 const TOY_START = {};
-const TOY_K = { ball: 0.6, duck: 0.55, bone: 0.55, bubbles: 0.95, yarn: 0.64, temari: 0.66 };      // how big each toy is drawn on the grass
+const TOY_K = { ball: 0.6, duck: 0.55, bone: 0.55, bubbles: 0.95, yarn: 0.64, temari: 0.66, rope: 0.8 };      // how big each toy is drawn on the grass
 // toys you tap in the yard (bubble machine, kite, sprinkler…): toy id → what happens
 const TOY_TAP = {};
 function toyTapAt(x, y) {
@@ -259,6 +261,7 @@ function updateParker(dt) {
   if (P.mode === 'fetch') return fetchUpdate(dt);
   if (P.mode === 'bubblego') return bubbleUpdate(dt);
   if (P.mode === 'yarnchase') return yarnChase(dt);
+  if (P.mode === 'tug') return tugUpdate(dt);
   if (P.mode === 'yarnbat') yarnBatTick();
   if (P.mode === 'temari') temariUpdate(dt);
   if (P.mode === 'bubblehop') bubbleHopTick();
@@ -285,6 +288,7 @@ function updateParker(dt) {
   else if (/^cat(boop|bow|side)$/.test(P.mode)) catPlayEnd();
   else if (P.mode === 'bubblehop' || P.mode === 'bubblewait') bubbleNext();
   else if (P.mode === 'yarnbat') yarnAfter();
+  else if (P.mode === 'ropewin') ropeDrop();
   else if (P.mode === 'temari') setMode('wag', HABITS.reactionTime.wag);
   else if (P.mode === 'pickup') fetchReturn();
   else if (P.mode === 'present') fetchDrop();
@@ -407,7 +411,7 @@ function bagRustle() {          // the sound of a plastic bag: he comes running
   P.hold = null; goTo(200, 104, () => setMode('expect', HABITS.expectTime));
 }
 function tapParker() {
-  if (/packup|departLook|arrive|fetch|pickup|present|bubble/.test(P.mode) || P.pack) return;
+  if (/packup|departLook|arrive|fetch|pickup|present|bubble|tug|ropewin/.test(P.mode) || P.pack) return;
   if (P.mode === 'gift') return receiveGift();
   if (/^(sleep|nap|stir)$/.test(P.mode)) {
     // a few quick taps wake him up; one tap just makes him stir
@@ -431,6 +435,8 @@ function parkerDrawing() {
   switch (P.mode) {
     case 'trot': key = `trot|${(P.data.slow ? Math.floor(f / 2) : f) % 6}${pk}`; break;
     case 'chase': case 'fetch': case 'bubblego': case 'yarnchase': key = `trot|${f % 6}`; break;
+    case 'tug': key = `tug|${f % 4 < 2 ? 0 : 1}`; break;
+    case 'ropewin': key = `sit|happy|0|${f % 4 < 2 ? -0.24 : 0.24}|0|rope`; break;      // shaking the rope he won
     case 'yarnbat': key = `bat|${(TT - P.t0) > 0.12 && (TT - P.t0) < 0.4 ? 1 : 0}`; break;
     case 'temari': key = `nosepush|${Math.floor(f / 2) % 6}`; break;
     case 'bubblewait': key = `sit|happy|${f % 4 < 2 ? 0.2 : -0.15}|-0.32`; break;
@@ -545,7 +551,7 @@ function drawScene() {
   mailboxFlag(ctx, MAILBOX.x, Y(MAILBOX.d), mail);
   // ground things, back to front
   const items = S.field.map(f => ({ d: f.d, f }));
-  for (const t of S.toys) if (P.hold !== t) items.push({ d: S.toyPos[t].d, toy: t });
+  for (const t of S.toys) if (P.hold !== t && !(t === 'rope' && TUG.on)) items.push({ d: S.toyPos[t].d, toy: t });
   if (P.present) items.push({ d: P.d, parker: true });
   for (const g of S.gifts) items.push({ d: g.d, g });
   if (VIS.on && VIS.kind !== 'sparrow') items.push({ d: VIS.d, vis: true });
@@ -588,6 +594,7 @@ function drawScene() {
       if (/^sun/.test(P.mode)) glow(ctx, P.x + 14 * P.face * s, Y(P.d) - 30 * s, 84, '255,232,170', 0.3 + 0.05 * Math.sin(TT * 1.3));   // warm in the sun
     }
   }
+  drawTugRope();
   drawBubbles();
   if (CHASE.on) drawBit(ctx, CHASE.season, CHASE.i, CHASE.x, CHASE.y, CHASE.rot, 1.9);
   drawVisitor();
@@ -620,6 +627,7 @@ cv.addEventListener('pointerdown', e => {
   if (Math.abs(x - GIFTBOX.x) < 24 && y > Y(GIFTBOX.d) - 38 && y < Y(GIFTBOX.d) + 6) { S.giftNew = false; return openPanel('gifts'); }
   if (best) return collect(best);
   if (toyTapAt(x, y)) return;
+  if (ropeGrab(x, y, e.pointerId)) { try { cv.setPointerCapture(e.pointerId); } catch (err) { } return; }
   if (ballGrab(x, y, e.pointerId)) { try { cv.setPointerCapture(e.pointerId); } catch (err) { } return; }
   if (P.present && onParker(x, y)) { press = { id: e.pointerId, t0: TT, x, y, dist: 0, rub: false }; try { cv.setPointerCapture(e.pointerId); } catch (err) { } return; }
   if (tapVisitor(x, y)) return;
@@ -630,11 +638,12 @@ cv.addEventListener('pointerdown', e => {
 });
 cv.addEventListener('pointermove', e => {
   if (FETCH.drag && e.pointerId === FETCH.drag.id) { const [x, y] = toScene(e); return ballFollow(x, y); }
+  if (TUG.on && e.pointerId === TUG.id) { const [x, y] = toScene(e); TUG.ax = x; TUG.ay = y; return; }
   if (!press || e.pointerId !== press.id) return;
   const [x, y] = toScene(e); press.dist += Math.hypot(x - press.x, y - press.y); press.x = x; press.y = y;
 });
-cv.addEventListener('pointerup', e => { if (FETCH.drag && e.pointerId === FETCH.drag.id) return ballThrow(); if (!press || e.pointerId !== press.id) return; press.rub ? endBelly() : tapParker(); press = null; });
-cv.addEventListener('pointercancel', () => { if (FETCH.drag) { FETCH.drag = null; } if (press && press.rub) endBelly(); press = null; });
+cv.addEventListener('pointerup', e => { if (FETCH.drag && e.pointerId === FETCH.drag.id) return ballThrow(); if (TUG.on && e.pointerId === TUG.id) return ropeRelease(); if (!press || e.pointerId !== press.id) return; press.rub ? endBelly() : tapParker(); press = null; });
+cv.addEventListener('pointercancel', () => { if (FETCH.drag) { FETCH.drag = null; } if (TUG.on) ropeRelease(); if (press && press.rub) endBelly(); press = null; });
 function checkRub() {
   if (!press || press.rub || /sleep|nap|stir|packup|departLook|arrive|gift/.test(P.mode) || P.pack) return;
   if (TT - press.t0 > HABITS.bellyRub.hold || press.dist > HABITS.bellyRub.rubDistance) {
@@ -907,6 +916,43 @@ function noteTick() {
   box.append(itemIcon(n.toy, 64), el('p', 'toy-note-text', T('note.' + n.friend)), el('p', 'toy-note-hint', T('note.tap')));
   box.onclick = () => { box.remove(); S.toyNote = null; writeSave(S); const t = S.toyPos[n.toy]; fx({ type: 'glow', x: t.x, y: Y(t.d) - 12, life: 1.6, r: 50, rgb: '255,236,170' }); P.want = n.toy; };
   document.getElementById('game').append(box); SFX.mail();
+}
+// ---------- 4. tug of war: press one end of the rope and pull; he bites the other end and pulls back. He always wins. ----------
+const TUG = { on: false }, TUG_LEN = 66;
+function ropeEnds() { const t = S.toyPos.rope, s = depthScale(t.d) * TOY_K.rope; return [[t.x - 24 * s, Y(t.d) - 10 * s], [t.x + 24 * s, Y(t.d) - 10 * s]]; }
+function ropeGrab(x, y, id) {
+  if (!S.toys.includes('rope') || P.hold === 'rope' || TUG.on || !P.present || P.pack || /packup|departLook|arrive|gift|fetch|pickup|present/.test(P.mode)) return false;
+  const [a, b] = ropeEnds(); if (Math.min(Math.hypot(x - a[0], y - a[1]), Math.hypot(x - b[0], y - b[1]), Math.hypot(x - (a[0] + b[0]) / 2, y - a[1])) > 30) return false;
+  const mine = Math.hypot(x - a[0], y - a[1]) < Math.hypot(x - b[0], y - b[1]) ? 0 : 1, other = mine ? a : b;
+  Object.assign(TUG, { on: true, id, ax: x, ay: y, bx: other[0], by: other[1], growlAt: TT + 0.6 });
+  const side = Math.sign(x - other[0]) || 1, t = S.toyPos.rope;
+  if (P.hold && P.hold !== 'ball') dropHeld();
+  wakeThen(() => goTo(clamp(other[0] - 56 * side * depthScale(t.d), 20, 380), clamp(t.d, 100, 224), () => faceThen(side, () => { if (TUG.on) { TUG.x0 = P.x; setMode('tug', null); SFX.growl(); } else ropePickUp(); }), { speed: 100 }));
+  return true;
+}
+function ropeMouth() { const s = depthScale(P.d); return [P.x + 66 * P.face * s, Y(P.d) - 62 * s]; }
+function tugUpdate(dt) {                 // braced and pulling back; a strong pull drags him a little, then he wins it back
+  const [mx, my] = ropeMouth(), dist = Math.hypot(TUG.ax - mx, TUG.ay - my), tension = clamp((dist - TUG_LEN) / 70), away = -P.face;
+  const want = TUG.x0 + away * (tension > 0.7 ? -14 : 22) * (tension > 0.7 ? tension : 1);
+  P.x += clamp(want - P.x, -30 * dt, 30 * dt); P.x = clamp(P.x, 20, 380);
+  if (Math.sign(TUG.ax - P.x) !== P.face && Math.abs(TUG.ax - P.x) > 30) P.face = -P.face;
+  if (TT > TUG.growlAt) { TUG.growlAt = TT + rand([1, 1.8]); SFX.growl(); }
+}
+function ropeRelease() {
+  TUG.on = false;
+  if (P.mode === 'tug') { P.hold = 'rope'; SFX.pop(); setMode('ropewin', HABITS.ropeShake); const [mx, my] = ropeMouth(); fx({ type: 'glow', x: mx, y: my, life: 0.6, r: 40, rgb: '255,236,170' }); for (let i = 0; i < 2; i++) fx({ type: 'spr', key: 'heart', x: mx + (i - 0.5) * 20, y: my - 40, vy: -30, delay: i * 0.2, sway: i, life: 1.3 }); }
+}
+function ropePickUp() { P.hold = 'rope'; setMode('ropewin', HABITS.ropeShake); }
+function ropeDrop() { S.toyPos.rope = { x: clamp(P.x + 40 * P.face, 30, 370), d: clamp(P.d - 4, 96, 226) }; P.hold = null; writeSave(S); setMode('sigh', HABITS.sighTime, { lie: false }); }
+function drawTugRope() {
+  if (!TUG.on) return;
+  const tugging = P.mode === 'tug', [bx, by] = tugging ? ropeMouth() : [TUG.bx, TUG.by], ax = TUG.ax, ay = TUG.ay;
+  const dist = Math.hypot(ax - bx, ay - by), tension = clamp((dist - TUG_LEN) / 70), N = 12, nx = -(ay - by) / (dist || 1), ny = (ax - bx) / (dist || 1);
+  const sag = Math.max(0, TUG_LEN - dist) * 0.55, w = lerp(6, 3.6, tension), pts = [];
+  for (let i = 0; i <= N; i++) { const u = i / N, wob = Math.sin(TT * (tugging ? 26 : 6) + u * 9) * (tugging ? 0.6 + 1.6 * tension : 0.4) * Math.sin(Math.PI * u); pts.push([lerp(bx, ax, u) + nx * wob, lerp(by, ay, u) + sag * Math.sin(Math.PI * u) + ny * wob]); }
+  ctx.save(); castShadow(ctx, c => { c.beginPath(); c.moveTo(...pts[0]); pts.forEach(p => c.lineTo(...p)); c.lineWidth = w; c.strokeStyle = '#000'; c.stroke(); }, 3, 1, 3, 0.25); ctx.restore();
+  for (let i = 0; i < N; i++) piece(ctx, slab(pts[i], pts[i + 1], w), i % 2 ? '#f6efe2' : '#5b8ed1', { mul: 0.3 });
+  for (const [x, y] of [[ax, ay], [bx, by]]) piece(ctx, circ(x, y, w * 0.95), '#5b8ed1', { mul: 0.3 });
 }
 // ---------- home from a trip: one short line in a little paper speech bubble above his head ----------
 const SAY = { on: false };
