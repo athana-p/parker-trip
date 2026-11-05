@@ -182,11 +182,20 @@ const TOY_START = {};
 const TOY_K = { ball: 0.6, duck: 0.55, bone: 0.55, bubbles: 0.95, yarn: 0.64, temari: 0.66, rope: 0.8, kite: 0.75, sprinkler: 0.85 };      // how big each toy is drawn on the grass
 // toys you tap in the yard (bubble machine, kite, sprinkler…): toy id → what happens
 const TOY_TAP = {};
-function toyTapAt(x, y) {
-  for (const id of S.toys) {
-    const f = TOY_TAP[id], t = S.toyPos[id]; if (!f || !t) continue;
-    const s = depthScale(t.d); if (Math.abs(x - t.x) < 26 * s && y > Y(t.d) - 44 * s && y < Y(t.d) + 6) { f(); return true; }
+// a touch on the toys: every toy under the finger is a candidate and the one nearest the finger wins.
+// A toy that can't be played right now (kite without wind, sprinkler without sun) only answers if nothing else is there,
+// so it never hides the ball or the rope lying next to it.
+function toyPick(x, y, id) {
+  const cands = [], grab = () => { try { cv.setPointerCapture(id); } catch (err) { } return true; };
+  if (S.toys.includes('ball') && P.hold !== 'ball') { const [bx, by] = ballScreen(), d = Math.hypot(x - bx, y - by); if (d <= 30) cands.push([d, () => ballGrab(x, y, id) && grab()]); }
+  if (S.toys.includes('rope') && !TUG.on && P.hold !== 'rope') { const [a, b] = ropeEnds(), d = Math.min(Math.hypot(x - a[0], y - a[1]), Math.hypot(x - b[0], y - b[1]), Math.hypot(x - (a[0] + b[0]) / 2, y - a[1])); if (d <= 30) cands.push([d, () => ropeGrab(x, y, id) && grab()]); }
+  for (const tid of S.toys) {
+    const f = TOY_TAP[tid], t = S.toyPos[tid]; if (!f || !t || (tid === 'kite' && KITE.on)) continue;
+    const s = depthScale(t.d); if (!(Math.abs(x - t.x) < 26 * s && y > Y(t.d) - 44 * s && y < Y(t.d) + 6)) continue;
+    cands.push([Math.hypot(x - t.x, y - (Y(t.d) - 18 * s)) + (toyWeatherOk(tid) ? 0 : 1000), () => (f(), true)]);
   }
+  cands.sort((p, q) => p[0] - q[0]);
+  for (const [, act] of cands) if (act()) return true;            // (the rope says no while he's away: then the next one gets it)
   return false;
 }                    // toys that start with a tap of yours (filled in by each toy below)
 // asleep when you want to play: he wakes slowly first (stretchy blink), then joins in. Returns true if he had to wake.
@@ -647,9 +656,7 @@ cv.addEventListener('pointerdown', e => {
   if (Math.abs(x - GIFTBOX.x) < 24 && y > Y(GIFTBOX.d) - 38 && y < Y(GIFTBOX.d) + 6) { S.giftNew = false; return openPanel('gifts'); }
   if (best) return collect(best);
   if (snowmanTap(x, y)) return;
-  if (toyTapAt(x, y)) return;
-  if (ropeGrab(x, y, e.pointerId)) { try { cv.setPointerCapture(e.pointerId); } catch (err) { } return; }
-  if (ballGrab(x, y, e.pointerId)) { try { cv.setPointerCapture(e.pointerId); } catch (err) { } return; }
+  if (toyPick(x, y, e.pointerId)) return;
   if (P.present && onParker(x, y)) { press = { id: e.pointerId, t0: TT, x, y, dist: 0, rub: false }; try { cv.setPointerCapture(e.pointerId); } catch (err) { } return; }
   if (tapVisitor(x, y)) return;
   const mb = Y(MAILBOX.d);
