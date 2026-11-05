@@ -24,6 +24,8 @@ const SPRITES = {
   item: a => [c => drawItem(c, a[0], +a[1]), { w: 44, h: 44, ox: 22, oy: 22 }, 1, false],
   bow: a => [c => drawPlayBowB(c, a[0], { wag: +(a[1] || 0) }), BOX_BOW, K_DOG],
   dust: a => [c => tornPiece(c, ellipsePts(0, 0, 3 + (+a[1]), 2 + (+a[1]) * 0.6, 10), a[0], { amp: 0.5, seed: 30 + (+a[1]), rim: 0, shadow: 0.15, mul: 0.3 }), { w: 14, h: 12, ox: 7, oy: 6 }, 1, false],
+  kite: () => [c => drawKite(c, false), { w: 50, h: 70, ox: 25, oy: 35 }, 1, false],
+  kitebow: a => [c => kiteBow(c, 0, 0, a[0]), { w: 16, h: 12, ox: 8, oy: 6 }, 1, false],
   confetti: a => [c => tornPiece(c, [[-3, -1.6], [3, -2], [2.6, 1.8], [-2.8, 1.4]], a[0], { amp: 0.4, seed: 3, rim: 0, shadow: 0.12, mul: 0.3 }), { w: 10, h: 8, ox: 5, oy: 4 }, 1, false],
   bird: a => [c => drawBird(c, +a[0]), { w: 60, h: 60, ox: 30, oy: 48 }, 1, false],
   ncat: a => [c => drawNeighborCat(c, a[0]), BOX_NCAT, 0.62],
@@ -174,7 +176,7 @@ function playToy(id) {
   wakeThen(() => { P.want = id; pickNext(); });
 }
 const TOY_START = {};
-const TOY_K = { ball: 0.6, duck: 0.55, bone: 0.55, bubbles: 0.95, yarn: 0.64, temari: 0.66, rope: 0.8 };      // how big each toy is drawn on the grass
+const TOY_K = { ball: 0.6, duck: 0.55, bone: 0.55, bubbles: 0.95, yarn: 0.64, temari: 0.66, rope: 0.8, kite: 0.75 };      // how big each toy is drawn on the grass
 // toys you tap in the yard (bubble machine, kite, sprinkler…): toy id → what happens
 const TOY_TAP = {};
 function toyTapAt(x, y) {
@@ -262,6 +264,7 @@ function updateParker(dt) {
   if (P.mode === 'bubblego') return bubbleUpdate(dt);
   if (P.mode === 'yarnchase') return yarnChase(dt);
   if (P.mode === 'tug') return tugUpdate(dt);
+  if (P.mode === 'kitechase') return kiteChase(dt);
   if (P.mode === 'yarnbat') yarnBatTick();
   if (P.mode === 'temari') temariUpdate(dt);
   if (P.mode === 'bubblehop') bubbleHopTick();
@@ -435,6 +438,7 @@ function parkerDrawing() {
   switch (P.mode) {
     case 'trot': key = `trot|${(P.data.slow ? Math.floor(f / 2) : f) % 6}${pk}`; break;
     case 'chase': case 'fetch': case 'bubblego': case 'yarnchase': key = `trot|${f % 6}`; break;
+    case 'kitechase': { const h = P.data.hopT0 != null ? clamp((TT - P.data.hopT0) / 0.6) : 1; if (h < 1) { lift = 28 * Math.sin(Math.PI * h); key = 'sit|happy|0|-0.36'; } else key = P.data.run ? `trot|${f % 6}` : `sit|happy|${f % 4 < 2 ? 0.22 : -0.16}|-0.3`; break; }
     case 'tug': key = `tug|${f % 4 < 2 ? 0 : 1}`; break;
     case 'ropewin': key = `sit|happy|0|${f % 4 < 2 ? -0.24 : 0.24}|0|rope`; break;      // shaking the rope he won
     case 'yarnbat': key = `bat|${(TT - P.t0) > 0.12 && (TT - P.t0) < 0.4 ? 1 : 0}`; break;
@@ -546,12 +550,13 @@ function drawScene() {
   }
   drawPrints();
   drawYarnThread();
+  drawKiteShadow();
   const mail = S.mail.length > 0;
   if (mail) glow(ctx, MAILBOX.x, Y(MAILBOX.d) - 106, 46, '255,236,170', 0.35 + 0.1 * Math.sin(TT * 2));
   mailboxFlag(ctx, MAILBOX.x, Y(MAILBOX.d), mail);
   // ground things, back to front
   const items = S.field.map(f => ({ d: f.d, f }));
-  for (const t of S.toys) if (P.hold !== t && !(t === 'rope' && TUG.on)) items.push({ d: S.toyPos[t].d, toy: t });
+  for (const t of S.toys) if (P.hold !== t && !(t === 'rope' && TUG.on) && !(t === 'kite' && KITE.on)) items.push({ d: S.toyPos[t].d, toy: t });
   if (P.present) items.push({ d: P.d, parker: true });
   for (const g of S.gifts) items.push({ d: g.d, g });
   if (VIS.on && VIS.kind !== 'sparrow') items.push({ d: VIS.d, vis: true });
@@ -601,6 +606,7 @@ function drawScene() {
   if (L.old && L.old.fore !== L.fore) { drawLayer(ctx, L.old.fore); ctx.save(); ctx.globalAlpha = fade; drawLayer(ctx, L.fore); ctx.restore(); }
   else drawLayer(ctx, L.fore);
   drawWeather(ctx, WX, H, TT, V.res);
+  drawFlyingKite();
   // light: multiply tint + vignette, then screen glow, lamp, motes
   ctx.save(); ctx.globalCompositeOperation = 'multiply';
   if (L.old) { ctx.globalAlpha = 1 - fade; drawLayer(ctx, L.old.mul); }
@@ -622,6 +628,7 @@ cv.addEventListener('pointerdown', e => {
   // dandelions first (nearest head within reach), front-most wins
   let best = null, bd = 30;
   for (const f of S.field) { const s = depthScale(f.d), hx = f.x, hy = Y(f.d) - 36 * s, dd = Math.hypot(x - hx, y - hy); if (dd < bd && Clock.now() - f.born > 600) { bd = dd; best = f; } }
+  if (kiteGrab(x, y, e.pointerId)) { try { cv.setPointerCapture(e.pointerId); } catch (err) { } return; }
   if (tapBubble(x, y)) return;
   const g = giftAt(x, y); if (g) return pickGift(g);
   if (Math.abs(x - GIFTBOX.x) < 24 && y > Y(GIFTBOX.d) - 38 && y < Y(GIFTBOX.d) + 6) { S.giftNew = false; return openPanel('gifts'); }
@@ -639,11 +646,12 @@ cv.addEventListener('pointerdown', e => {
 cv.addEventListener('pointermove', e => {
   if (FETCH.drag && e.pointerId === FETCH.drag.id) { const [x, y] = toScene(e); return ballFollow(x, y); }
   if (TUG.on && e.pointerId === TUG.id) { const [x, y] = toScene(e); TUG.ax = x; TUG.ay = y; return; }
+  if (KITE.drag && e.pointerId === KITE.drag.id) { const [x, y] = toScene(e); return kiteMove(x, y); }
   if (!press || e.pointerId !== press.id) return;
   const [x, y] = toScene(e); press.dist += Math.hypot(x - press.x, y - press.y); press.x = x; press.y = y;
 });
-cv.addEventListener('pointerup', e => { if (FETCH.drag && e.pointerId === FETCH.drag.id) return ballThrow(); if (TUG.on && e.pointerId === TUG.id) return ropeRelease(); if (!press || e.pointerId !== press.id) return; press.rub ? endBelly() : tapParker(); press = null; });
-cv.addEventListener('pointercancel', () => { if (FETCH.drag) { FETCH.drag = null; } if (TUG.on) ropeRelease(); if (press && press.rub) endBelly(); press = null; });
+cv.addEventListener('pointerup', e => { if (FETCH.drag && e.pointerId === FETCH.drag.id) return ballThrow(); if (TUG.on && e.pointerId === TUG.id) return ropeRelease(); if (KITE.drag && e.pointerId === KITE.drag.id) return kiteUp(); if (!press || e.pointerId !== press.id) return; press.rub ? endBelly() : tapParker(); press = null; });
+cv.addEventListener('pointercancel', () => { if (FETCH.drag) { FETCH.drag = null; } KITE.drag = null; if (TUG.on) ropeRelease(); if (press && press.rub) endBelly(); press = null; });
 function checkRub() {
   if (!press || press.rub || /sleep|nap|stir|packup|departLook|arrive|gift/.test(P.mode) || P.pack) return;
   if (TT - press.t0 > HABITS.bellyRub.hold || press.dist > HABITS.bellyRub.rubDistance) {
@@ -726,7 +734,7 @@ function boot() {
     Clock.tick(dt);
     if (TT > todAt) { todAt = TT + 1; worldTick(); wxCheck(); }
     if (TT > saveAt) { saveAt = TT + 15; writeSave(S); }
-    checkRub(); updateParker(dt); updateBall(dt); updateVisitor(dt); updateBubbles(dt); updateYarn(dt); updateChase(dt); updateWeather(dt, WX, V.H, TT); parkerExtras(); catPlayTick(); sayTick(); noteTick(); sleepZ(); updateFX(dt); drawScene();
+    checkRub(); updateParker(dt); updateBall(dt); updateVisitor(dt); updateBubbles(dt); updateYarn(dt); updateKite(dt); updateChase(dt); updateWeather(dt, WX, V.H, TT); parkerExtras(); catPlayTick(); sayTick(); noteTick(); sleepZ(); updateFX(dt); drawScene();
     if (!window.READY) window.READY = true;
     requestAnimationFrame(loop);
   };
@@ -738,7 +746,7 @@ function boot() {
   idle(step);
 }
 // test hook (screenshots): advance the simulation deterministically
-window.__advance = secs => { for (let i = 0; i < secs * 30; i++) { TT += 1 / 30; checkRub(); updateParker(1 / 30); updateBall(1 / 30); updateVisitor(1 / 30); updateBubbles(1 / 30); updateYarn(1 / 30); updateChase(1 / 30); updateWeather(1 / 30, WX, V.H, TT); parkerExtras(); catPlayTick(); sayTick(); updateFX(1 / 30); } drawScene(); };
+window.__advance = secs => { for (let i = 0; i < secs * 30; i++) { TT += 1 / 30; checkRub(); updateParker(1 / 30); updateBall(1 / 30); updateVisitor(1 / 30); updateBubbles(1 / 30); updateYarn(1 / 30); updateKite(1 / 30); updateChase(1 / 30); updateWeather(1 / 30, WX, V.H, TT); parkerExtras(); catPlayTick(); sayTick(); updateFX(1 / 30); } drawScene(); };
 // time of day or weather changed: rebuild the backdrop (it cross-fades), switch the weather sounds
 function wxCheck() {
   const tod = currentTod(), wx = weatherNow();
@@ -953,6 +961,65 @@ function drawTugRope() {
   ctx.save(); castShadow(ctx, c => { c.beginPath(); c.moveTo(...pts[0]); pts.forEach(p => c.lineTo(...p)); c.lineWidth = w; c.strokeStyle = '#000'; c.stroke(); }, 3, 1, 3, 0.25); ctx.restore();
   for (let i = 0; i < N; i++) piece(ctx, slab(pts[i], pts[i + 1], w), i % 2 ? '#f6efe2' : '#5b8ed1', { mul: 0.3 });
   for (const [x, y] of [[ax, ay], [bx, by]]) piece(ctx, circ(x, y, w * 0.95), '#5b8ed1', { mul: 0.3 });
+}
+// ---------- 5. the kite (windy days only): tap it to fly it, drag it around the sky; he chases its shadow below ----------
+const KITE = { on: false, tail: [] };
+function kiteSky() { return [40, Y(330)]; }               // how high / low it can fly (screen y)
+function kiteLaunch() {
+  if (!toyWeatherOk('kite')) { showToast('ui.toy.wait.wind', 2200); return; }
+  if (KITE.on) return;
+  const t = S.toyPos.kite, s = depthScale(t.d), [top, low] = kiteSky();
+  Object.assign(KITE, { on: true, x: t.x, y: Y(t.d) - 14 * s, tx: clamp(t.x - 60, 60, 340), ty: lerp(top, low, 0.35), vx: 0, vy: 0, rot: 0, landing: false, idleAt: TT, drag: null, flapAt: TT + 1 });
+  KITE.tail = [...Array(7)].map((_, i) => [KITE.x, KITE.y + 6 * i]);
+  SFX.flutter();
+  if (P.present && !P.pack && !/packup|departLook|arrive|gift/.test(P.mode)) wakeThen(() => setMode('kitechase', null, { hopAt: TT + 1.2 }));
+}
+TOY_TAP.kite = kiteLaunch; TOY_START.kite = kiteLaunch;
+function kiteGrab(x, y, id) {
+  if (!KITE.on || KITE.landing || Math.hypot(x - KITE.x, y - KITE.y) > 42) return false;
+  KITE.drag = { id, x0: x, y0: y, moved: 0 }; return true;
+}
+function kiteMove(x, y) { const [top, low] = kiteSky(), D = KITE.drag; D.moved += Math.hypot(x - D.x0, y - D.y0); D.x0 = x; D.y0 = y; KITE.tx = clamp(x, 36, SCENE_W - 36); KITE.ty = clamp(y, top, low); KITE.idleAt = TT; }
+function kiteUp() { const D = KITE.drag; KITE.drag = null; if (D && D.moved < 8) kiteLand(); }    // a tap without dragging reels it in
+function kiteLand() { if (!KITE.on) return; const t = S.toyPos.kite; KITE.landing = true; KITE.tx = t.x; KITE.ty = Y(t.d) - 14 * depthScale(t.d); }
+function updateKite(dt) {
+  if (!KITE.on) return;
+  if (!KITE.landing && (!toyWeatherOk('kite') || TT - KITE.idleAt > 90)) kiteLand();         // the wind dropped, or nobody's flown it for a while
+  const sway = KITE.landing ? 0 : 14 * Math.sin(TT * 1.3) + 6 * Math.sin(TT * 3.1), bob = KITE.landing ? 0 : 8 * Math.sin(TT * 1.7);
+  const ax = (KITE.tx + sway - KITE.x) * 4 - KITE.vx * 2.6, ay = (KITE.ty + bob - KITE.y) * 4 - KITE.vy * 2.6;
+  KITE.vx += ax * dt; KITE.vy += ay * dt; KITE.x += KITE.vx * dt; KITE.y += KITE.vy * dt;
+  KITE.rot = clamp(KITE.vx / 160, -0.5, 0.5) + 0.06 * Math.sin(TT * 2.3);
+  // the tail: each little bow follows the one before it, pushed by the wind
+  let prev = [KITE.x - Math.sin(KITE.rot) * 36, KITE.y + Math.cos(KITE.rot) * 36];
+  for (let i = 0; i < KITE.tail.length; i++) {
+    const p = KITE.tail[i]; p[0] += (-26 + 10 * Math.sin(TT * 4 + i)) * dt; p[1] += 30 * dt;
+    const dx = p[0] - prev[0], dy = p[1] - prev[1], L = Math.hypot(dx, dy) || 1; p[0] = prev[0] + dx / L * 9; p[1] = prev[1] + dy / L * 9; prev = p;
+  }
+  if (!KITE.landing && TT > KITE.flapAt) { KITE.flapAt = TT + rand([1.6, 3]); SFX.flutter(0.5); }
+  if (KITE.landing && Math.hypot(KITE.x - KITE.tx, KITE.y - KITE.ty) < 4) { KITE.on = false; if (P.mode === 'kitechase') setMode('wag', HABITS.reactionTime.wag); }
+}
+function kiteShadow() { const [top, low] = kiteSky(), u = clamp((low - KITE.y) / (low - top)); return [clamp(KITE.x + 18, 40, 360), lerp(112, 200, u), 1 - u * 0.45]; }   // the higher, the farther back and fainter
+function kiteChase(dt) {
+  if (!KITE.on || KITE.landing) return setMode('wag', HABITS.reactionTime.wag);
+  const [sx, sd] = kiteShadow(), dx = sx - P.x, dd = clamp(sd, 100, 224) - P.d, L = Math.hypot(dx, dd);
+  if (Math.abs(dx) > 10) P.face = Math.sign(dx);
+  const step = Math.min(L, 104 * dt); if (L > 4) { P.x += dx / L * step; P.d += dd / L * step; P.data.run = true; } else P.data.run = false;
+  if (L < 30 && TT > P.data.hopAt) { P.data.hopAt = TT + rand([1.2, 2.2]); P.data.hopT0 = TT; }       // a jump up at it
+  if (WX.look === 'snow' && (P.walked = (P.walked || 0) + step) > HABITS.printEvery) leavePrint();
+}
+function drawKiteShadow() {
+  if (!KITE.on || KITE.landing) return;
+  const [x, d, a] = kiteShadow(), s = depthScale(d);
+  ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = `rgba(100,90,115,${0.42 * a})`; ctx.translate(x, Y(d)); ctx.rotate(KITE.rot); ctx.scale(1.5, 0.45);
+  ctx.beginPath(); ctx.moveTo(0, -24 * s); ctx.lineTo(16 * s, -4 * s); ctx.lineTo(0, 24 * s); ctx.lineTo(-16 * s, -4 * s); ctx.closePath(); ctx.fill(); ctx.restore();
+}
+function drawFlyingKite() {
+  if (!KITE.on) return;
+  const sx = SCENE_W / 2 + 30, sy = V.H + 10, mx = (sx + KITE.x) / 2, my = (sy + KITE.y) / 2 + 40;     // the string, held by you below the screen
+  ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.quadraticCurveTo(mx, my, KITE.x, KITE.y + 6); ctx.stroke(); ctx.restore();
+  const cols = ['#f5c04a', '#5b8ed1', '#e2574a'];
+  KITE.tail.forEach((p, i) => { const s = sprite(`kitebow|${cols[i % 3]}`); drawSprite(s, p[0], p[1], { rot: Math.sin(TT * 5 + i) * 0.5, shA: 0.12, scale: 1.3 }); });
+  drawSprite(sprite('kite'), KITE.x, KITE.y, { rot: KITE.rot, scale: 1.45 });
 }
 // ---------- home from a trip: one short line in a little paper speech bubble above his head ----------
 const SAY = { on: false };

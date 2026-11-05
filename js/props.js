@@ -92,6 +92,7 @@ function drawItem(c, id, s = 1) {
       c.save(); c.globalAlpha = 0.45; piece(c, circ(7, -23, 5.6), '#dff3ff', { mul: 0.2 }); c.restore();
       break;
     }
+    case 'kite': drawKite(c, true); break;
     case 'rope': {                         // a tug rope: twisted blue-and-cream cotton with a fat knot at each end
       const path = [[-22, 2], [-8, -3], [8, 3], [22, -2]];
       for (let i = 0; i < path.length - 1; i++) P(slab(path[i], path[i + 1], 7), i % 2 ? '#f6efe2' : '#5b8ed1', 0.15);
@@ -122,6 +123,18 @@ function drawItem(c, id, s = 1) {
   }
   c.restore();
 }
+
+// a paper kite: four coloured quarters on a cross of sticks (tail = a string of little paper bows, drawn live when it flies)
+function drawKite(c, tail) {
+  const T = [0, -26], R = [17, -4], B = [0, 26], L = [-17, -4], M = [0, -4];
+  if (tail) { c.save(); c.strokeStyle = 'rgba(90,70,60,0.6)'; c.lineWidth = 1; c.beginPath(); c.moveTo(0, 26); c.quadraticCurveTo(10, 36, 4, 46); c.stroke(); c.restore(); for (const [x, y, col] of [[6, 33, '#f5c04a'], [8, 40, '#5b8ed1'], [4, 46, '#e2574a']]) kiteBow(c, x, y, col); }
+  fp(c, poly([T, R, B, L]), '#e2574a', { sh: 0.22, mul: 0.5 });
+  piece(c, poly([T, R, M]), '#f5c04a', { mul: 0.4 }); piece(c, poly([B, L, M]), '#f5c04a', { mul: 0.4 });
+  piece(c, poly([L, T, M]), '#fff3dc', { mul: 0.3 });
+  c.save(); c.strokeStyle = '#8a5a34'; c.lineWidth = 1.3; c.beginPath(); c.moveTo(...T); c.lineTo(...B); c.moveTo(...L); c.lineTo(...R); c.stroke(); c.restore();
+  pawPrint(c, 6, 8, 0.32, '#fff3dc');
+}
+function kiteBow(c, x, y, col, a = 0) { c.save(); c.translate(x, y); c.rotate(a); fp(c, union(poly([[0, 0], [-5, -3], [-5, 3]]), poly([[0, 0], [5, -3], [5, 3]])), col, { sh: 0.12, mul: 0.4 }); c.restore(); }
 
 // souvenirs on the shelf: base of the object at y = 0
 function drawSouvenir(c, id, s = 1) {
