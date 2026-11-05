@@ -1,5 +1,5 @@
 // ================= FESTIVALS: real dates, fixed in this table =================
-// Window: from 3 days before a festival's first day to 7 days after its last day. Inside it, Parker gives you
+// Window: from 3 days before a festival's first day to 7 days after its last day (birthdays: from the day itself). Inside it, Parker gives you
 // that festival's card once per year — by mail if he's travelling, in person (a card in his mouth) if he's home.
 const FEST_WINDOW = { before: 3, after: 7 };
 const FESTIVALS = [
@@ -10,6 +10,10 @@ const FESTIVALS = [
   { id: 'newyear', every: ['01-01'] },
   { id: 'cny', dates: { 2027: ['2027-02-06'], 2028: ['2028-01-26'], 2029: ['2029-02-13'], 2030: ['2030-02-03'] } },
   { id: 'songkran', every: ['04-13', '04-15'] },
+  // family birthdays: the card comes on the day itself (not before), any time in the week after
+  { id: 'bday-parker', every: ['11-13'], window: { before: 0, after: 7 } },
+  { id: 'bday-sister', every: ['05-02'], window: { before: 0, after: 7 } },
+  { id: 'bday-mom', every: ['01-25'], window: { before: 0, after: 7 } },
 ];
 const festCard = id => 'fest-' + id;
 function festDays(f, year) { return f.dates ? f.dates[year] || null : f.every.map(md => `${year}-${md}`); }
@@ -19,7 +23,7 @@ function activeFestivals(now) {
   const y = new Date(now).getFullYear(), out = [];
   for (const f of FESTIVALS) for (const yr of [y - 1, y, y + 1]) {
     const ds = festDays(f, yr); if (!ds) continue;
-    const a = dayStart(ds[0]) - FEST_WINDOW.before * 864e5, b = dayStart(ds[ds.length - 1]) + (FEST_WINDOW.after + 1) * 864e5;
+    const w = f.window || FEST_WINDOW, a = dayStart(ds[0]) - w.before * 864e5, b = dayStart(ds[ds.length - 1]) + (w.after + 1) * 864e5;
     if (now >= a && now < b) out.push({ id: f.id, year: yr });
   }
   return out;

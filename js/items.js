@@ -22,7 +22,7 @@ const CATS = ['food', 'charm', 'toy'];
 // real places; ★ rare ones are more likely with a charm
 const DESTS = [
   { id: 'chiangmai' }, { id: 'pai' }, { id: 'krabi' }, { id: 'floatingmarket' }, { id: 'inthanon' }, { id: 'fuji' },
-  { id: 'fushimi' }, { id: 'guilin' }, { id: 'swiss' }, { id: 'istanbul' },
+  { id: 'fushimi' }, { id: 'guilin' }, { id: 'swiss' }, { id: 'istanbul' }, { id: 'egypt' },
   { id: 'furano', rare: true }, { id: 'dunhuang', rare: true }, { id: 'tekapo', rare: true },
 ];
 const TRIP = {

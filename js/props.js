@@ -93,6 +93,12 @@ function drawItem(c, id, s = 1) {
       break;
     }
     case 'kite': drawKite(c, true); break;
+    case 'bouquet': {                      // a little bunch of flowers wrapped in pink paper (for Mommy)
+      for (const [x, y, col] of [[-8, -18, '#e2574a'], [6, -22, '#f5c04a'], [-1, -28, '#fff7ee'], [12, -12, '#f2a0c0'], [-14, -8, '#c8a6df']]) { leaf(c, x, y + 8, 10, 3, -1.4 + x * 0.05, '#5f9a52'); fp(c, circ(x, y, 7), col, { sh: 0.12, mul: 0.4 }); piece(c, circ(x, y, 2.4), '#f6c453', { mul: 0.3 }); }
+      fp(c, poly([[-20, -8], [20, -8], [4, 26], [-4, 26]]), '#f6c3d2', { sh: 0.18, mul: 0.4 }); piece(c, poly([[-20, -8], [0, -8], [0, 26], [-4, 26]]), '#fbd8e2', { mul: 0.3 });
+      fp(c, union(ell(-6, 6, 7, 4, 0.4), ell(6, 6, 7, 4, -0.4)), '#e2574a', { sh: 0.1, mul: 0.4 });
+      break;
+    }
     case 'sprinkler': {                    // a little garden sprinkler: green base, yellow spinning arm, a curl of hose
       c.save(); c.strokeStyle = '#4f9e58'; c.lineWidth = 3; c.lineCap = 'round'; c.beginPath(); c.moveTo(-14, 10); c.bezierCurveTo(-30, 14, -30, 0, -20, -2); c.stroke(); c.restore();
       P(ell(0, 8, 18, 7), '#4f9e58'); P(rectP(-5, -10, 10, 18), '#6fbf72', 0.12); piece(c, rectP(-5, -10, 3, 18), '#94d49a', { mul: 0.3 });
@@ -222,6 +228,13 @@ function drawSouvenir(c, id, s = 1) {
       const b = new Path2D(); b.moveTo(-6, -36); b.lineTo(6, -36); b.lineTo(6, -28); b.quadraticCurveTo(16, -24, 16, -12); b.lineTo(16, 0); b.lineTo(-16, 0); b.lineTo(-16, -12); b.quadraticCurveTo(-16, -24, -6, -28); b.closePath();
       P(b, '#e8f2f0'); clipped(c, b, () => [['#e8a34a', -4], ['#f3cf6a', -9], ['#d9663f', -13], ['#f2b46a', -18]].forEach(([col, y]) => piece(c, rectP(-20, y - 5, 40, 6), col, { mul: 0.4 })));
       P(rectP(-5, -42, 10, 7), '#b07a50', 0.1); break;
+    }
+    case 'egypt': {          // a little golden pyramid on a blue base
+      P(rectP(-20, -6, 40, 6), '#3f6fb0'); piece(c, rectP(-20, -6, 40, 2), '#7ab6e8', { mul: 0.3 });
+      P(poly([[-17, -6], [0, -40], [17, -6]]), '#e8b44a'); piece(c, poly([[0, -40], [17, -6], [3, -6]]), '#f5d27a', { mul: 0.3 });
+      for (let k = 1; k < 5; k++) piece(c, rectP(-20, -6 - k * 7, 40, 1), '#c8902e', { mul: 0.3 });
+      P(poly([[-4, -32], [0, -40], [4, -32]]), '#7ab6e8', 0.05);
+      break;
     }
     case 'istanbul':         // a tulip-shaped glass of Turkish tea
       teaGlass(c, 0, 0, 1.3); break;

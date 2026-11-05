@@ -409,7 +409,7 @@ function drawSitB(c, expr = 'calm', wag = 0, o = {}) {
   if (o.pack) backpack(c, -26, -96, 0.5);
   if (scarfLater) scarfSide(c);
   c.save(); c.translate(34, -166 + (o.headDy || 0)); c.rotate(o.headRot || 0); c.scale(0.9, 0.9); head3q(c, DESIGNS.B.q.G, expr);
-  if (o.mouth) { c.translate(30, 52); c.rotate(0.2); drawItem(c, o.mouth, o.mouth === 'simit' ? 0.85 : 1.05); }        // a toy held in his mouth
+  if (o.mouth) { c.translate(30, 52); c.rotate(0.2); drawItem(c, o.mouth, o.mouth === 'simit' ? 0.85 : o.mouth === 'bouquet' ? 1.6 : 1.05); }        // a toy held in his mouth
   c.restore();
 }
 const BOX_SIT = { w: 250, h: 280, ox: 115, oy: 264 };

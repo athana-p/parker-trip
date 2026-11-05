@@ -1193,6 +1193,202 @@ const FRIEND_SPOT = {
   dunhuang: { pose: 'sit', x: 680, y: 556, k: 0.85, flip: true },
 };
 
+
+// ================= EGYPT: the pyramids of Giza and the Sphinx =================
+function pyramid(c, cx, by, w, h, lit, shadow, seed, cap) {
+  const L = [cx - w / 2, by], R = [cx + w / 2, by], T = [cx, by - h], M = [cx + w * 0.12, by];
+  const all = poly([L, T, R]);
+  castShadow(c, all, 4, 2, 4, 0.18);
+  piece(c, poly([L, T, M]), shadow, { mul: 0.55, scr: 0.15 }); piece(c, poly([M, T, R]), lit, { mul: 0.55, scr: 0.2 });
+  clipped(c, all, () => { for (let k = 1; k < 16; k++) piece(c, rectP(cx - w, by - h * k / 16, w * 2, 1.2), shade(shadow, 0.9), { mul: 0.3 }); });   // the steps
+  if (cap) clipped(c, all, () => piece(c, rectP(cx - w, by - h, w * 2, h * 0.16), '#f6e6c4', { mul: 0.3 }));                                   // what's left of the white casing
+}
+function palm(c, x, by, h, s, seed) {
+  const r = rng(seed); pp(c, limb([x, by], [x + 6 * s, by - h], 4 * s, 3 * s), '#8a6a42', 0.12);
+  for (let i = 0; i < 7; i++) { const a = -Math.PI / 2 + (i - 3) * 0.45 + (r() - 0.5) * 0.2; leaf(c, x + 6 * s, by - h, 34 * s, 6 * s, a + (Math.abs(i - 3) > 1 ? 0.6 * Math.sign(i - 3) : 0), i % 2 ? '#4f8a4a' : '#5f9a52'); }
+}
+function sphinx(c, x, by, s) {                 // lying lion, paws forward, head in the striped nemes headdress, facing right
+  c.save(); c.translate(x, by); c.scale(s, s);
+  const stone = '#c8955a', dark = '#9e6a38', light = '#ddb07a';
+  c.save(); c.globalAlpha = 0.5; piece(c, ell(10, 4, 190, 12), '#b8884e', { mul: 0.4 }); c.restore();       // its shadow on the sand
+  const body = union(ell(-60, -48, 96, 42), circ(-130, -42, 36), ell(30, -40, 60, 36));
+  pp(c, body, stone, 0.3);                                                                              // body and haunch
+  clipped(c, body, () => { piece(c, ell(-50, -10, 130, 18), dark, { mul: 0.45 }); piece(c, ell(-70, -78, 80, 12), light, { mul: 0.3 }); for (const x of [-120, -60, 0]) piece(c, rectP(x, -90, 1.6, 80), dark, { mul: 0.3 }); });   // weathered stone blocks
+  for (const [y, w] of [[-14, 16], [-4, 18]]) pp(c, union(limb([40, y - 6], [150, y], w, w * 0.9), ell(154, y, w * 0.7, w * 0.55)), y < -10 ? light : stone, 0.15);   // the long front paws
+  pp(c, slab([-150, -30], [-176, 0], 8), stone, 0.1);                                                 // tail
+  // head + nemes
+  c.save(); c.translate(70, -96);
+  const nemes = poly([[-34, -30], [34, -30], [44, 30], [24, 46], [-24, 46], [-44, 30]]); pp(c, nemes, light, 0.2);
+  clipped(c, nemes, () => { for (let k = 0; k < 9; k++) piece(c, rectP(-50, -26 + k * 9, 100, 4), dark, { mul: 0.35 }); });
+  pp(c, union(ell(0, -4, 24, 30), ell(0, -38, 30, 10)), stone, 0.15);                                 // face and the band on the brow
+  piece(c, rectP(-30, -42, 60, 5), dark, { mul: 0.3 });
+  c.strokeStyle = '#7a5a3a'; c.lineWidth = 2; c.lineCap = 'round'; for (const ex of [-10, 10]) { c.beginPath(); c.moveTo(ex - 6, -10); c.lineTo(ex + 6, -10); c.stroke(); }
+  piece(c, poly([[0, -6], [5, 8], [-5, 8]]), dark, { mul: 0.3 }); c.beginPath(); c.moveTo(-8, 16); c.quadraticCurveTo(0, 20, 8, 16); c.stroke();
+  pp(c, rectP(-5, 24, 10, 22), dark, 0.1);                                                             // the beard
+  c.restore(); c.restore();
+}
+function pcEgypt(c, W, H) {
+  skyBands(c, W, ['#7cc0ea', '#98ceec', '#c2dde6', '#ecdcb8', '#f6c88a'], 46, 300, 2000);
+  glow(c, 800, 250, 260, '255,214,150', 0.55); tornPiece(c, ellipsePts(800, 252, 26, 26, 36), '#fff0c4', { amp: 1.2, seed: 2001, shadow: 0, rimCol: '#fffbe8' });
+  // far edge of the plateau: the green palm line and a haze of the city
+  strip(c, -20, W + 20, x => 318 + 3 * fbm1(x / 50, 2), H, '#b8bba0', { seed: 2002, rim: 0, shadow: 0.06, amp: 2 });
+  const rp = rng(2003); for (let k = 0; k < 18; k++) tornPiece(c, ellipsePts(-10 + k * 26 + rp() * 10, 318, 14, 9, 16), '#7a9a6a', { amp: 1.5, seed: 2010 + k, rim: 0, shadow: 0.08 });
+  pyramid(c, 120, 330, 170, 110, '#ecc68c', '#c99a62', 2020, false);
+  pyramid(c, 330, 334, 300, 205, '#f0cc90', '#cc9c64', 2021, true);
+  pyramid(c, 620, 338, 380, 236, '#f2d096', '#cf9f66', 2022, false);
+  for (let i = 0; i < 4; i++) camel(c, 470 + i * 22, 340 + (i % 2) * 2, 0.55, '#a07a52');               // a camel line far off
+  // the sand, rolling toward us
+  dune(c, -200, 120, 352, 520, 380, '#efcc8e', '#d6a868', 2030);
+  dune(c, 300, 780, 360, 1150, 400, '#f2d094', '#d8aa6a', 2031);
+  strip(c, -20, W + 20, x => 430 + 4 * fbm1(x / 110, 3), H, '#f4d69c', { seed: 2032, rimCol: '#fbe8c0', shadow: 0.16 });
+  sphinx(c, 250, 476, 1.05);
+  palm(c, 40, 460, 120, 1, 2040); palm(c, 860, 470, 100, 0.9, 2041);
+  strip(c, -20, W + 20, x => 520 + 4 * fbm1(x / 130, 4), H, '#f6dca4', { seed: 2033, rimCol: '#fff0cc', shadow: 0.18 });
+  const rr = rng(2034); for (let k = 0; k < 14; k++) { const x = rr() * W, y = 540 + rr() * 50; piece(c, slab([x - 26, y], [x + 26, y + 3], 0.9), '#e2bc7a', { mul: 0.2 }); }   // wind ripples
+}
+function pcEgyptFront(c, W, H, res) {
+  pcEgypt(c, W, H);
+  for (let i = 0; i < 6; i++) pp(c, ell(760 - i * 34, 588 - i * 4 + (i % 2) * 5, 5, 2.4), '#ddb276', 0);   // his paw prints
+  // Parker lying just like the Sphinx, paws out front, head up, keeping watch with it
+  pcParker(c, res, BOX_LIE, 1.05, p => drawLieB(p, 'happy', { headRot: -0.12 }), 600, 586);
+  vignette(c, W, H, '190,150,110', 0.45, 1.05);
+}
+
+// ================= BIRTHDAYS: Parker's (Nov 13), big sister's (May 2), Mommy's (Jan 25) =================
+function partyHat(c, x, y, s, rot, col, stripe) {
+  c.save(); c.translate(x, y); c.rotate(rot); c.scale(s, s);
+  const cone = poly([[-16, 0], [0, -42], [16, 0]]); pp(c, cone, col, 0.2);
+  clipped(c, cone, () => { for (let k = 0; k < 4; k++) piece(c, slab([-20, -6 - k * 11], [20, -14 - k * 11], 4), stripe, { mul: 0.3 }); });
+  pp(c, ell(0, 0, 17, 4), '#fff3dc', 0.08); pp(c, circ(0, -44, 6), '#fff3dc', 0.12);
+  c.restore();
+}
+function balloon(c, x, y, r, col, sx, sy) {
+  c.save(); c.strokeStyle = 'rgba(90,70,70,0.55)'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(x, y + r * 1.2); c.bezierCurveTo(x - 8, y + r * 2, sx + 10, (y + sy) / 2 + 20, sx, sy); c.stroke(); c.restore();
+  pp(c, ell(x, y, r, r * 1.18), col, 0.2); pp(c, poly([[x - 4, y + r * 1.25], [x + 4, y + r * 1.25], [x, y + r * 1.12]]), col, 0.05);
+  piece(c, ell(x - r * 0.35, y - r * 0.45, r * 0.22, r * 0.36, -0.4), 'rgba(255,255,255,0.6)', { mul: 0 });
+}
+function bunting(c, x0, x1, y, sag, cols, seed) {
+  const n = Math.floor((x1 - x0) / 34), pt = u => [lerp(x0, x1, u), y + sag * 4 * u * (1 - u)];
+  c.save(); c.strokeStyle = 'rgba(90,70,60,0.6)'; c.lineWidth = 1.4; c.beginPath(); for (let i = 0; i <= 40; i++) { const [px, py] = pt(i / 40); i ? c.lineTo(px, py) : c.moveTo(px, py); } c.stroke(); c.restore();
+  for (let i = 0; i < n; i++) { const [ax, ay] = pt((i + 0.15) / n), [bx, by] = pt((i + 0.85) / n); pp(c, poly([[ax, ay], [bx, by], [(ax + bx) / 2, (ay + by) / 2 + 22]]), cols[i % cols.length], 0.15); }
+}
+function cake(c, x, by, s, o = {}) {           // a little cake: tiers, dripping icing, candles with flames
+  c.save(); c.translate(x, by); c.scale(s, s);
+  pp(c, ell(0, 2, 56, 10), '#f6efe4', 0.2);                                                                 // the plate
+  const tiers = o.tiers || [[44, 34, o.col || '#f2b8c6']];
+  let y = 0;
+  for (const [w, h, col] of tiers) {
+    pp(c, rectP(-w, y - h, w * 2, h), col, 0.2); pp(c, ell(0, y - h, w, w * 0.22), shade(col, 1.15), 0.05);
+    const ic = new Path2D(); ic.moveTo(-w, y - h); for (let k = 0; k <= 8; k++) { const px = -w + k * w / 4; ic.lineTo(px, y - h + 6 + (k % 2 ? 8 : 3)); } ic.lineTo(w, y - h); ic.closePath();
+    piece(c, ic, o.icing || '#fffaf0', { mul: 0.2 }); piece(c, ell(0, y - h, w, w * 0.2), o.icing || '#fffaf0', { mul: 0.2 });
+    y -= h;
+  }
+  if (o.top) o.top(c, y);
+  const n = o.candles || 1;
+  for (let i = 0; i < n; i++) { const cx = (i - (n - 1) / 2) * 14; pp(c, rectP(cx - 2.5, y - 24, 5, 22), ['#7ab6e8', '#f5c04a', '#e98a8a'][i % 3], 0.1); glow(c, cx, y - 30, 22, '255,214,140', 0.8); pp(c, poly([[cx, y - 38], [cx + 4, y - 28], [cx, y - 24], [cx - 4, y - 28]]), '#ffcf5a', 0); }
+  c.restore();
+}
+function present(c, x, by, w, h, col, ribbon) { pp(c, rectP(x - w / 2, by - h, w, h), col, 0.2); pp(c, rectP(x - 3, by - h, 6, h), ribbon, 0); pp(c, union(ell(x - 7, by - h - 3, 8, 4, 0.4), ell(x + 7, by - h - 3, 8, 4, -0.4)), ribbon, 0.1); }
+function confetti(c, x0, y0, x1, y1, n, seed) { const r = rng(seed), cols = ['#e2574a', '#f5c04a', '#7ab6e8', '#8fd09a', '#f2a0c0']; for (let k = 0; k < n; k++) { const x = lerp(x0, x1, r()), y = lerp(y0, y1, r()), a = r() * TAU; piece(c, poly([[x + Math.cos(a) * 4, y + Math.sin(a) * 4], [x - Math.sin(a) * 2, y + Math.cos(a) * 2], [x - Math.cos(a) * 4, y - Math.sin(a) * 4]]), cols[k % 5], { mul: 0.3 }); } }
+// Parker's birthday: a party in his own yard, with his little visitors as guests
+function pcBdayParker(c, W, H) {
+  skyBands(c, W, ['#8cc8f0', '#a2d2f0', '#bcdef0', '#d6eaf0', '#eef0e4'], 40, 280, 2100);
+  for (const [x, y, w] of [[160, 110, 70], [640, 80, 90]]) { tornPiece(c, ellipsePts(x, y, w, w * 0.3, 30), '#ffffff', { amp: 2.5, seed: 2101 + x, rimCol: '#ffffff', shadow: 0.08, mul: 0.5 }); }
+  strip(c, -20, W + 20, x => 300 + 6 * fbm1(x / 90, 2), H, '#a6d878', { seed: 2102, rimCol: '#e1f3c8', shadow: 0.14 });
+  c.save(); c.translate(0, 26); c.scale(2.25, 2.25); fence(c, 130, 300); c.restore();
+  for (const [x, w] of [[470, 60], [560, 46], [880, 56]]) tornPiece(c, ellipsePts(x, 336, w, w * 0.6, 30), '#5fae62', { amp: 2.4, seed: 2110 + x, rimCol: '#a6d8a0', shadow: 0.2 });
+  strip(c, -20, W + 20, x => 360 + 4 * fbm1(x / 110, 3), H, '#9bd16f', { seed: 2103, rimCol: '#d8efbb', shadow: 0.18 });
+  c.save(); c.translate(30, 470); c.scale(1.55, 1.55); doghouse(c, 0, 0); c.restore();
+  bunting(c, -10, 520, 150, 60, ['#e2574a', '#f5c04a', '#7ab6e8', '#8fd09a', '#f2a0c0'], 2104);
+  bunting(c, 480, 910, 120, 50, ['#f2a0c0', '#7ab6e8', '#f5c04a', '#e2574a'], 2105);
+  for (const [x, y, r, col] of [[300, 210, 26, '#e2574a'], [340, 180, 24, '#f5c04a'], [272, 168, 22, '#7ab6e8']]) balloon(c, x, y, r, col, 250, 352);
+  strip(c, -20, W + 20, x => 470 + 4 * fbm1(x / 120, 4), H, '#93cb68', { seed: 2106, rimCol: '#cfe9b1', shadow: 0.12 });
+  const rt = rng(2107); for (let k = 0; k < 24; k++) tuft(c, rt() * W, 480 + rt() * 110, 14 + rt() * 8, rt() < 0.5 ? '#78b553' : '#86c15e', 2120 + k);
+  for (let k = 0; k < 8; k++) flower(c, 40 + rt() * 820, 500 + rt() * 90, 6, ['#fff7ee', '#f58cbf', '#f8d36a'][k % 3], 2140 + k, false);
+}
+function pcBdayParkerFront(c, W, H, res) {
+  pcBdayParker(c, W, H);
+  // a meaty birthday cake with a bone on top, one candle
+  cake(c, 560, 560, 1.05, { tiers: [[46, 30, '#c98a5a'], [32, 24, '#d9a070']], icing: '#fff6e8', candles: 1, top: (c, y) => { c.save(); c.translate(-16, y - 2); drawItem(c, 'bone', 0.5); c.restore(); } });
+  present(c, 700, 590, 56, 44, '#7ab6e8', '#fff3dc'); present(c, 750, 594, 40, 30, '#f2a0c0', '#f5c04a');
+  // the guests: the neighbour's cat (in a hat too), the squirrel with a nut, the sparrow on the roof
+  pcParker(c, res, BOX_NCAT, 1.0, p => drawNeighborCat(p, 'blink'), 820, 560, true); partyHat(c, 820, 428, 0.7, 0.18, '#8fd09a', '#fff3dc');
+  pcParker(c, res, BOX_SQ, 1.2, p => drawSquirrel(p, 'nibble'), 640, 596);
+  pcParker(c, res, { w: 60, h: 60, ox: 30, oy: 48 }, 1.5, p => drawBird(p, 0), 160, 300);
+  pcParker(c, res, BOX_SIT, 0.9, p => drawSitB(p, 'happy', 0.25), 380, 596);
+  partyHat(c, 404, 428, 1.1, 0.2, '#e2574a', '#f5c04a');
+  confetti(c, 200, 120, 880, 420, 60, 2150);
+  vignette(c, W, H, '200,170,170', 0.45, 1.05);
+}
+// big sister's birthday: a picnic in a spring garden
+function pcBdaySister(c, W, H) {
+  skyBands(c, W, ['#86c6ee', '#9ed0ee', '#bcdcee', '#dcecee', '#f4eee0'], 40, 260, 2200);
+  strip(c, -20, W + 20, x => 270 - 40 * Math.exp(-(((x - 650) / 220) ** 2)) + 4 * fbm1(x / 60, 2), H, '#b5dc96', { seed: 2201, shadow: 0.1 });
+  strip(c, -20, W + 20, x => 300 - 26 * Math.exp(-(((x - 200) / 200) ** 2)) + 4 * fbm1(x / 60, 3), H, '#9ccf7e', { seed: 2202, shadow: 0.12 });
+  for (const [x, y, r] of [[120, 270, 54], [760, 250, 60]]) {                                         // blossoming trees
+    pp(c, limb([x, y + 70], [x + 4, y + 10], 9, 7), '#7a5a42', 0.15);
+    tornPiece(c, ellipsePts(x, y, r, r * 0.8, 30), '#f4b8c8', { amp: 2.4, seed: 2210 + x, rimCol: '#fde0e8', shadow: 0.18 });
+    tornPiece(c, ellipsePts(x - r * 0.3, y - r * 0.4, r * 0.55, r * 0.45, 24), '#f8cad6', { amp: 2, seed: 2220 + x, rim: 0, shadow: 0.1 });
+    const rb = rng(2230 + x); for (let k = 0; k < 22; k++) { const a = rb() * TAU, d = Math.sqrt(rb()) * r * 0.85; piece(c, circ(x + Math.cos(a) * d, y + Math.sin(a) * d * 0.8, 2.5 + rb() * 2.5), k % 3 ? '#fde4ec' : '#e88aa6', { mul: 0.3 }); }
+  }
+  strip(c, -20, W + 20, x => 360 + 4 * fbm1(x / 100, 4), H, '#8cc86a', { seed: 2203, rimCol: '#cde8b4', shadow: 0.16 });
+  const rf = rng(2204); for (let k = 0; k < 30; k++) flower(c, rf() * W, 380 + rf() * 210, 4 + rf() * 3, ['#fff7ee', '#f58cbf', '#f8d36a', '#c8a6df'][k % 4], 2240 + k, false);
+  // the picnic blanket (red gingham) in perspective
+  const blanket = poly([[360, 470], [800, 470], [880, 590], [300, 590]]);
+  pp(c, blanket, '#fbeeee', 0.2);
+  clipped(c, blanket, () => { for (let k = 0; k < 12; k++) { const u = k / 12; piece(c, poly([[lerp(360, 800, u), 470], [lerp(360, 800, u) + 18, 470], [lerp(300, 880, u) + 24, 590], [lerp(300, 880, u), 590]]), 'rgba(226,87,74,0.55)', { mul: 0 }); } for (let k = 0; k < 5; k++) piece(c, rectP(280, 476 + k * 26, 620, 11), 'rgba(226,87,74,0.45)', { mul: 0 }); });
+}
+function pcBdaySisterFront(c, W, H, res) {
+  pcBdaySister(c, W, H);
+  cake(c, 640, 552, 1.0, { tiers: [[46, 36, '#fbe6ee']], icing: '#ffffff', candles: 3, top: (c, y) => { for (const dx of [-26, -8, 12, 28]) { pp(c, ell(dx, y + 2, 6, 5), '#e2574a', 0.08); piece(c, ell(dx, y - 3, 3, 1.4), '#5fae5a', { mul: 0.3 }); } } });
+  present(c, 770, 576, 48, 38, '#c8a6df', '#fff3dc');
+  // a little basket of flowers he picked for her
+  pp(c, ell(500, 566, 40, 14), '#c9944e', 0.2); pp(c, rectP(462, 540, 76, 26), '#d9a45e', 0.15); c.save(); c.strokeStyle = '#a8742f'; c.lineWidth = 4; c.beginPath(); c.arc(500, 540, 34, Math.PI, 0); c.stroke(); c.restore();
+  for (let k = 0; k < 7; k++) flower(c, 474 + k * 9, 534 - (k % 2) * 6, 7, ['#f58cbf', '#fff7ee', '#f8d36a'][k % 3], 2250 + k, false);
+  for (const [x, y, r, col] of [[210, 180, 26, '#f2a0c0'], [250, 150, 24, '#fff3a8'], [176, 140, 22, '#a8d8f0']]) balloon(c, x, y, r, col, 300, 440);
+  pcParker(c, res, BOX_SIT, 0.92, p => drawSitB(p, 'happy', 0.2, { mouth: 'gift' }), 300, 594);
+  for (const [x, y, col] of [[420, 230, '#f5c04a'], [560, 300, '#fff7ee'], [860, 380, '#c8a6df']]) { for (const d of [-1, 1]) pp(c, ell(x + d * 7, y, 8, 5, d * 0.5), col, 0.1); pp(c, ell(x, y + 1, 1.6, 5), '#5b3f37', 0); }   // butterflies
+  confetti(c, 340, 120, 880, 360, 30, 2260);
+  vignette(c, W, H, '190,160,180', 0.45, 1.05);
+}
+// Mommy's birthday: a warm room on a snowy winter evening
+function pcBdayMom(c, W, H) {
+  piece(c, rectP(0, 0, W, H), '#f4e2c6', { scr: 0.2 });                                              // wallpaper
+  for (let x = 30; x < W; x += 60) for (let y = 30; y < 440; y += 60) piece(c, circ(x + ((y / 60) % 2) * 30, y, 4), '#ead0a8', { mul: 0.3 });
+  pp(c, rectP(0, 420, W, 14), '#c99a6a', 0.2);                                                       // a dado rail
+  piece(c, rectP(0, 434, W, 170), '#e6c49a', { mul: 0.4 });
+  // the window: snowy evening outside
+  const win = rectP(300, 70, 300, 230);
+  pp(c, rectP(286, 56, 328, 258), '#fbf4e8', 0.25);
+  clipped(c, win, () => {
+    skyBands(c, W, ['#2a3366', '#344080', '#4a5294', '#6a6aa8', '#8a82b8'], 70, 260, 2300);
+    for (const [x, w, h] of [[320, 60, 40], [400, 80, 56], [500, 70, 46], [580, 60, 38]]) { pp(c, rectP(x - w / 2, 300 - h, w, h), '#5a5a86', 0.1); pp(c, poly([[x - w / 2 - 6, 300 - h], [x, 300 - h - 22], [x + w / 2 + 6, 300 - h]]), '#eef2fc', 0.1); glow(c, x, 300 - h / 2, 18, '255,200,120', 0.7); piece(c, rectP(x - 6, 300 - h / 2 - 6, 12, 12), '#ffd88a', { mul: 0.2 }); }
+    snowPine(c, 360, 300, 60, 2310); snowPine(c, 560, 300, 50, 2311);
+    piece(c, rectP(300, 280, 300, 20), '#e8eef8', { mul: 0.2 });
+    snowFall(c, W, 320, 2312, 60);
+  });
+  pp(c, rectP(446, 70, 8, 230), '#fbf4e8', 0.1); pp(c, rectP(300, 180, 300, 8), '#fbf4e8', 0.1);
+  for (const side of [-1, 1]) { const x = side < 0 ? 270 : 630; const cur = poly([[x - 26, 50], [x + 26, 50], [x + 18 + side * 10, 330], [x - 18 + side * 10, 330]]); pp(c, cur, '#d9786a', 0.2); clipped(c, cur, () => { for (let k = 0; k < 5; k++) piece(c, rectP(x - 30 + k * 13, 40, 3, 300), '#c4645a', { mul: 0.3 }); }); }
+  // string lights along the top, a framed paw print
+  for (let i = 0; i < 14; i++) { const u = i / 13, x = lerp(30, 870, u), y = 30 + Math.sin(u * Math.PI * 3) * 10; glow(c, x, y, 14, ['255,200,120', '255,150,150', '170,220,255'][i % 3], 0.8); }
+  pp(c, rectP(90, 120, 110, 130), '#c99a6a', 0.25); pp(c, rectP(100, 130, 90, 110), '#fff6e8', 0); pawPrint(c, 145, 190, 1.6, '#e2574a');
+  pp(c, rectP(700, 110, 130, 100), '#c99a6a', 0.25); pp(c, rectP(710, 120, 110, 80), '#fff6e8', 0); for (let k = 0; k < 3; k++) piece(c, ell(740 + k * 26, 172, 10, 14), ['#f2a0c0', '#7ab6e8', '#f5c04a'][k], { mul: 0.3 });   // a little drawing of the family
+  // the table
+  pp(c, rectP(140, 450, 620, 20), '#fbf4ee', 0.25); clipped(c, rectP(140, 450, 620, 80), () => { for (let k = 0; k < 20; k++) piece(c, circ(150 + k * 32, 470, 8), '#fbf4ee', { mul: 0.2 }); });   // lace edge
+  pp(c, rectP(150, 470, 18, 140), '#a8743e', 0.2); pp(c, rectP(732, 470, 18, 140), '#a8743e', 0.2);
+  glow(c, 450, 300, 360, '255,210,150', 0.25);
+}
+function pcBdayMomFront(c, W, H, res) {
+  pcBdayMom(c, W, H);
+  cake(c, 560, 450, 1.0, { tiers: [[50, 34, '#fbe2c0'], [34, 26, '#fbe2c0']], icing: '#ffffff', candles: 5, top: (c, y) => { pp(c, ell(0, y - 2, 8, 6), '#e2574a', 0.08); } });
+  // a vase of tulips
+  pp(c, poly([[268, 450], [300, 450], [306, 410], [262, 410]]), '#7ab6e8', 0.2);
+  for (const [dx, col] of [[-14, '#e2574a'], [0, '#f2a0c0'], [14, '#f5c04a']]) { pp(c, limb([284, 412], [284 + dx, 350], 2, 1.6), '#5f9a52', 0.08); pp(c, union(ell(284 + dx, 342, 9, 12), poly([[275 + dx, 340], [279 + dx, 328], [284 + dx, 336], [289 + dx, 328], [293 + dx, 340]])), col, 0.12); }
+  pp(c, ell(450, 590, 260, 22), '#d98a6a', 0.15); pp(c, ell(450, 590, 220, 16), '#e8a87a', 0);     // the rug
+  pcParker(c, res, BOX_SIT, 0.92, p => drawSitB(p, 'happy', 0.2, { mouth: 'bouquet' }), 420, 596);
+  vignette(c, W, H, '170,120,100', 0.45, 1.05);
+}
+
 const POSTCARDS = [
   { id: 'chiangmai', rare: false, front: pcChiangMaiFront, scene: pcChiangMai, stamp: '#c4533f', ink: '#6c4a6e' },
   { id: 'pai', front: pcPaiFront, scene: pcPai, ink: '#7a4a6e' },
@@ -1207,6 +1403,7 @@ const POSTCARDS = [
   { id: 'dunhuang', rare: true, front: pcDunhuangFront, scene: pcDunhuang, ink: '#9a5a2a' },
   { id: 'tekapo', rare: true, front: pcTekapoFront, scene: pcTekapo, ink: '#2a3a6a' },
   { id: 'istanbul', front: pcIstanbulFront, scene: (c, W, H) => pcIstanbul(c, W, H, false), ink: '#2f4a6a' },
+  { id: 'egypt', front: pcEgyptFront, scene: pcEgypt, ink: '#8a5a2a' },
   { id: 'meet-cat', meet: 'cat', front: pcMeetCatFront, scene: (c, W, H) => pcIstanbul(c, W, H, true), ink: '#6a3a5a' },
   { id: 'meet-peafowl', meet: 'peafowl', front: pcMeetPeafowlFront, scene: pcMeetPeafowl, ink: '#2f6a5a' },
   { id: 'meet-kinako', meet: 'kinako', front: pcMeetKinakoFront, scene: pcFushimi, ink: '#8a3a2e' },
@@ -1216,6 +1413,9 @@ const POSTCARDS = [
   { id: 'fest-newyear', fest: 'newyear', front: pcNewYearFront, scene: pcNewYear, ink: '#7a3a4a' },
   { id: 'fest-cny', fest: 'cny', front: pcCNYFront, scene: pcCNY, ink: '#a8282a' },
   { id: 'fest-songkran', fest: 'songkran', front: pcSongkranFront, scene: pcSongkran, ink: '#2a6a8a' },
+  { id: 'fest-bday-parker', fest: 'bday-parker', front: pcBdayParkerFront, scene: pcBdayParker, ink: '#a8423a' },
+  { id: 'fest-bday-sister', fest: 'bday-sister', front: pcBdaySisterFront, scene: pcBdaySister, ink: '#9a4a7a' },
+  { id: 'fest-bday-mom', fest: 'bday-mom', front: pcBdayMomFront, scene: pcBdayMom, ink: '#8a4a3a' },
 ];
 
 // ---- back: place name + a short line in both languages, stamp, postmark ----
@@ -1261,7 +1461,9 @@ function pcBack(c, W, H, pc, res, year, friend) {
   c.save(); c.strokeStyle = pc.ink; c.fillStyle = pc.ink; c.globalAlpha = 0.55; c.lineWidth = 2;
   const px = sx - 20, py = sy + 120;
   c.beginPath(); c.arc(px, py, 46, 0, TAU); c.stroke(); c.beginPath(); c.arc(px, py, 38, 0, TAU); c.stroke();
-  c.font = `600 10px ${FONT}`; c.textAlign = 'center'; c.fillText(T(`pc.${id}.name`, 'en').split(' ').slice(0, 2).join(' ').toUpperCase(), px, py - 4); c.fillText('· 2026 ·', px, py + 14);
+  const pm = T(`pc.${id}.name`, 'en').split(' ').slice(0, 2).join(' ').toUpperCase(); c.textAlign = 'center';
+  c.font = `600 10px ${FONT}`; const fw = c.measureText(pm).width; if (fw > 66) c.font = `600 ${Math.max(7, 10 * 66 / fw).toFixed(1)}px ${FONT}`;   // shrink long names to fit the ring
+  c.fillText(pm, px, py - 4); c.font = `600 10px ${FONT}`; c.fillText(`· ${year || 2026} ·`, px, py + 14);
   for (let i = 0; i < 4; i++) { c.beginPath(); for (let x = 0; x <= 120; x += 4) { const yy = py - 22 + i * 13 + Math.sin(x / 9) * 3; x ? c.lineTo(px + 50 + x, yy) : c.moveTo(px + 50, yy); } c.stroke(); }
   c.restore();
   // address lines
