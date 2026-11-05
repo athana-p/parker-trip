@@ -9,6 +9,9 @@
 //  - loves playing ball                            → stage 2: ball toy (shop)
 //  - shakes his plush toy side to side             → stage 2: plush toy (shop)
 //  - comes running at the sound of a plastic bag   → stage 2: opening the shop / backpack brings him over
+//  - weather (stage 3): watches the rain from under the eave (and dashes out, gets wet, shakes off), naps in the
+//    sun then rolls belly-up, chases a blown leaf or petal, snaps at snowflakes (snow on his nose, paw prints),
+//    lies flat in the shade on a hot summer afternoon, wanders slowly sniffing in the fog
 const HABITS = {
   // what he does next when he's free, per time of day
   idle: {
@@ -39,4 +42,21 @@ const HABITS = {
   stirTime: 1.4,
   wakeTaps: 3,                         // tap him this many times quickly while he sleeps and he gets up to keep you company
   companyTime: 150,                    // …for this many seconds, then back to bed
+  // weather: extra free-time choices on top of the usual ones; `calm` scales the usual ones (not at night)
+  weather: {
+    rain:  { add: { shelter: 7, splash: 1.2 }, calm: 0.25 },   // under the eave watching; now and then a dash out into it
+    sunny: { add: { sunbathe: 1.6 }, calm: 1 },                // a nap in the sun, then belly-up (morning and day only)
+    wind:  { add: { chase: 2.6 }, calm: 0.8 },                 // chases a leaf or petal blowing past
+    snow:  { add: { snap: 2.6, snowwalk: 2.2 }, calm: 0.6 },   // snaps at flakes; walks about leaving paw prints
+    hot:   { add: { flat: 5 }, calm: 0.35 },                    // hot summer afternoon: flat out in the shade
+    fog:   { add: { fogsniff: 4.5 }, calm: 0.4 },              // wanders slowly, sniffing
+    cloudy: { add: {}, calm: 1 },
+  },
+  wxTime: { shelter: [10, 20], wet: [2.5, 4], shakeOff: 1.3, sunnap: [10, 18], sunbelly: 4.5, chase: [2.4, 3.4], snap: 2.6, flat: [14, 24] },
+  slowSpeed: 24,                       // walking in the fog
+  chaseSpeed: 108,                     // after a blown leaf
+  noseSnow: 9,                         // seconds the snow stays on his nose
+  giftSniff: 1.2,                      // a visitor's gift lying in the yard: he goes over to sniff it (stage 4)
+  printEvery: 13,                      // a paw print every this many scene units walked in snow
 };
+

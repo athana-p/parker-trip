@@ -64,6 +64,18 @@ function drawItem(c, id, s = 1) {
       c.fillStyle = PK.eye; c.beginPath(); c.arc(-12, -13, 1.7, 0, TAU); c.fill();
       blush(c, [[-6, -7]], 2.6, 0.6);
       break;
+    case 'simit': {                        // an Istanbul sesame ring
+      const r = new Path2D(); r.addPath(circ(0, 0, 20)); const h = new Path2D(); h.arc(0, 0, 9, 0, TAU, true);
+      pp(c, union(r, h), '#c9853a', 0.2); c.save(); c.clip(union(r, h), 'evenodd'); piece(c, circ(-4, -4, 18), '#e0a050', { mul: 0.3 }); c.restore();
+      c.save(); c.fillStyle = '#fbf0d8'; const rr = rng(77); for (let i = 0; i < 30; i++) { const a = rr() * TAU, d = 11 + rr() * 8; c.beginPath(); c.ellipse(Math.cos(a) * d, Math.sin(a) * d, 1.4, 0.8, a, 0, TAU); c.fill(); } c.restore();
+      break;
+    }
+    case 'teaglass': teaGlass(c, 0, 20, 1.2); break;
+    case 'gift': {                         // a small wrapped present
+      pp(c, rectP(-18, -14, 36, 28), '#d9433a', 0.22); pp(c, rectP(-4, -14, 8, 28), ARCH.gold, 0); pp(c, rectP(-18, -4, 36, 7), ARCH.gold, 0);
+      pp(c, union(ell(-8, -18, 9, 5, 0.4), ell(8, -18, 9, 5, -0.4)), ARCH.gold, 0.12); pp(c, circ(0, -17, 3.5), '#e2a93d', 0);
+      break;
+    }
     case 'card': {
       c.rotate(-0.12);
       pp(c, rectP(-24, -16, 48, 32), '#fffaf0', 0.22); pp(c, rectP(-21, -13, 27, 26), '#24366c', 0);
@@ -127,6 +139,8 @@ function drawSouvenir(c, id, s = 1) {
       P(b, '#e8f2f0'); clipped(c, b, () => [['#e8a34a', -4], ['#f3cf6a', -9], ['#d9663f', -13], ['#f2b46a', -18]].forEach(([col, y]) => piece(c, rectP(-20, y - 5, 40, 6), col, { mul: 0.4 })));
       P(rectP(-5, -42, 10, 7), '#b07a50', 0.1); break;
     }
+    case 'istanbul':         // a tulip-shaped glass of Turkish tea
+      teaGlass(c, 0, 0, 1.3); break;
     case 'tekapo': {         // a jar of stars
       const j = new Path2D(); j.roundRect ? j.roundRect(-16, -38, 32, 38, 7) : j.rect(-16, -38, 32, 38);
       P(j, '#2c3561'); P(rectP(-13, -44, 26, 7), '#c9a26e', 0.1);
@@ -137,17 +151,21 @@ function drawSouvenir(c, id, s = 1) {
   c.restore();
 }
 
-// the little bird that visits while he's away. k: 0 stand, 1 peck, 2/3 wings
+// the sparrow that visits (mostly while he's away): a tree sparrow — chestnut cap, white cheek with a black spot,
+// little black bib, streaky brown back. k: 0 stand, 1 peck, 2/3 wings
 function drawBird(c, k = 0) {
   c.save(); if (k === 1) { c.translate(0, -8); c.rotate(0.5); c.translate(0, 8); }
-  if (k < 2) { c.save(); c.strokeStyle = '#d9883c'; c.lineWidth = 1.4; c.beginPath(); c.moveTo(-2, -6); c.lineTo(-3, 0); c.moveTo(3, -6); c.lineTo(3, 0); c.stroke(); c.restore(); }
-  fp(c, poly([[-12, -14], [-24, -18], [-22, -10]]), '#5d8fbf', { sh: 0.1 });
-  fp(c, ell(0, -14, 13, 10), '#7fb6e0', { sh: 0.2 }); piece(c, ell(3, -10, 8, 5.5), '#fff2d8', { mul: 0.3 });
-  fp(c, circ(9, -22, 7), '#7fb6e0', { sh: 0.1 });
-  piece(c, poly([[15, -23], [21, -21], [15, -19]]), '#f0a33c', { mul: 0.4 });
+  if (k < 2) { c.save(); c.strokeStyle = '#c99a7a'; c.lineWidth = 1.4; c.beginPath(); c.moveTo(-2, -6); c.lineTo(-3, 0); c.moveTo(3, -6); c.lineTo(3, 0); c.stroke(); c.restore(); }
+  fp(c, poly([[-12, -14], [-24, -17], [-22, -10]]), '#6e4a32', { sh: 0.1 });                          // tail
+  const body = ell(0, -14, 13, 10); fp(c, body, '#b4875e', { sh: 0.2 });
+  clipped(c, body, () => { piece(c, ell(3, -9, 9, 6), '#efe2cc', { mul: 0.3 }); for (const x of [-9, -4]) piece(c, slab([x, -22], [x - 3, -14], 1.8), '#5e3e28', { mul: 0.4 }); });
+  fp(c, circ(9, -22, 7), '#a5603c', { sh: 0.1 });                                                       // chestnut cap
+  clipped(c, circ(9, -22, 7), () => { piece(c, ell(10, -18, 7.5, 4.2), '#fbf6ee', { mul: 0.2 }); piece(c, circ(8, -18.5, 1.6), '#2f2622', { mul: 0.3 }); });   // white cheek + black spot
+  piece(c, ell(14, -15, 2.6, 2.2), '#2f2622', { mul: 0.3 });                                           // bib
+  piece(c, poly([[15, -23], [20.5, -21.5], [15, -19.5]]), '#4a3a32', { mul: 0.4 });
   c.fillStyle = PK.eye; c.beginPath(); c.arc(11, -24, 1.4, 0, TAU); c.fill();
-  blush(c, [[9, -19]], 2.2, 0.5);
   const wing = k === 2 ? poly([[-6, -16], [-14, -38], [4, -20]]) : k === 3 ? poly([[-6, -14], [-12, 2], [4, -12]]) : ell(-3, -15, 8, 5, 0.3);
-  fp(c, wing, '#5d8fbf', { sh: 0.12 });
+  fp(c, wing, '#8a5e3c', { sh: 0.12 });
+  if (k < 2) { piece(c, slab([-9, -13], [2, -16], 1.4), '#f6efe4', { mul: 0.3 }); piece(c, slab([-8, -17], [-1, -19], 1.6), '#4e3424', { mul: 0.4 }); }
   c.restore();
 }

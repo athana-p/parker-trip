@@ -141,6 +141,14 @@ function head3q(c, G, expr) {
   const [nx, ny, nrx, nry] = G.nose;
   mouthFront(c, nx, ny + nry + 1.5 * G.s, G.s, expr);
   nose(c, nx, ny, nrx, nry);
+  if (HEAD_SNOW) noseSnow(c, nx, ny, nrx, nry);
+}
+// a dab of snow on his nose (stage 3): the sprite builder switches it on for drawings whose key ends in |sn
+let HEAD_SNOW = false;
+function noseSnow(c, x, y, rx, ry) {
+  const m = union(ell(x, y - ry * 0.95, rx * 1.15, ry * 0.7), circ(x - rx * 0.35, y - ry * 1.45, rx * 0.55), circ(x + rx * 0.45, y - ry * 1.35, rx * 0.5));
+  fp(c, m, '#dfe9f6', { sh: 0.45, mul: 0.2 });                       // cool shadowed underside so it reads on white fur
+  fp(c, union(ell(x - rx * 0.1, y - ry * 1.25, rx * 0.95, ry * 0.5), circ(x - rx * 0.35, y - ry * 1.55, rx * 0.42)), '#ffffff', { sh: 0, mul: 0.15 });
 }
 // side head, facing right
 function headSide(c, G, expr) {
@@ -164,6 +172,7 @@ function headSide(c, G, expr) {
   }
   c.restore();
   nose(c, nx, ny, nrx, nry);
+  if (HEAD_SNOW) noseSnow(c, nx, ny, nrx, nry);
 }
 
 // ================= THE TWO DESIGN OPTIONS =================
@@ -378,6 +387,7 @@ function lookBackPose(wagK = 0) {
 
 // ---- sitting (side body, head turned 3/4 to the viewer) ----
 function drawSitB(c, expr = 'calm', wag = 0, o = {}) {
+  const scarfLater = !!o.scarf;
   // tail puff peeking out behind the rump
   c.save(); c.translate(-30, -40); c.rotate(wag); c.translate(30, 40); tail(c, -50, -62, 25); c.restore();
   fp(c, union(limb([22, -84], [26, -9], 22, 20), ell(30, -8, 11, 6.5)), PK.furS, { sh: 0.14 });   // far front leg
@@ -397,8 +407,9 @@ function drawSitB(c, expr = 'calm', wag = 0, o = {}) {
   const p = new Path2D(); p.moveTo(-4, -118); p.quadraticCurveTo(30, -100, 70, -116); p.lineTo(70, -106); p.quadraticCurveTo(30, -88, -4, -108); p.closePath();
   clipped(c, union(body, ell(40, -100, 24, 30)), () => twoTone(c, p, 46, PK.hYellow, PK.hGreen)); ring(c, 46, -101, 3.5);
   if (o.pack) backpack(c, -26, -96, 0.5);
+  if (scarfLater) scarfSide(c);
   c.save(); c.translate(34, -166 + (o.headDy || 0)); c.rotate(o.headRot || 0); c.scale(0.9, 0.9); head3q(c, DESIGNS.B.q.G, expr);
-  if (o.mouth) { c.translate(30, 52); c.rotate(0.2); drawItem(c, o.mouth, 1.05); }        // a toy held in his mouth
+  if (o.mouth) { c.translate(30, 52); c.rotate(0.2); drawItem(c, o.mouth, o.mouth === 'simit' ? 0.85 : 1.05); }        // a toy held in his mouth
   c.restore();
 }
 const BOX_SIT = { w: 250, h: 280, ox: 115, oy: 264 };
@@ -424,6 +435,25 @@ function drawLieB(c, expr = 'sleepy', o = {}) {
   c.save(); c.translate(84, -58 - br * 0.5); c.rotate(o.headRot ?? 0.06); c.scale(0.86, 0.86); head3q(c, DESIGNS.B.q.G, expr); c.restore();
 }
 const BOX_LIE = { w: 280, h: 170, ox: 110, oy: 150 };
+// flat out on a hot afternoon (stage 3): belly on the cool ground, hind legs stretched out behind, panting
+function drawFlatB(c, k = 0) {
+  const br = k ? 1.2 : 0;
+  tail(c, -84, -16, 19);
+  fp(c, union(limb([-36, -12], [-100, -9], 17, 13), ell(-104, -8, 11, 6)), PK.furS, { sh: 0.14 });    // far hind leg, stretched back
+  fp(c, union(limb([34, -14], [88, -7], 17, 15), ell(92, -6, 11, 6)), PK.furS, { sh: 0.14 });         // far front leg
+  const body = union(ell(-6, -24 - br, 66, 22 + br), circ(-40, -24, 22), circ(30, -26 - br * 0.6, 24 + br * 0.6));
+  fp(c, body, PK.fur, { sh: 0.16 });
+  clipped(c, body, () => {
+    c.save(); c.globalAlpha = 0.85; piece(c, ell(0, -3, 70, 8), PK.furS, { mul: 0.5, scr: 0.1 }); c.restore();
+    c.save(); c.globalAlpha = 0.5; piece(c, ell(-14, -44, 56, 8), PK.cream, { mul: 0.4, scr: 0.1 }); c.restore();
+    girth(c, [6, -50 - br], [10, -2], 10);
+    band(c, [40, -48 - br], [8, -48 - br], 8, PK.hNavy, { sh: 0.14 });
+  });
+  fp(c, union(limb([-28, -10], [-94, -3], 19, 15), ell(-98, -3, 12, 6.5)), PK.fur, { sh: 0.16 });     // near hind leg, frog-style
+  fp(c, union(limb([40, -12], [98, -5], 19, 17), ell(102, -5, 12, 7)), PK.fur, { sh: 0.14 });         // near front leg
+  c.save(); c.translate(88, -42 - br * 0.4); c.rotate(0.1); c.scale(0.86, 0.86); head3q(c, DESIGNS.B.q.G, 'pant'); c.restore();
+}
+const BOX_FLAT = { w: 320, h: 150, ox: 140, oy: 128 };
 // sniffing: standing, head low, two drawings (sniff-sniff)
 function sniffPose(k) { return { ...STAND0, wag: 0.1, head: { view: 'side', dx: 6, dy: 32 + (k % 2) * 2.5, rot: 0.4 + (k % 2) * 0.03 }, expr: 'sniff' }; }
 
@@ -546,8 +576,21 @@ function drawWaveB(c, k = 0, o = {}) {
   const nl = new Path2D(); nl.moveTo(-34, -94); nl.quadraticCurveTo(0, -78, 34, -94); nl.lineTo(34, -85); nl.quadraticCurveTo(0, -69, -34, -85); nl.closePath();
   twoTone(c, nl, 3, PK.hYellow, PK.hGreen); ring(c, 3, -81, 3.5);
   for (const s of [-1, 1]) fp(c, ell(s * 46, -6, 14, 7.5), PK.fur, { sh: 0.14 });            // hind paws
+  const paws = o.paws || 'wave';
   fp(c, union(limb([-16, -62], [-18, -8], 20, 18), ell(-18, -6, 13, 7.5)), PK.fur, { sh: 0.16 });   // the paw on the ground
-  c.save(); c.translate(0, -126); c.rotate(-0.06); c.scale(0.8, 0.8); head3q(c, DESIGNS.B.q.G, o.expr || 'happy'); c.restore();
+  if (paws === 'bow') fp(c, union(limb([16, -62], [18, -8], 20, 18), ell(18, -6, 13, 7.5)), PK.fur, { sh: 0.16 });
+  if (o.scarf) scarfFront(c, -86);
+  const bow = paws === 'bow';
+  c.save(); c.translate(0, bow ? -100 : -130); c.rotate(bow ? 0.04 : -0.06); c.scale(bow ? 0.76 : 0.8, bow ? 0.76 : 0.8); head3q(c, DESIGNS.B.q.G, o.expr || (bow ? 'content' : 'happy')); c.restore();
+  if (paws === 'gong') {                                                     // forepaws pressed together at the chest, a red envelope between them
+    fp(c, rectP(-11, -86, 22, 30), '#d9332e', 0.2); piece(c, rectP(-11, -86, 22, 9), '#b8282a', { mul: 0.4 }); piece(c, circ(0, -74, 4.5), ARCH.gold, { mul: 0.3 });
+    for (const s of [-1, 1]) {
+      fp(c, limb([s * 30, -84], [s * 14, -66], 20, 17), PK.fur, { sh: 0.2 });
+      fp(c, ell(s * 12, -64, 11, 13, s * -0.25), PK.fur, { sh: 0.22 });
+      c.save(); c.strokeStyle = 'rgba(150,120,100,0.45)'; c.lineWidth = 1.2; for (const t of [-4, 2]) { c.beginPath(); c.moveTo(s * 12 - 6, -58 + t); c.lineTo(s * 12 + 6, -58 + t); c.stroke(); } c.restore();
+    }
+  }
+  if (paws !== 'wave') return;
   // the waving paw, palm toward you
   const paw = k ? [70, -124] : [58, -136];
   fp(c, limb([20, -76], paw, 20, 17), PK.fur, { sh: 0.18 });
@@ -557,3 +600,38 @@ function drawWaveB(c, k = 0, o = {}) {
   c.restore();
 }
 const BOX_WAVE = { w: 230, h: 260, ox: 112, oy: 236 };
+
+// ---- a little knitted scarf (Christmas): red with cream stripes and a fringed end ----
+function knit(c, p) {
+  fp(c, p, '#d9433a', { sh: 0.2, mul: 0.5 });
+  clipped(c, p, () => { for (let k = -8; k < 8; k++) piece(c, rectP(k * 14, -400, 5, 800), '#f6e6cc', { mul: 0.3 }); });
+}
+function scarfFront(c, y) {
+  const p = new Path2D(); p.moveTo(-38, y - 8); p.quadraticCurveTo(0, y + 12, 38, y - 8); p.lineTo(38, y + 6); p.quadraticCurveTo(0, y + 26, -38, y + 6); p.closePath(); knit(c, p);
+  const t = poly([[8, y + 10], [24, y + 8], [28, y + 46], [12, y + 48]]); knit(c, t);
+  for (let i = 0; i < 4; i++) fp(c, rectP(13 + i * 4, y + 47, 2.4, 7), '#f6e6cc', { sh: 0 });
+}
+function scarfSide(c) {                                     // around the neck of the 3/4 sitting pose
+  const p = new Path2D(); p.moveTo(-6, -122); p.quadraticCurveTo(32, -100, 72, -118); p.lineTo(72, -102); p.quadraticCurveTo(32, -84, -6, -106); p.closePath(); knit(c, p);
+  const t = poly([[40, -96], [56, -98], [60, -58], [44, -56]]); knit(c, t);
+  for (let i = 0; i < 4; i++) fp(c, rectP(45 + i * 4, -57, 2.4, 7), '#f6e6cc', { sh: 0 });
+}
+
+// ---- shaking off water, facing you: soaked spiky fur, head whipping to one side (k = 0/1: the two ends of the shake) ----
+function drawShakeB(c, k = 0, o = {}) {
+  const d = k ? 1 : -1;
+  tail(c, -d * 34, -126, 17);
+  for (const s of [-1, 1]) fp(c, union(limb([s * 30, -52], [s * 34, -8], 18, 16), ell(s * 36, -6, 12, 7)), PK.furS, { sh: 0.14 });   // hind legs behind
+  const body = ell(d * 4, -72, 46, 36, d * 0.08);
+  const spikes = new Path2D(); for (let i = 0; i < 18; i++) { const a = i / 18 * TAU, x = d * 4 + Math.cos(a) * 44, y = -72 + Math.sin(a) * 34; spikes.addPath(poly([[x - Math.sin(a) * 6, y + Math.cos(a) * 6], [x + Math.cos(a) * 12, y + Math.sin(a) * 12], [x + Math.sin(a) * 6, y - Math.cos(a) * 6]])); }
+  fp(c, union(body, spikes), PK.fur, { sh: 0.16 });                         // wet, spiky outline
+  if (o.pack) for (const s of [-1, 1]) band(c, [s * 30, -100], [s * 36, -62], 7, '#c7453a', { sh: 0.12 });
+  fp(c, ell(0, -50, 32, 22), PK.fur, { sh: 0.12 });
+  band(c, [3, -60], [3, -30], 8, PK.hBlue, { sh: 0.12 });
+  for (const s of [-1, 1]) fp(c, union(limb([s * 16, -52], [s * 18, -6], 19, 17), ell(s * 19, -5, 13, 7.5)), PK.fur, { sh: 0.16 });   // forelegs
+  // motion: pale paper slivers either side, and drops flying off
+  for (const s of [-1, 1]) for (let i = 0; i < 2; i++) { const r = 64 + i * 12, p = new Path2D(); p.arc(d * 6, -110, r, s > 0 ? -0.5 : Math.PI - 0.4, s > 0 ? 0.4 : Math.PI + 0.5); p.arc(d * 6, -110, r - 4, s > 0 ? 0.4 : Math.PI + 0.5, s > 0 ? -0.5 : Math.PI - 0.4, true); p.closePath(); piece(c, p, '#cfe8f6', { mul: 0.2 }); }
+  for (const [x, y] of [[-78, -150], [84, -140], [-70, -96], [90, -100], [-60, -170], [66, -172]]) { const p = new Path2D(); p.moveTo(x, y - 7); p.quadraticCurveTo(x + 5, y, x, y + 4); p.quadraticCurveTo(x - 5, y, x, y - 7); fp(c, p, '#7cc4ec', { sh: 0.1, mul: 0.4 }); }
+  c.save(); c.translate(d * 14, -118); c.rotate(d * 0.34); c.scale(0.78, 0.78); head3q(c, DESIGNS.B.q.G, o.expr || 'happy'); c.restore();
+}
+const BOX_SHAKE = { w: 260, h: 260, ox: 130, oy: 236 };

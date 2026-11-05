@@ -6,7 +6,7 @@ const DEV = new URLSearchParams(location.search);     // dev: ?tod=night  ?pose=
 const cv = document.getElementById('scene'), ctx = cv.getContext('2d');
 const V = { H: 700, res: 2, cssW: 1, cssH: 1, k: 1 };
 const Y = d => V.H - d;
-let S = null, TT = 0, LAY = null, TOD = null, shown = 0;
+let S = null, TT = 0, LAY = null, TOD = null, WX = null, shown = 0;
 
 // ---------- sprites: puppet drawings rendered once (sticker edge + soft shadow baked), then reused ----------
 function makeSprite(fn, box, k, stick = true) {
@@ -20,9 +20,13 @@ function makeSprite(fn, box, k, stick = true) {
   return { img, sh, ox: bx.ox + PAD, oy: bx.oy + PAD, w, h, stick };
 }
 const SPRITES = {
-  sit: a => [c => drawSitB(c, a[0], +a[1], { headRot: +a[2], headDy: +(a[3] || 0), pack: a[4] === 'pack', mouth: ['duck', 'card'].includes(a[4]) ? a[4] : null }), BOX_SIT, K_DOG],
+  sit: a => [c => drawSitB(c, a[0], +a[1], { headRot: +a[2], headDy: +(a[3] || 0), pack: a[4] === 'pack', mouth: ['duck', 'card', 'simit'].includes(a[4]) ? a[4] : null }), BOX_SIT, K_DOG],
   item: a => [c => drawItem(c, a[0], +a[1]), { w: 44, h: 44, ox: 22, oy: 22 }, 1, false],
   bird: a => [c => drawBird(c, +a[0]), { w: 60, h: 60, ox: 30, oy: 48 }, 1, false],
+  ncat: a => [c => drawNeighborCat(c, a[0]), BOX_NCAT, 0.62],
+  sq: a => [c => drawSquirrel(c, a[0]), BOX_SQ, 0.66],
+  gift: a => [c => drawGift(c, a[0]), BOX_GIFT, 1.25, false],
+  giftbox: () => [c => drawGiftBox(c), BOX_GIFTBOX, 1.2, false],
   belly: a => [c => drawBellyB(c, +a[0]), BOX_BELLY, K_DOG],
   puff: () => [c => drawPuff(c), { w: 30, h: 22, ox: 15, oy: 11 }, 1, false],
   trot: a => [c => drawStandB(c, { ...trotPose(+a[0]), pack: a[1] === 'pack' }), BOX_STAND, K_DOG],
@@ -34,12 +38,20 @@ const SPRITES = {
   heart: () => [c => drawHeart(c, 1), { w: 30, h: 30, ox: 15, oy: 15 }, 1, false],
   z: () => [c => drawZ(c, 1.1), { w: 24, h: 24, ox: 12, oy: 12 }, 1, false],
   petal: () => [c => piece(c, ell(0, 0, 4, 1.8), '#f6c22c', { mul: 0.5 }), { w: 12, h: 8, ox: 6, oy: 4 }, 1, false],
+  shake: a => [c => drawShakeB(c, +a[0]), BOX_SHAKE, K_DOG],
+  flat: a => [c => drawFlatB(c, +a[0]), BOX_FLAT, K_DOG],
+  drop: () => [c => { const p = new Path2D(); p.moveTo(0, -4.5); p.quadraticCurveTo(3.4, 1, 0, 4); p.quadraticCurveTo(-3.4, 1, 0, -4.5); piece(c, p, '#8fcdef', { mul: 0.35 }); }, { w: 12, h: 14, ox: 6, oy: 7 }, 1, false],
+  flake: () => [c => tornPiece(c, ellipsePts(0, 0, 3.4, 3, 14), '#ffffff', { amp: 0.6, seed: 905, rimCol: '#ffffff', shadow: 0.2, mul: 0.2 }), { w: 14, h: 14, ox: 7, oy: 7 }, 1, false],
   seed: () => [c => { c.strokeStyle = '#fff'; c.lineWidth = 0.8; c.beginPath(); c.moveTo(0, 4); c.lineTo(0, -3); c.stroke(); for (let i = -2; i <= 2; i++) { c.beginPath(); c.moveTo(0, -3); c.lineTo(i * 1.8, -6); c.stroke(); } }, { w: 12, h: 14, ox: 6, oy: 7 }, 1, false],
 };
 const SPR = new Map();
 function sprite(key) {
   let s = SPR.get(key);
-  if (!s) { const a = key.split('|'), [fn, box, k, stick] = SPRITES[a[0]](a.slice(1)); s = makeSprite(fn, box, k, stick); SPR.set(key, s); if (SPR.size > 64) SPR.delete(SPR.keys().next().value); }
+  if (!s) {
+    const sn = key.endsWith('|sn'), a = (sn ? key.slice(0, -3) : key).split('|'), [fn, box, k, stick] = SPRITES[a[0]](a.slice(1));
+    HEAD_SNOW = sn; try { s = makeSprite(fn, box, k, stick); } finally { HEAD_SNOW = false; }      // |sn = a dab of snow on his nose
+    SPR.set(key, s); if (SPR.size > 72) SPR.delete(SPR.keys().next().value);
+  }
   return s;
 }
 function drawSprite(s, x, y, o = {}) {
@@ -57,13 +69,15 @@ function layout() {
   SPR.clear(); LAY = null; buildStatic(TOD);
 }
 function buildStatic(tod) {
-  const p = PALETTES[tod], old = LAY;
-  const L = { tod, sky: buildSky(p, V.H, V.res), clouds: cloudSprites(p, V.res), mul: buildMulOverlay(p, V.H), scr: buildScrOverlay(p, V.H), p };
-  L.yard = old && old.yard || buildYard(V.H, V.res);
-  L.fore = old && old.fore || buildFore(V.H, V.res);
+  const p = wxPalette(PALETTES[tod], WX), old = LAY, look = WX.look;
+  const L = { tod, look, sky: buildSky(p, V.H, V.res), clouds: cloudSprites(p, V.res), mul: buildMulOverlay(p, V.H), scr: buildScrOverlay(p, V.H), p };
+  const same = old && old.look === look;            // the yard only changes with the season (and snow on the ground)
+  L.yard = same ? old.yard : buildYard(V.H, V.res, look);
+  L.fore = same ? old.fore : buildFore(V.H, V.res, look);
   if (old) { L.old = old; L.fadeT0 = TT; old.old = null; }
   LAY = L;
 }
+const weatherNow = () => weatherAt(Clock.now());
 function currentTod() { return DEV.get('tod') || timeOfDay(new Date(Clock.now())); }
 // is it his bedtime? (the sky turns to night at 19:00, but he stays up until 22:00)
 function sleepTime() { const h = new Date(Clock.now()).getHours(), [a, b] = HABITS.bedtime; return h >= a || h < b; }
@@ -122,6 +136,13 @@ function pickNext() {
   const tod = currentTod(), company = TT < (P.awakeUntil || 0), asleep = sleepTime() && !company;
   const w = { ...HABITS.idle[company && sleepTime() ? 'company' : asleep ? 'night' : tod === 'night' ? 'evening' : tod] };
   if (!asleep) { for (const t of S.toys) w[t] = HABITS.toys[t]; w.eat = HABITS.eat; }
+  if (P.wet) return shakeOff();
+  if (!asleep && S.gifts.length) w.sniffgift = HABITS.giftSniff;
+  const rule = !asleep && !company && HABITS.weather[WX.hot ? 'hot' : WX.kind];
+  if (rule && !P.want) {
+    for (const k in w) w[k] *= rule.calm;
+    for (const k in rule.add) if (k !== 'sunbathe' || tod === 'morning' || tod === 'day') w[k] = rule.add[k];
+  }
   const k = P.want && S.toys.includes(P.want) && !asleep ? P.want : pickWeighted(w); P.want = null;
   if (k === 'ball') return playBall(0);
   if (k === 'duck') { const t = S.toyPos.duck, side = Math.sign(t.x - P.x) || 1; return goTo(clamp(t.x - 36 * side, 40, 360), t.d, () => faceThen(side, () => { P.hold = 'duck'; setMode('shake', HABITS.shakeTime); })); }
@@ -129,19 +150,83 @@ function pickNext() {
   if (k === 'eat') return goTo(160, 226, () => faceThen(1, () => setMode('eat', rand(HABITS.duration.eat))));
   if (k === 'trot') { const [x, d] = randomSpot(); return goTo(x, d, Math.random() < 0.45 ? () => setMode('sniff', rand(HABITS.duration.sniff)) : null); }
   if (k === 'sigh') return setMode('sigh', HABITS.sighTime, { lie: false });
+  if (WX_ACTS[k]) return WX_ACTS[k]();
+  if (k === 'sniffgift') { const g = S.gifts[Math.floor(Math.random() * S.gifts.length)], side = Math.sign(g.x - P.x) || 1; return goTo(clamp(g.x - 46 * side, 40, 360), clamp(g.d, 100, 224), () => faceThen(side, () => setMode('sniff', rand([2.5, 4])))); }
   if (k === 'sleep') { if (Math.hypot(P.x - BED[0], P.d - BED[1]) > 6) return goTo(BED[0], BED[1], () => faceThen(1, () => setMode('sleep', rand(HABITS.duration.sleep)))); return setMode('sleep', rand(HABITS.duration.sleep)); }
   setMode(k, rand(HABITS.duration[k]));
 }
 function faceThen(f, then) { if (f === P.face) then(); else setMode('turn', 2 / 12, { to: f, then }); }
-function goTo(x, d, then) { const f = Math.sign(x - P.x) || P.face; faceThen(f, () => setMode('trot', null, { x, d, then })); }
+function goTo(x, d, then, o = {}) { const f = Math.sign(x - P.x) || P.face; faceThen(f, () => setMode('trot', null, { x, d, then, ...o })); }
+// ---- weather behaviours (stage 3) ----
+const SHELTER = [118, 244], SHADE = [100, 238];
+const isLying = () => /lie|sleep|nap|stir|belly|chew|flat/.test(P.mode) || (P.mode === 'sigh' && P.data.lie);
+const WX_ACTS = {
+  shelter: () => goTo(SHELTER[0], SHELTER[1], () => faceThen(1, () => setMode('shelter', rand(HABITS.wxTime.shelter)))),
+  splash: () => { const [x, d] = randomSpot(); goTo(clamp(x, 170, 350), Math.min(d, 190), () => { P.wet = true; setMode('wet', rand(HABITS.wxTime.wet)); }); },
+  sunbathe: () => goTo(200 + Math.random() * 140, 110 + Math.random() * 70, () => faceThen(Math.random() < 0.5 ? 1 : -1, () => setMode('sunnap', rand(HABITS.wxTime.sunnap)))),
+  flat: () => goTo(SHADE[0], SHADE[1], () => faceThen(1, () => setMode('flat', rand(HABITS.wxTime.flat)))),
+  chase: () => {
+    const dir = P.x < 200 ? 1 : -1, y = Y(P.d) - 58 * depthScale(P.d);
+    faceThen(dir, () => { Object.assign(CHASE, { on: true, leaving: false, x: P.x + 30 * dir, y0: y, y, vx: 104 * dir, vy: 0, rot: 0, i: Math.floor(Math.random() * 3), season: WX.season }); setMode('chase', rand(HABITS.wxTime.chase), { dir }); });
+  },
+  snap: () => setMode('snap', HABITS.wxTime.snap, { hops: 0 }),
+  snowwalk: () => { const a = randomSpot(), b = randomSpot(); goTo(a[0], a[1], () => goTo(b[0], b[1], () => setMode('look', rand(HABITS.duration.look)))); },
+  fogsniff: () => {
+    const step = n => { const [x, d] = randomSpot(); goTo(clamp(P.x + (x - P.x) * 0.5, 40, 360), d, () => setMode('sniff', rand([2.5, 4]), { next: n > 1 ? () => step(n - 1) : null }), { speed: HABITS.slowSpeed, slow: true }); };
+    step(3);
+  },
+};
+function shakeOff() { goTo(SHELTER[0], SHELTER[1], () => faceThen(1, () => { setMode('shakeoff', HABITS.wxTime.shakeOff); SFX.shake(); const [hx, hy] = parkerCenter(); for (let i = 0; i < 10; i++) { const a = -Math.PI * (0.1 + 0.8 * i / 9); fx({ type: 'spr', key: 'drop', x: hx, y: hy - 10, vx: Math.cos(a) * 90, vy: Math.sin(a) * 70, g: 220, life: 0.7, rot: a + Math.PI / 2 }); } })); }
+// snapping at snowflakes: three little hops, a flake caught at the top of each
+function snapTick() {
+  const u = (TT - P.t0) / (HABITS.wxTime.snap / 3), n = Math.floor(u);
+  if (n > P.data.hops - 1 && u - n > 0.45 && n < 3) {
+    P.data.hops = n + 1; const s = depthScale(P.d), mx = P.x + 34 * P.face * s, my = Y(P.d) - 118 * s;
+    fx({ type: 'spr', key: 'flake', x: mx + 6 * P.face, y: my - 22, vy: 30, life: 0.35, grow: false }); fx({ type: 'glow', x: mx, y: my, life: 0.35, r: 18, rgb: '255,255,255' });
+  }
+}
+const CHASE = { on: false };
+function updateChase(dt) {
+  if (!CHASE.on) return;
+  if (!CHASE.leaving && P.mode !== 'chase') { CHASE.leaving = true; CHASE.vy = -40; }
+  CHASE.x += CHASE.vx * dt; CHASE.rot += 6 * dt * Math.sign(CHASE.vx);
+  if (CHASE.leaving) { CHASE.vy -= 60 * dt; CHASE.y += CHASE.vy * dt; if (CHASE.y < -30 || CHASE.x < -40 || CHASE.x > SCENE_W + 40) CHASE.on = false; }
+  else CHASE.y = CHASE.y0 + 14 * Math.sin(TT * 5) - 10 * Math.sin(TT * 1.7);
+}
+// paw prints in the snow
+const PRINTS = [];
+function leavePrint() {
+  P.walked = 0; P.printSide = !P.printSide; const s = depthScale(P.d);
+  PRINTS.push({ x: P.x + (P.printSide ? 18 : -26) * P.face * s, d: P.d + (P.printSide ? -2.5 : 2.5), t: TT, s });
+  if (PRINTS.length > 70) PRINTS.shift();
+}
+function drawPrints() {
+  if (!PRINTS.length) return;
+  ctx.save(); ctx.fillStyle = 'rgb(136,154,186)';
+  for (const p of PRINTS) {
+    const a = 0.7 * clamp(1 - (TT - p.t) / 70); if (a <= 0) continue;
+    const x = p.x, y = Y(p.d) - 1, s = p.s * 0.75; ctx.globalAlpha = a;
+    ctx.beginPath(); ctx.ellipse(x, y, 6 * s, 3 * s, 0, 0, TAU); for (const dx of [-6, -2, 2, 6]) ctx.ellipse(x + dx * s, y - 4.6 * s + Math.abs(dx) * 0.4 * s, 2 * s, 1.4 * s, 0, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+}
 function updateParker(dt) {
   if (!P.present) return;
   if (P.mode === 'trot') {
-    const dx = P.data.x - P.x, dd = P.data.d - P.d, L = Math.hypot(dx, dd), step = HABITS.trotSpeed * dt;
+    const dx = P.data.x - P.x, dd = P.data.d - P.d, L = Math.hypot(dx, dd), step = (P.data.speed || HABITS.trotSpeed) * dt;
+    if (WX.look === 'snow' && (P.walked = (P.walked || 0) + Math.min(step, L)) > HABITS.printEvery) leavePrint();
     if (L <= step) { P.x = P.data.x; P.d = P.data.d; const then = P.data.then; then ? then() : pickNext(); }
     else { P.x += dx / L * step; P.d += dd / L * step; }
     return;
   }
+  if (P.mode === 'chase') {
+    const tx = CHASE.x - 52 * P.data.dir, step = HABITS.chaseSpeed * dt;
+    P.x += clamp(tx - P.x, -step, step);
+    if (WX.look === 'snow' && (P.walked = (P.walked || 0) + step) > HABITS.printEvery) leavePrint();
+    if (P.x < 40 || P.x > 360) P.until = Math.min(P.until, TT);
+  }
+  if (P.mode === 'wet' && TT > (P.dripAt || 0)) { P.dripAt = TT + 0.25; const [hx, hy] = parkerCenter(); fx({ type: 'spr', key: 'drop', x: hx + (Math.random() - 0.5) * 50, y: hy + 10, vy: 30, g: 200, life: 0.5, rot: 0 }); }
+  if (P.mode === 'snap') snapTick();
   if (TT < P.until) return;
   if (P.mode === 'turn') { P.face = P.data.to; P.data.then(); }
   else if (P.mode === 'watch') P.data.next();
@@ -154,6 +239,13 @@ function updateParker(dt) {
   else if (P.mode === 'shake') { S.toyPos.duck = { x: clamp(P.x + 34 * P.face, 30, 370), d: clamp(P.d - 6, 96, 226) }; P.hold = null; writeSave(S); setMode('sigh', HABITS.sighTime, { lie: false }); }
   else if (P.mode === 'chew') { S.toyPos.bone = { x: clamp(P.x + 64 * P.face, 30, 370), d: P.d }; P.hold = null; writeSave(S); setMode('sigh', HABITS.sighTime, { lie: true }); }
   else if (P.mode === 'belly') setMode('sigh', HABITS.sighTime, { lie: true });
+  else if (P.mode === 'wet') shakeOff();
+  else if (P.mode === 'shakeoff') { P.wet = false; setMode('sigh', HABITS.sighTime, { lie: false }); }
+  else if (P.mode === 'sunnap') { setMode('sunbelly', HABITS.wxTime.sunbelly); fx({ type: 'glow', x: P.x, y: Y(P.d) - 30, life: 0.8, r: 70, rgb: '255,236,180' }); }
+  else if (P.mode === 'sunbelly') setMode('sigh', HABITS.sighTime, { lie: true });
+  else if (P.mode === 'chase') { setMode('hop', HABITS.reactionTime.hop); SFX.pop(); }
+  else if (P.mode === 'snap') { P.noseSnowUntil = TT + HABITS.noseSnow; setMode('tilt', HABITS.reactionTime.tilt + 0.6); }
+  else if (P.mode === 'sniff' && P.data.next) P.data.next();
   else if (P.mode === 'sigh') P.data.lie ? setMode('lie', rand(HABITS.duration.lie)) : setMode('sit', rand([3, 6]));
   else if (HABITS.reactions.includes(P.mode)) Math.random() < HABITS.sighAfterHappy ? setMode('sigh', HABITS.sighTime, { lie: false }) : setMode('sit', rand([3, 6]));
   else pickNext();
@@ -217,7 +309,15 @@ function parkerDrawing() {
   const open = blink ? 'blink' : 'calm', pk = P.pack ? '|pack' : '';
   let key, sx = P.face, lift = 0;
   switch (P.mode) {
-    case 'trot': key = `trot|${f % 6}${pk}`; break;
+    case 'trot': key = `trot|${(P.data.slow ? Math.floor(f / 2) : f) % 6}${pk}`; break;
+    case 'chase': key = `trot|${f % 6}`; break;
+    case 'shelter': { const ph = Math.floor((TT - P.t0) / 3) % 3; key = `sit|${open}|0|${ph === 1 ? -0.16 : ph === 2 ? 0.1 : 0}`; break; }   // watching the rain, now and then looking up
+    case 'wet': key = `look|${Math.floor(f / 6) % 2}`; break;
+    case 'shakeoff': key = `shake|${f % 4 < 2 ? 0 : 1}`; sx = 1; break;
+    case 'sunnap': { const b = [0, 1.2, 2.4, 1.2][Math.floor(TT / 0.9) % 4]; key = `lie|sleepy|${b}`; break; }
+    case 'sunbelly': key = `belly|${Math.floor(f / 6) % 2}`; break;
+    case 'flat': key = `flat|${Math.floor(TT * 4) % 2}`; break;
+    case 'snap': { const u = ((TT - P.t0) / (HABITS.wxTime.snap / 3)) % 1; lift = 18 * Math.max(0, Math.sin(Math.PI * clamp((u - 0.15) / 0.6))); key = lift > 4 ? 'sit|happy|0|-0.34' : 'sit|calm|0|-0.24'; break; }
     case 'turn': key = `stand|calm${pk}`; sx = (f < 1 ? 0.55 : -0.55) * P.face; lift = 8 * Math.sin(Math.PI * clamp((TT - P.t0) / (2 / 12))); break;
     case 'sniff': key = `sniff|${Math.floor(f / 3) % 2}`; break;
     case 'look': key = `look|${Math.floor(f / 6) % 2}`; break;
@@ -242,9 +342,10 @@ function parkerDrawing() {
     case 'hop': { const u = clamp((TT - P.t0) / 0.6); lift = 16 * Math.sin(Math.PI * u); key = 'sit|happy|0.1|0'; break; }
     default: key = `sit|${open}|0|0`;
   }
+  if (P.noseSnowUntil > TT && !/^(shake|belly)/.test(key)) key += '|sn';
   return { key, sx, lift };
 }
-function parkerCenter() { const s = depthScale(P.d), lying = /sleep|nap|stir|lie|belly|chew/.test(P.mode) || (P.mode === 'sigh' && P.data.lie); return [P.x + (lying ? 20 : 4) * P.face * s, Y(P.d) - (lying ? 34 : 64) * s]; }
+function parkerCenter() { const s = depthScale(P.d), lying = isLying(); return [P.x + (lying ? 20 : 4) * P.face * s, Y(P.d) - (lying ? 34 : 64) * s]; }
 
 // ---------- particles ----------
 const FX = [];
@@ -261,7 +362,7 @@ function drawFX() {
   for (const p of FX) {
     if (p.delay > 0) continue;
     const u = p.age / p.life;
-    if (p.type === 'spr') drawSprite(sprite(p.key), p.x, p.y, { alpha: Math.min(1, (1 - u) * 2.2), rot: p.rot, shA: 0.15, scale: p.grow ? lerp(0.6, 1.5, u) : 1 });
+    if (p.type === 'spr') drawSprite(sprite(p.key), p.x, p.y, { alpha: Math.min(1, (1 - u) * 2.2), rot: p.rot, shA: 0.15, scale: (p.scale || 1) * (p.grow ? lerp(0.6, 1.5, u) : 1) });
     else if (p.type === 'glow') glow(ctx, p.x, p.y, p.r * (0.6 + u * 0.6), p.rgb, 0.8 * (1 - u));
     else if (p.type === 'fly') {
       const e = smooth(u), cx = (p.x0 + p.x1) / 2, cy = Math.min(p.y0, p.y1) - 60;
@@ -296,9 +397,17 @@ function drawScene() {
   if (L.old) drawLayer(ctx, L.old.sky);
   ctx.save(); ctx.globalAlpha = fade; drawLayer(ctx, L.sky);
   const hz = H - 330;
-  L.clouds.forEach((cl, i) => { const span = SCENE_W + 200, x = ((i * 157 + TT * (3 + i * 1.5)) % span) - 100; drawLayer(ctx, cl, x, hz * [0.2, 0.42, 0.1][i]); });
+  const cs = WX.kind === 'wind' ? 5 : 1;
+  L.clouds.forEach((cl, i) => { const span = SCENE_W + 200, x = ((i * 157 + TT * cs * (3 + i * 1.5)) % span) - 100; drawLayer(ctx, cl, x, hz * [0.2, 0.42, 0.1][i]); });
   ctx.restore();
-  drawLayer(ctx, L.yard);
+  if (L.old && L.old.yard !== L.yard) { drawLayer(ctx, L.old.yard); ctx.save(); ctx.globalAlpha = fade; drawLayer(ctx, L.yard); ctx.restore(); }   // the season / snow changes softly
+  else drawLayer(ctx, L.yard);
+  if (WX.hot) {           // cool shade in front of the house on a hot afternoon
+    ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.translate(SHADE[0] - 6, Y(SHADE[1] - 2)); ctx.scale(1, 0.2);
+    const g = ctx.createRadialGradient(0, 0, 10, 0, 0, 110); g.addColorStop(0, 'rgba(150,170,205,0.6)'); g.addColorStop(0.6, 'rgba(170,186,214,0.35)'); g.addColorStop(1, 'rgba(190,200,220,0)');
+    ctx.fillStyle = g; ctx.fillRect(-110, -110, 220, 220); ctx.restore();
+  }
+  drawPrints();
   const mail = S.mail.length > 0;
   if (mail) glow(ctx, MAILBOX.x, Y(MAILBOX.d) - 106, 46, '255,236,170', 0.35 + 0.1 * Math.sin(TT * 2));
   mailboxFlag(ctx, MAILBOX.x, Y(MAILBOX.d), mail);
@@ -306,27 +415,44 @@ function drawScene() {
   const items = S.field.map(f => ({ d: f.d, f }));
   for (const t of S.toys) if (P.hold !== t) items.push({ d: S.toyPos[t].d, toy: t });
   if (P.present) items.push({ d: P.d, parker: true });
+  for (const g of S.gifts) items.push({ d: g.d, g });
+  if (VIS.on && VIS.kind !== 'sparrow') items.push({ d: VIS.d, vis: true });
+  items.push({ d: GIFTBOX.d, box: true });
   items.sort((a, b) => b.d - a.d);
   const now = Clock.now();
   for (const it of items) {
-    if (it.toy) {
+    if (it.g) {
+      const g = it.g, s = depthScale(g.d), tw = 0.5 + 0.5 * Math.sin(TT * 1.6 + g.id);
+      drawSprite(sprite(`gift|${g.kind}`), g.x, Y(g.d), { scale: s });
+      if (tw > 0.85) glow(ctx, g.x + 5, Y(g.d) - 18 * s, 20, '255,250,225', (tw - 0.85) * 4);    // a little glint now and then
+    } else if (it.vis) {
+      const s = depthScale(VIS.d), dr = visitorDrawing();
+      drawSprite(sprite(dr.key), VIS.x, Y(VIS.d) - dr.lift, { sx: VIS.face, scale: s });
+    } else if (it.box) {
+      if (S.giftNew) glow(ctx, GIFTBOX.x, Y(GIFTBOX.d) - 14, 34, '255,236,170', 0.35 + 0.1 * Math.sin(TT * 2));
+      drawSprite(sprite('giftbox'), GIFTBOX.x, Y(GIFTBOX.d), { scale: depthScale(GIFTBOX.d) });
+    } else if (it.toy) {
       const t = S.toyPos[it.toy], s = depthScale(t.d), k = { ball: 0.6, duck: 0.55, bone: 0.55 }[it.toy];
       drawSprite(sprite(`item|${it.toy}|${k}`), t.x, Y(t.d) - 11 * s, { scale: s, rot: it.toy === 'ball' ? BALL.rot : 0 });
     } else if (it.f) {
       const f = it.f, s = depthScale(f.d), grow = smooth(clamp((now - f.born) / 1200)), sw = 0.035 * Math.sin(TT * 1.1 + f.id * 1.7);
       if (grow > 0) drawSprite(sprite(`dand|${f.kind}`), f.x, Y(f.d), { scale: s * lerp(0.2, 1, grow), alpha: Math.min(1, grow * 3), rot: sw });
     } else {
-      const s = depthScale(P.d), dr = parkerDrawing(), lying = /lie|sleep|nap|stir|belly|chew/.test(P.mode) || (P.mode === 'sigh' && P.data.lie);
+      const s = depthScale(P.d), dr = parkerDrawing(), lying = isLying();
       ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = 'rgba(120,110,120,0.35)';
       ctx.beginPath(); ctx.ellipse(P.x + (lying ? 14 * P.face : 0) * s, Y(P.d) + 1, (lying ? 70 : 52) * s * Math.max(0.6, Math.abs(dr.sx)), 6 * s, 0, 0, TAU); ctx.fill(); ctx.restore();
       drawSprite(sprite(dr.key), P.x, Y(P.d) - dr.lift, { sx: dr.sx, scale: s });
       if (P.mode === 'turn') glow(ctx, P.x, Y(P.d) - 50 * s, 46, '255,240,200', 0.5);
       if (P.carrying && P.mode !== 'gift') drawSprite(sprite('item|card|0.5'), P.x + 64 * P.face * s * Math.abs(dr.sx), Y(P.d) - 72 * s - dr.lift, { scale: s, rot: 0.15 * P.face });   // the card in his mouth on the way
       if (P.mode === 'gift') glow(ctx, P.x, Y(P.d) - 70 * s, 70, '255,236,170', 0.25 + 0.08 * Math.sin(TT * 2.5));
+      if (/^sun/.test(P.mode)) glow(ctx, P.x + 14 * P.face * s, Y(P.d) - 30 * s, 84, '255,232,170', 0.3 + 0.05 * Math.sin(TT * 1.3));   // warm in the sun
     }
   }
+  if (CHASE.on) drawBit(ctx, CHASE.season, CHASE.i, CHASE.x, CHASE.y, CHASE.rot, 1.9);
   drawVisitor();
-  drawLayer(ctx, L.fore);
+  if (L.old && L.old.fore !== L.fore) { drawLayer(ctx, L.old.fore); ctx.save(); ctx.globalAlpha = fade; drawLayer(ctx, L.fore); ctx.restore(); }
+  else drawLayer(ctx, L.fore);
+  drawWeather(ctx, WX, H, TT, V.res);
   // light: multiply tint + vignette, then screen glow, lamp, motes
   ctx.save(); ctx.globalCompositeOperation = 'multiply';
   if (L.old) { ctx.globalAlpha = 1 - fade; drawLayer(ctx, L.old.mul); }
@@ -334,7 +460,7 @@ function drawScene() {
   ctx.globalCompositeOperation = 'screen'; drawLayer(ctx, L.scr);
   ctx.restore();
   if (p.lamp) glow(ctx, LAMP.x + 14, Y(LAMP.d) - 62, 70, '255,206,130', 0.55 * p.lamp * (1 + 0.04 * Math.sin(TT * 2.3)));
-  if (p.fireflies) fireflies(TT); else motes(ctx, TT, SCENE_W, H * 0.8, 8, 91, p.motes);
+  if (p.fireflies) fireflies(TT); else if (p.motes) motes(ctx, TT, SCENE_W, H * 0.8, 8, 91, p.motes);
   drawFX();
 }
 
@@ -347,9 +473,11 @@ cv.addEventListener('pointerdown', e => {
   // dandelions first (nearest head within reach), front-most wins
   let best = null, bd = 30;
   for (const f of S.field) { const s = depthScale(f.d), hx = f.x, hy = Y(f.d) - 36 * s, dd = Math.hypot(x - hx, y - hy); if (dd < bd && Clock.now() - f.born > 600) { bd = dd; best = f; } }
+  const g = giftAt(x, y); if (g) return pickGift(g);
+  if (Math.abs(x - GIFTBOX.x) < 24 && y > Y(GIFTBOX.d) - 38 && y < Y(GIFTBOX.d) + 6) { S.giftNew = false; return openPanel('gifts'); }
   if (best) return collect(best);
   if (P.present && onParker(x, y)) { press = { id: e.pointerId, t0: TT, x, y, dist: 0, rub: false }; try { cv.setPointerCapture(e.pointerId); } catch (err) { } return; }
-  if (tapBird(x, y)) return;
+  if (tapVisitor(x, y)) return;
   const mb = Y(MAILBOX.d);
   if (x > MAILBOX.x - 42 && x < MAILBOX.x + 42 && y > mb - 136 && y < mb - 70) return openPanel('mail');
   const hb = Y(HOUSE.d);
@@ -402,6 +530,7 @@ const T_ = k => window.T(k);
 document.getElementById('langBtn').addEventListener('click', () => { LANG = LANG === 'zh' ? 'en' : 'zh'; storeLang(LANG); applyLang(); if (UI.panel) renderPanel(); });
 let toastTimer = 0;
 function showToast(k, ms = 0) { const t = document.getElementById('toast'); t.dataset.i18n = k; t.textContent = T_(k); t.classList.remove('hidden'); clearTimeout(toastTimer); if (ms) toastTimer = setTimeout(hideToast, ms); }
+function toastText(text, ms) { const t = document.getElementById('toast'); delete t.dataset.i18n; t.textContent = text; t.classList.remove('hidden'); clearTimeout(toastTimer); if (ms) toastTimer = setTimeout(hideToast, ms); }
 function hideToast() { document.getElementById('toast').classList.add('hidden'); }
 
 // ---------- boot ----------
@@ -419,13 +548,16 @@ function boot() {
   const now = Clock.now();
   S = loadSave();
   if (!S) { S = defaultSave(now); for (let i = 0; i < START_DANDELIONS; i++) spawnDandelion(now + 400 + i * 350); S.nextSpawnAt = now + SPAWN_INTERVAL; writeSave(S); }
-  if (debugOn()) { try { Clock.offset = +localStorage.getItem(CLOCK_KEY) || 0; } catch (e) { } }
+  if (debugOn()) { try { Clock.offset = +localStorage.getItem(CLOCK_KEY) || 0; } catch (e) { } loadWxForce(); }
+  const lastSeen = S.lastSeen || now;
   tickSpawns();
   advanceWorld(Clock.now());                 // whatever happened while the game was closed
+  const waiting = offlineVisits(lastSeen, Clock.now());
   P.present = !S.trip;
   shown = S.dandelions; updateHUD(false); drawCoinIcon();
   if (!S.seenHint) setTimeout(() => { if (!S.seenHint) showToast('hint.tap'); }, 2500);
-  TOD = currentTod(); layout();
+  else if (waiting) setTimeout(() => showToast('toast.giftsWaiting', 4000), 1800);
+  TOD = currentTod(); WX = weatherNow(); SFX.weather(WX); layout();
   buildDebug(); wireDebugTaps();
   const pose = DEV.get('pose');
   if (pose) { if (pose === 'sleep') { P.x = BED[0]; P.d = BED[1]; P.face = 1; } setMode(pose, 9999); }
@@ -437,9 +569,9 @@ function boot() {
   const loop = ts => {
     const dt = Math.min(0.05, (ts - last) / 1000); last = ts; TT += dt;
     Clock.tick(dt);
-    if (TT > todAt) { todAt = TT + 1; worldTick(); const tod = currentTod(); if (tod !== TOD) { TOD = tod; buildStatic(tod); } }
+    if (TT > todAt) { todAt = TT + 1; worldTick(); wxCheck(); }
     if (TT > saveAt) { saveAt = TT + 15; writeSave(S); }
-    checkRub(); updateParker(dt); updateBall(dt); updateBird(dt); parkerExtras(); sleepZ(); updateFX(dt); drawScene();
+    checkRub(); updateParker(dt); updateBall(dt); updateVisitor(dt); updateChase(dt); updateWeather(dt, WX, V.H, TT); parkerExtras(); sleepZ(); updateFX(dt); drawScene();
     if (!window.READY) window.READY = true;
     requestAnimationFrame(loop);
   };
@@ -451,7 +583,14 @@ function boot() {
   idle(step);
 }
 // test hook (screenshots): advance the simulation deterministically
-window.__advance = secs => { for (let i = 0; i < secs * 30; i++) { TT += 1 / 30; checkRub(); updateParker(1 / 30); updateBall(1 / 30); updateBird(1 / 30); parkerExtras(); updateFX(1 / 30); } drawScene(); };
+window.__advance = secs => { for (let i = 0; i < secs * 30; i++) { TT += 1 / 30; checkRub(); updateParker(1 / 30); updateBall(1 / 30); updateVisitor(1 / 30); updateChase(1 / 30); updateWeather(1 / 30, WX, V.H, TT); parkerExtras(); updateFX(1 / 30); } drawScene(); };
+// time of day or weather changed: rebuild the backdrop (it cross-fades), switch the weather sounds
+function wxCheck() {
+  const tod = currentTod(), wx = weatherNow();
+  if (tod === TOD && wx.key === WX.key) return;
+  if (wx.look !== WX.look) PRINTS.length = 0;
+  TOD = tod; WX = wx; buildStatic(tod); SFX.weather(wx);
+}
 // ---------- world events (trips, mail) ----------
 function worldTick() {
   tickSpawns();
@@ -465,7 +604,7 @@ function worldTick() {
       if (e.souvenir) fx({ type: 'glow', x: HOUSE.x + 60, y: Y(HOUSE.d) - 50, life: 2, r: 90, rgb: '255,236,170' });
     }
   }
-  if (!P.present) birdTick();
+  visitTick();
   festGiftTick();
   if (window.debugRefresh) debugRefresh();
 }
@@ -474,7 +613,7 @@ function festGiftTick() {
   const f = S.festPending; if (!f || S.trip || !P.present || (typeof UI !== 'undefined' && UI.panel)) return;
   if (P.mode === 'gift' || (P.carrying && /trot|turn/.test(P.mode))) return;
   if (/^(sleep|nap|stir)$/.test(P.mode)) { if (!P.giftHinted) { P.giftHinted = true; showToast('toast.giftLater', 4500); } return; }   // he'll give it when he's up
-  if (P.pack || !/^(sit|lie|look|sniff|trot|sigh|eat|expect|watch|wag|tilt|hop|drowsy)$/.test(P.mode)) return;
+  if (P.pack || !/^(sit|lie|look|sniff|trot|sigh|eat|expect|watch|wag|tilt|hop|drowsy|shelter|flat|sunnap)$/.test(P.mode)) return;
   if (P.hold === 'duck') S.toyPos.duck = { x: clamp(P.x + 30 * P.face, 30, 370), d: P.d };
   if (P.hold === 'bone') S.toyPos.bone = { x: clamp(P.x + 60 * P.face, 30, 370), d: P.d };
   P.hold = null; P.carrying = true;
@@ -488,27 +627,111 @@ function receiveGift() {
   setMode('sigh', HABITS.sighTime, { lie: false }); showToast('toast.giftGot', 3000);
   UI.tab = 'fests'; openPanel('album'); UI.view = festCard(f.id); UI.viewYear = f.year; renderPanel();
 }
-// ---------- the bird (only while he's away) ----------
-const BIRD = { on: false, next: 0 };
-function birdPerches() { return [[150 + Math.random() * 60, Y(296) - 34], [MAILBOX.x - 6, Y(MAILBOX.d) - 128], [60 + Math.random() * 280, Y(100 + Math.random() * 110)]]; }
-function birdTick() {
-  if (BIRD.on || TT < BIRD.next) return;
-  const [tx, ty] = birdPerches()[Math.floor(Math.random() * 3)], from = Math.random() < 0.5 ? -30 : SCENE_W + 30;
-  Object.assign(BIRD, { on: true, phase: 'in', x0: from, y0: ty - 160, tx, ty, x: from, y: ty - 160, t0: TT, face: Math.sign(tx - from), until: TT + rand([8, 16]), pose: 0, poseAt: 0 });
+// ---------- small visitors: the sparrow, the neighbour's cat, the squirrel (stage 4) ----------
+// One at a time. Mostly while he's away; nobody at night or in heavy rain. Some leave a gift where they were.
+const VIS = { on: false, next: 25 };
+const GIFTBOX = { x: 168, d: 249 };
+const VIS_SPEED = { cat: 34, squirrel: 70 };
+function birdPerches() { return [[150 + Math.random() * 60, Y(296) - 34, null], [MAILBOX.x - 6, Y(MAILBOX.d) - 128, null], ...[0, 1].map(() => { const d = 100 + Math.random() * 110; return [60 + Math.random() * 280, Y(d), d]; })]; }
+function giftSpot(x0, d0) {             // a free spot on the lawn (near x0/d0 if given)
+  for (let i = 0; i < 40; i++) {
+    const x = x0 != null ? clamp(x0 + (Math.random() - 0.5) * (20 + i * 4), 30, 370) : 40 + Math.random() * 320, d = d0 != null ? clamp(d0 + (Math.random() - 0.5) * (10 + i * 2), 100, 220) : 100 + Math.random() * 120;
+    if (spotFree(x, d) && S.gifts.every(g => Math.hypot(g.x - x, (g.d - d) * 1.6) > 30) && Math.hypot(x - GIFTBOX.x, d - GIFTBOX.d) > 30) return [x, d];
+  }
+  return [x0 != null ? clamp(x0, 30, 370) : 200, d0 != null ? clamp(d0, 100, 220) : 160];
 }
-function updateBird(dt) {
-  if (!BIRD.on) return;
-  if (P.present && BIRD.phase !== 'out') birdLeave();
-  const u = clamp((TT - BIRD.t0) / 1.6), e = smooth(u);
-  if (BIRD.phase === 'in') { BIRD.x = lerp(BIRD.x0, BIRD.tx, e); BIRD.y = lerp(BIRD.y0, BIRD.ty, e) - Math.sin(Math.PI * u) * 30; if (u >= 1) { BIRD.phase = 'stay'; BIRD.t0 = TT; } }
-  else if (BIRD.phase === 'stay') { if (TT > BIRD.poseAt) { BIRD.pose = Math.random() < 0.45 ? 1 : 0; BIRD.poseAt = TT + rand([0.4, 1.2]); if (Math.random() < 0.25) BIRD.face *= -1; } if (TT > BIRD.until) birdLeave(); }
-  else { BIRD.x = lerp(BIRD.x0, BIRD.tx, e); BIRD.y = lerp(BIRD.y0, BIRD.ty, e); if (u >= 1) { BIRD.on = false; BIRD.next = TT + rand(TRIP.birdEvery); } }
+function visitTick() {
+  if (VIS.on || TT < VIS.next) return;
+  const now = Clock.now();
+  VIS.next = TT + rand(P.present ? VISIT.homeEvery : VISIT.awayEvery) * (WX.kind === 'rain' ? VISIT.rainSlow : 1);
+  if (visitorsSleep(now) || WX.heavy || (P.present && /packup|departLook|arrive|gift/.test(P.mode))) return;
+  startVisit(pickVisitor(now));
 }
-function birdLeave() { Object.assign(BIRD, { phase: 'out', x0: BIRD.x, y0: BIRD.y, tx: BIRD.x + BIRD.face * 260, ty: BIRD.y - 220, t0: TT }); }
-function tapBird(x, y) { if (!BIRD.on || BIRD.phase !== 'stay' || Math.hypot(x - BIRD.x, y - (BIRD.y - 14)) > 30) return false; BIRD.face = x < BIRD.x ? 1 : -1; birdLeave(); return true; }
-function drawVisitor() {
-  if (!BIRD.on) return;
-  const k = BIRD.phase !== 'stay' ? 2 + Math.floor(TT * 12) % 2 : BIRD.pose;
-  drawSprite(sprite(`bird|${k}`), BIRD.x, BIRD.y, { sx: BIRD.face, scale: 0.8 });
+function startVisit(kind, forceGift) {
+  const now = Clock.now(); S.visits[kind] = (S.visits[kind] || 0) + 1;
+  const gift = forceGift || (canGift(now) && Math.random() < VISIT.giftChance) ? rollGift(kind, now) : null;
+  const from = Math.random() < 0.5 ? -40 : SCENE_W + 40, stay = rand(VISIT.stay[kind]);
+  if (kind === 'sparrow') {
+    const ps = birdPerches(), [tx, ty, d] = ps[Math.floor(Math.random() * ps.length)];
+    Object.assign(VIS, { on: true, kind, phase: 'in', x0: from, y0: ty - 160, tx, ty, x: from, y: ty - 160, d, t0: TT, face: Math.sign(tx - from), stay, pose: 0, poseAt: 0, gift });
+    SFX.chirp();
+  } else {
+    let tx = 70 + Math.random() * 260, td = 110 + Math.random() * 100;
+    if (P.present && Math.abs(tx - P.x) < 90) tx = clamp(P.x + (tx < P.x ? -110 : 110), 50, 350);
+    Object.assign(VIS, { on: true, kind, phase: 'in', x: from, d: td, tx, t0: TT, face: Math.sign(tx - from), stay, pose: 'sit', poseAt: 0, gift });
+    if (kind === 'squirrel') SFX.chitter();
+  }
+  writeSave(S);
+  // he notices, and sits watching it
+  if (P.present && /^(sit|lie|look|sniff)$/.test(P.mode)) faceThen(Math.sign(VIS.tx - P.x) || P.face, () => setMode('sit', rand([5, 9])));
+}
+function visitorLeave() {
+  if (!VIS.on || VIS.phase === 'out') return;
+  if (VIS.gift) {                         // the gift stays where it was
+    const [x, d] = VIS.kind === 'sparrow' ? giftSpot(VIS.x, VIS.d != null ? VIS.d : 120 + Math.random() * 80) : giftSpot(VIS.x + 14 * VIS.face, VIS.d - 4);
+    dropGift(VIS.gift, x, d, Clock.now()); VIS.gift = null; writeSave(S);
+    fx({ type: 'glow', x, y: Y(d) - 10, life: 0.9, r: 30, rgb: '255,240,200' });
+  }
+  if (VIS.kind === 'sparrow') Object.assign(VIS, { phase: 'out', x0: VIS.x, y0: VIS.y, tx: VIS.x + VIS.face * 260, ty: VIS.y - 220, t0: TT });
+  else { VIS.face = VIS.x < 200 ? -1 : 1; Object.assign(VIS, { phase: 'out', tx: VIS.face < 0 ? -60 : SCENE_W + 60, t0: TT }); }
+}
+function updateVisitor(dt) {
+  if (!VIS.on) return;
+  const near = P.present && Math.abs(P.x - VIS.x) < 64 && (VIS.d == null || Math.abs(P.d - VIS.d) < 40) && /trot|chase/.test(P.mode);
+  if (near && VIS.phase === 'stay') visitorLeave();             // he came over to say hello: off they go
+  if (VIS.kind === 'sparrow') {
+    const u = clamp((TT - VIS.t0) / 1.6), e = smooth(u);
+    if (VIS.phase === 'in') { VIS.x = lerp(VIS.x0, VIS.tx, e); VIS.y = lerp(VIS.y0, VIS.ty, e) - Math.sin(Math.PI * u) * 30; if (u >= 1) { VIS.phase = 'stay'; VIS.until = TT + VIS.stay; } }
+    else if (VIS.phase === 'stay') { if (TT > VIS.poseAt) { VIS.pose = Math.random() < 0.45 ? 1 : 0; VIS.poseAt = TT + rand([0.4, 1.2]); if (Math.random() < 0.25) VIS.face *= -1; } if (TT > VIS.until) visitorLeave(); }
+    else { VIS.x = lerp(VIS.x0, VIS.tx, e); VIS.y = lerp(VIS.y0, VIS.ty, e); if (u >= 1) VIS.on = false; }
+    return;
+  }
+  if (VIS.phase === 'stay') {
+    if (TT > VIS.poseAt) {
+      VIS.poseAt = TT + rand([1.2, 3]);
+      VIS.pose = VIS.kind === 'cat' ? (Math.random() < 0.3 ? 'blink' : 'sit') : (Math.random() < 0.5 ? 'nibble' : 'sit');
+      if (VIS.kind === 'squirrel' && Math.random() < 0.2) VIS.face *= -1;
+    }
+    if (TT > VIS.until) visitorLeave();
+    return;
+  }
+  const dx = VIS.tx - VIS.x, step = VIS_SPEED[VIS.kind] * dt * (VIS.phase === 'out' ? 1.4 : 1);
+  if (Math.abs(dx) <= step) {
+    VIS.x = VIS.tx;
+    if (VIS.phase === 'in') { VIS.phase = 'stay'; VIS.until = TT + VIS.stay; VIS.face = Math.random() < 0.5 ? 1 : -1; if (P.present) VIS.face = Math.sign(P.x - VIS.x) || 1; }
+    else VIS.on = false;
+  } else VIS.x += Math.sign(dx) * step;
+}
+function tapVisitor(x, y) {
+  if (!VIS.on || VIS.phase !== 'stay') return false;
+  const cy = VIS.kind === 'sparrow' ? VIS.y - 16 : Y(VIS.d) - (VIS.kind === 'cat' ? 44 : 24) * depthScale(VIS.d);
+  if (Math.hypot(x - VIS.x, y - cy) > (VIS.kind === 'cat' ? 42 : 32)) return false;
+  if (VIS.kind === 'cat') {               // the cat doesn't mind: a slow blink back at you
+    VIS.pose = 'blink'; VIS.poseAt = TT + 1.4; SFX.mew();
+    fx({ type: 'spr', key: 'heart', x: VIS.x, y: cy - 30, vy: -26, sway: 1, life: 1.3, scale: 0.7 });
+    return true;
+  }
+  VIS.face = x < VIS.x ? 1 : -1; visitorLeave(); return true;
+}
+function visitorDrawing() {
+  if (VIS.kind === 'cat') return { key: VIS.phase === 'stay' ? `ncat|${VIS.pose}` : `ncat|walk${Math.floor(TT * 6) % 2}`, lift: 0 };
+  if (VIS.phase === 'stay') return { key: `sq|${VIS.pose}`, lift: 0 };
+  const u = (TT * 2.6) % 1; return { key: `sq|${u < 0.35 ? 'hop0' : 'hop1'}`, lift: u < 0.35 ? 0 : 12 * Math.sin(Math.PI * (u - 0.35) / 0.65) };
+}
+function drawVisitor() {                 // the sparrow (it perches up high, so it's drawn over the ground things)
+  if (!VIS.on || VIS.kind !== 'sparrow') return;
+  const k = VIS.phase !== 'stay' ? 2 + Math.floor(TT * 12) % 2 : VIS.pose;
+  drawSprite(sprite(`bird|${k}`), VIS.x, VIS.y, { sx: VIS.face, scale: 1 });
+}
+// ---------- gifts on the ground ----------
+function giftAt(x, y) { let best = null, bd = 30; for (const g of S.gifts) { const dd = Math.hypot(x - g.x, y - (Y(g.d) - 12)); if (dd < bd) { bd = dd; best = g; } } return best; }
+function pickGift(g) {
+  S.gifts = S.gifts.filter(h => h !== g);
+  S.giftBox[g.kind] = (S.giftBox[g.kind] || 0) + 1; S.dandelions += g.dand; S.giftNew = true; writeSave(S);
+  const y = Y(g.d) - 10; SFX.gift(g.kind === 'clover');
+  fx({ type: 'glow', x: g.x, y, life: 0.7, r: g.kind === 'clover' ? 60 : 40, rgb: g.kind === 'clover' ? '220,255,190' : '255,236,170' });
+  fx({ type: 'spr', key: `gift|${g.kind}`, x: g.x, y: y + 4, vy: -50, life: 0.8, scale: 1 });
+  if (g.dand) { const t = hudTarget(); fx({ type: 'fly', x0: g.x, y0: y, x1: t[0], y1: t[1], life: 0.8, value: g.dand }); }
+  toastText(T_('toast.giftPick').replace('{what}', T_('gift.' + g.kind + '.a')).replace('{who}', T_('vis.' + g.from + '.the')) + (g.dand ? T_('toast.giftDand').replace('{n}', g.dand) : ''), 3800);
 }
 boot();

@@ -7,15 +7,17 @@ const Clock = {
 };
 const CLOCK_KEY = 'parker-trip-debug-clock';
 
-const SAVE_KEY = 'parker-trip-save', LANG_KEY = 'parker-trip-lang', SAVE_VERSION = 3;
+const SAVE_KEY = 'parker-trip-save', LANG_KEY = 'parker-trip-lang', SAVE_VERSION = 5;
 function defaultSave(now) {
-  return addV3(addV2({ v: SAVE_VERSION, createdAt: now, lastSeen: now, dandelions: 0, field: [], nextSpawnAt: now, seq: 0, seenHint: false }));
+  return addV5(addV4(addV3(addV2({ v: SAVE_VERSION, createdAt: now, lastSeen: now, dandelions: 0, field: [], nextSpawnAt: now, seq: 0, seenHint: false }))));
 }
 // upgrade older saves step by step here when the format changes (v1 → v2 → …)
 function migrateSave(s) {
   if (!s || typeof s !== 'object' || !s.v) return null;
   if (s.v === 1) { addV2(s); s.v = 2; }
   if (s.v === 2) { addV3(s); s.v = 3; }
+  if (s.v === 3) { addV4(s); s.v = 4; }
+  if (s.v === 4) { addV5(s); s.v = 5; }
   return s;
 }
 function loadSave() { try { return migrateSave(JSON.parse(localStorage.getItem(SAVE_KEY))); } catch (e) { return null; } }
@@ -29,4 +31,12 @@ function addV2(s) {
 // v3: festival cards — which festival-years are given (festGot), one waiting to be handed over (festPending), the album of them
 function addV3(s) {
   return Object.assign(s, { festGot: {}, festPending: null, festAlbum: {}, ...s });
+}
+// v4: friends met on trips ({ id: { metAt, place, count, card } }) and which places' cards came with a friend in them
+function addV4(s) {
+  return Object.assign(s, { friends: {}, albumFriend: {}, ...s });
+}
+// v5: small visitors — gifts lying in the yard, the gift box ({ kind: count }), how often each visitor came, the last gift time
+function addV5(s) {
+  return Object.assign(s, { gifts: [], giftBox: {}, visits: {}, lastGiftAt: 0, ...s });
 }

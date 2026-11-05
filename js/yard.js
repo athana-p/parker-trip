@@ -20,7 +20,7 @@ const PALETTES = {
 function buildSky(p, H, res) {
   const L = makeLayer(0, 0, SCENE_W, H, res), c = L.ctx, W = SCENE_W, hz = H - 330, rr = rng(5);
   piece(c, rectP(0, 0, W, H), p.sky[0], { scr: p.stars ? 0.1 : 0.25 });
-  if (p.stars) {
+  if (p.stars && !p.noStars) {
     for (let k = 0; k < 70; k++) { const x = rr() * W, y = rr() * hz * 0.9, r = 0.6 + rr() * 1.2; c.fillStyle = `rgba(255,246,214,${0.4 + rr() * 0.5})`; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); }
     for (let k = 0; k < 9; k++) { const x = 20 + rr() * (W - 40), y = 20 + rr() * hz * 0.7, s = 3 + rr() * 3; glow(c, x, y, s * 4, '255,240,200', 0.35); piece(c, poly([[x, y - s * 1.6], [x + s * 0.35, y - s * 0.35], [x + s * 1.6, y], [x + s * 0.35, y + s * 0.35], [x, y + s * 1.6], [x - s * 0.35, y + s * 0.35], [x - s * 1.6, y], [x - s * 0.35, y - s * 0.35]]), '#fff3c8', { mul: 0.3, scr: 0.2 }); }
   }
@@ -29,23 +29,22 @@ function buildSky(p, H, res) {
     const y = lerp(hz * 0.16, hz - 40, (i - 1) / (n - 2));
     strip(c, -20, W + 20, x => y + 7 * Math.sin(x / (90 + i * 23) + i * 1.7) + 3 * fbm1(x / 50, i), H, p.sky[i], { seed: 20 + i, shadow: p.stars ? 0.18 : 0.1, amp: 3.5, scr: 0.22 });
   }
-  const orb = p.sun || p.moon, ox = orb.x * W, oy = hz * orb.y;
-  glow(c, ox, oy, orb.r * 5, orb.glow, 0.5);
+  const orb = p.sun || p.moon, ox = orb.x * W, oy = hz * orb.y, veil = p.overcast > 0.4;
+  c.save(); if (veil) c.globalAlpha = 0.3;          // behind the overcast the sun / moon is only a pale disc
+  glow(c, ox, oy, orb.r * 5, orb.glow, 0.5 * (1 - p.overcast));
   if (p.moon) {
     const m = mk(orb.r * 2.6 * res, orb.r * 2.6 * res), mc = m.getContext('2d'); mc.scale(res, res);
     piece(mc, circ(orb.r * 1.3, orb.r * 1.3, orb.r), orb.col, { mul: 0.4, scr: 0.2 });
     mc.globalCompositeOperation = 'destination-out'; mc.fill(circ(orb.r * 1.75, orb.r * 1.05, orb.r * 0.86));
     c.drawImage(m, ox - orb.r * 1.3, oy - orb.r * 1.3, orb.r * 2.6, orb.r * 2.6);
   } else tornPiece(c, ellipsePts(ox, oy, orb.r, orb.r, 40), orb.col, { amp: 1.4, seed: 7, shadow: 0, rimCol: '#fffbe8' });
+  c.restore();
+  if (p.overcast) overcastClouds(c, p, hz);
   // hills and the trees behind the fence
   strip(c, -20, W + 20, x => hz - 18 - 30 * Math.exp(-(((x - 300) / 110) ** 2)) - 14 * Math.exp(-(((x - 60) / 90) ** 2)) + 3 * fbm1(x / 40, 3), H, p.hill1, { seed: 40, shadow: 0.12 });
   if (p.mist) { c.save(); c.globalAlpha = p.mist; strip(c, -20, W + 20, x => hz - 6 + 3 * Math.sin(x / 60), H, '#fff8f0', { seed: 44, shadow: 0, rim: 0, amp: 3 }); c.restore(); }
   strip(c, -20, W + 20, x => hz + 4 - 10 * Math.exp(-(((x - 140) / 120) ** 2)) + 3 * fbm1(x / 40, 4), H, p.hill2, { seed: 41, shadow: 0.15 });
-  const rt = rng(9);
-  for (const [x, r] of [[262, 30], [300, 38], [346, 28], [380, 34], [-6, 26]]) {
-    tornPiece(c, ellipsePts(x, hz + 2 - r * 0.5, r, r * 0.92, 36), p.tree, { amp: 2.2, seed: 60 + x | 0, rimCol: shade(p.tree, 1.3), rimA: 0.6, shadow: 0.16 });
-    if (rt() < 0.7) tornPiece(c, ellipsePts(x - r * 0.3, hz - r * 0.9, r * 0.6, r * 0.55, 30), shade(p.tree, 1.12), { amp: 2, seed: 70 + x | 0, rim: 0, shadow: 0.1 });
-  }
+  seasonTrees(c, p, hz);
   return L;
 }
 function cloudSprites(p, res) {
@@ -68,11 +67,11 @@ function buildMulOverlay(p, H) {
 function buildScrOverlay(p, H) {
   const L = makeLayer(0, 0, SCENE_W, H, 1), c = L.ctx, hz = H - 330, orb = p.sun || p.moon;
   c.fillStyle = '#000'; c.fillRect(0, 0, SCENE_W, H);
-  glow(c, orb.x * SCENE_W, hz * orb.y, H * 0.55, p.light, p.stars ? 0.08 : 0.14);
+  glow(c, orb.x * SCENE_W, hz * orb.y, H * 0.55, p.light, (p.stars ? 0.08 : 0.14) * (p.lightA ?? 1));
   return L;
 }
 
-// ---- the yard itself (same for every time of day; the overlay tints it) ----
+// ---- the yard itself (same for every time of day — the overlay tints it; it changes with the season and snow) ----
 const HOUSE = { x: 24, d: 250 }, MAILBOX = { x: 330, d: 232 }, LAMP = { x: 222, d: 292 };
 function doghouse(c, x0, by) {
   const C = { wall: '#f6cf86', plank: '#eab86c', side: '#e2ac62', trim: '#fff6e6', roof: '#e8604c', roofL: '#f27d5f', roofD: '#c94b3b', door: '#4a2f2b' };
@@ -133,33 +132,39 @@ function lampPost(c, x, by) {     // a little garden lantern, lit at dusk and ni
 function bowl(c, x, by) {
   pp(c, ell(x, by - 6, 20, 8), '#5b8ed1', 0.28); pp(c, ell(x, by - 10, 18, 5), '#e9f1fb', 0); pp(c, ell(x, by - 10, 13, 3), '#c7854a', 0);
 }
-function buildYard(H, res) {
-  const W = SCENE_W, y0 = H - 440, L = makeLayer(0, y0, W, H, res), c = L.ctx, Y = d => H - d;
-  strip(c, -20, W + 20, x => Y(318) + 4 * fbm1(x / 70, 2), H, '#a6d878', { seed: 80, rimCol: '#e1f3c8', shadow: 0.16 });
+function buildYard(H, res, look = 'spring') {
+  const W = SCENE_W, y0 = H - 440, L = makeLayer(0, y0, W, H, res), c = L.ctx, Y = d => H - d, K = YARD_LOOK[look];
+  strip(c, -20, W + 20, x => Y(318) + 4 * fbm1(x / 70, 2), H, K.lawn[0], { seed: 80, rimCol: K.rims[0], shadow: 0.16 });
   fence(c, Y(296), H);
+  if (K.caps) fenceSnow(c, Y);
   const rb = rng(81);
   for (const [x, w] of [[214, 46], [262, 34], [395, 40]]) {     // bushes along the fence
-    tornPiece(c, ellipsePts(x, Y(300), w, w * 0.62, 30), '#5fae62', { amp: 2.4, seed: 90 + x, rimCol: '#a6d8a0', shadow: 0.2 });
-    for (let k = 0; k < 5; k++) flower(c, x + (rb() - 0.5) * w * 1.3, Y(304) - rb() * w * 0.5, 4 + rb() * 2, ['#f58cbf', '#fff7ee', '#f8d36a'][k % 3], 100 + x + k, false);
+    tornPiece(c, ellipsePts(x, Y(300), w, w * 0.62, 30), K.bush, { amp: 2.4, seed: 90 + x, rimCol: K.bushRim, shadow: 0.2 });
+    if (K.caps) bushSnow(c, Y, x, w);
+    for (let k = 0; k < K.nBushFl; k++) flower(c, x + (rb() - 0.5) * w * 1.3, Y(304) - rb() * w * 0.5, 4 + rb() * 2, K.bushFl[k % K.bushFl.length], 100 + x + k, false);
   }
-  strip(c, -20, W + 20, x => Y(286) + 3 * fbm1(x / 90, 3), H, '#9bd16f', { seed: 82, rimCol: '#d8efbb', shadow: 0.2 });
+  strip(c, -20, W + 20, x => Y(286) + 3 * fbm1(x / 90, 3), H, K.lawn[1], { seed: 82, rimCol: K.rims[1], shadow: 0.2 });
   lampPost(c, LAMP.x, Y(LAMP.d) + 2);
   doghouse(c, HOUSE.x, Y(HOUSE.d));
   bowl(c, 206, Y(246));
-  strip(c, -20, W + 20, x => Y(220) + 3 * fbm1(x / 110, 4), H, '#93cb68', { seed: 83, rimCol: '#cfe9b1', shadow: 0.1, amp: 2.5, rimA: 0.5 });
+  strip(c, -20, W + 20, x => Y(220) + 3 * fbm1(x / 110, 4), H, K.lawn[2], { seed: 83, rimCol: K.rims[2], shadow: 0.1, amp: 2.5, rimA: 0.5 });
   mailbox(c, MAILBOX.x, Y(MAILBOX.d));
+  if (K.caps) yardSnowCaps(c, Y);
   for (const [x, d, r] of [[84, 238, 15], [96, 200, 14], [78, 162, 15], [94, 124, 14]]) {     // stepping stones from his door
     const st = ell(x, Y(d), r, r * 0.42); castShadow(c, st, 2, 0.5, 2, 0.25); piece(c, st, '#ece2cf', { mul: 0.5 }); piece(c, ell(x - 2, Y(d) - 1, r * 0.7, r * 0.22), '#f8f1e4', { mul: 0.3 });
   }
-  for (let k = 0; k < 34; k++) tuft(c, 10 + rb() * (W - 20), Y(286 - rb() * 190), 9 + rb() * 6, rb() < 0.5 ? '#78b553' : '#86c15e', 400 + k);
-  for (let k = 0; k < 10; k++) flower(c, 120 + rb() * 260, Y(110 + rb() * 150), 3.5 + rb() * 1.5, ['#fff7ee', '#c8a6df', '#f8d36a'][k % 3], 500 + k, false);
+  for (let k = 0; k < K.nTuft; k++) tuft(c, 10 + rb() * (W - 20), Y(286 - rb() * 190), 9 + rb() * 6, rb() < 0.5 ? K.tuft[0] : K.tuft[1], 400 + k);
+  for (let k = 0; k < K.nFl; k++) flower(c, 120 + rb() * 260, Y(110 + rb() * 150), 3.5 + rb() * 1.5, K.fl[k % K.fl.length], 500 + k, false);
+  if (K.fallen) yardFallen(c, Y, K, rng(85));
+  if (K.petals) yardPetals(c, Y, rng(86), K.petals);
   return L;
 }
-function buildFore(H, res) {
-  const W = SCENE_W, L = makeLayer(0, H - 90, W, H, res), c = L.ctx, rb = rng(91);
-  strip(c, -20, W + 20, x => H - 56 + 4 * fbm1(x / 80, 6), H, '#7fbb58', { seed: 84, rimCol: '#c3e3a3', shadow: 0.24 });
-  for (let k = 0; k < 16; k++) tuft(c, rb() * W, H - 46 + rb() * 30, 14 + rb() * 8, rb() < 0.5 ? '#68a84a' : '#72b252', 600 + k);
-  for (let k = 0; k < 5; k++) flower(c, rb() * W, H - 40 + rb() * 24, 6 + rb() * 2, ['#fff7ee', '#f58cbf', '#f8d36a'][k % 3], 700 + k, false);
+function buildFore(H, res, look = 'spring') {
+  const W = SCENE_W, L = makeLayer(0, H - 90, W, H, res), c = L.ctx, rb = rng(91), K = YARD_LOOK[look];
+  strip(c, -20, W + 20, x => H - 56 + 4 * fbm1(x / 80, 6), H, K.lawn[3], { seed: 84, rimCol: K.rims[3], shadow: 0.24 });
+  for (let k = 0; k < (K.caps ? 6 : 16); k++) tuft(c, rb() * W, H - 46 + rb() * 30, 14 + rb() * 8, rb() < 0.5 ? K.ftuft[0] : K.ftuft[1], 600 + k);
+  for (let k = 0; k < K.nForeFl; k++) flower(c, rb() * W, H - 40 + rb() * 24, 6 + rb() * 2, ['#fff7ee', '#f58cbf', '#f8d36a'][k % 3], 700 + k, false);
+  if (K.fallen) yardFallen(c, d => H - d, K, rng(92), [8, 40], 6);
   return L;
 }
 

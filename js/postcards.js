@@ -888,6 +888,311 @@ function pcLoyKrathongFront(c, W, H, res) {
 }
 
 
+// ---- Christmas: a snowy Alpine village at dusk, warm windows; Parker in a little scarf ----
+function snowFall(c, W, H, seed, n = 70) { const r = rng(seed); for (let k = 0; k < n; k++) { const x = r() * W, y = r() * H * 0.9, s = 1.5 + r() * 2.5; c.save(); c.globalAlpha = 0.6 + r() * 0.4; piece(c, poly([[x - s, y], [x, y - s], [x + s, y], [x, y + s]]), '#ffffff', { mul: 0.2 }); c.restore(); } }
+function snowPine(c, x, y, h, seed) { pine(c, x, y, h, '#2f5a4a', seed); for (let i = 0; i < 3; i++) { const w = h * (0.42 - i * 0.1) * 0.7, yy = y - i * h * 0.26 - h * 0.3; piece(c, poly([[x - w, yy + 4], [x, yy - h * 0.18], [x + w, yy + 4]]), '#f4f8ff', { mul: 0.2 }); } }
+function litChalet(c, x, by, s) {
+  chalet(c, x, by, s);
+  c.save(); c.translate(x, by); c.scale(s, s);
+  pp(c, poly([[-82, -66], [0, -120], [82, -66], [72, -60], [0, -108], [-72, -60]]), '#f4f8ff', 0.1);         // snow on the roof
+  for (const wx of [-36, 24]) { glow(c, wx, -43, 30, '255,200,120', 0.7); pp(c, rectP(wx - 9, -51, 18, 16), '#ffd88a', 0); pp(c, rectP(wx - 1, -51, 2, 16), '#8a5a3a', 0); }
+  for (let i = 0; i < 9; i++) { const u = i / 8, px = lerp(-70, 70, u), py = -60 - Math.sin(u * Math.PI) * 4; glow(c, px, py, 6, ['255,120,120', '255,220,120', '140,220,160'][i % 3], 0.9); }   // string lights under the eaves
+  c.restore();
+}
+function pcXmas(c, W, H) {
+  skyBands(c, W, ['#232b58', '#2e3870', '#475290', '#736ca8', '#b297bf'], 50, 250, 1400);
+  for (const [pts, seed] of [[[[-20, 300], [110, 170], [200, 210], [320, 300]], 1401], [[[260, 300], [430, 150], [560, 230], [700, 300]], 1402], [[[600, 300], [760, 140], [860, 200], [940, 300]], 1403]]) {
+    const m = tornPiece(c, pts.concat([[pts[pts.length - 1][0], 340], [pts[0][0], 340]]), '#7f8ab8', { amp: 2, seed, rimCol: '#d8e0f4', shadow: 0.15 });
+    clipped(c, m, () => piece(c, rectP(-20, 120, 960, 80), '#eef2fc', { mul: 0.2 }));
+  }
+  strip(c, -20, W + 20, x => 300 + 6 * fbm1(x / 70, 2), H, '#dfe6f6', { seed: 1404, rimCol: '#ffffff', shadow: 0.12 });
+  const rp = rng(1405); for (let k = 0; k < 14; k++) snowPine(c, rp() * W, 304 + rp() * 10, 30 + rp() * 20, 1410 + k);
+  // the little church
+  pp(c, rectP(150, 300, 70, 70), '#efe6dc', 0.25); pp(c, poly([[140, 304], [185, 268], [230, 304]]), '#5a3a3a', 0.2); pp(c, poly([[140, 304], [185, 268], [230, 304], [222, 300], [185, 276], [148, 300]]), '#f4f8ff', 0);
+  pp(c, rectP(196, 240, 22, 64), '#efe6dc', 0.2); pp(c, poly([[192, 242], [207, 200], [222, 242]]), '#5a3a3a', 0.2); glow(c, 185, 336, 26, '255,200,120', 0.7); pp(c, rectP(178, 322, 14, 24), '#ffd88a', 0);
+  litChalet(c, 330, 392, 0.9); litChalet(c, 820, 400, 1.0);
+  strip(c, -20, W + 20, x => 400 + 5 * fbm1(x / 90, 3), H, '#e8eef8', { seed: 1406, rimCol: '#ffffff', shadow: 0.16 });
+  // the village Christmas tree
+  for (let i = 0; i < 4; i++) { const w = 62 - i * 13, y = 410 - i * 34; pp(c, poly([[560 - w, y], [560, y - 52], [560 + w, y]]), i % 2 ? '#2f6a4a' : '#3a7a52', 0.25); }
+  const rl = rng(1407); for (let k = 0; k < 18; k++) { const y = 400 - rl() * 130, half = (410 - y) * 0.42, x = 560 + (rl() - 0.5) * 2 * half; glow(c, x, y, 8, ['255,120,120', '255,220,120', '140,200,255'][k % 3], 0.9); }
+  pp(c, poly([...Array(10)].map((_, i) => [560 + Math.cos(i * Math.PI / 5 - Math.PI / 2) * (i % 2 ? 6 : 14), 268 + Math.sin(i * Math.PI / 5 - Math.PI / 2) * (i % 2 ? 6 : 14)])), ARCH.gold, 0.15); glow(c, 560, 268, 30, '255,230,150', 0.8);
+  strip(c, -20, W + 20, x => 470 + 6 * fbm1(x / 120, 4), H, '#f4f7fd', { seed: 1408, rimCol: '#ffffff', shadow: 0.2 });
+}
+function snowman(c, x, y, s) {
+  c.save(); c.translate(x, y); c.scale(s, s);
+  for (const [cy, r] of [[-26, 30], [-74, 22], [-108, 16]]) pp(c, circ(0, cy, r), '#fbfdff', 0.25);
+  for (const [dx, dy] of [[-6, -112], [6, -112]]) { c.fillStyle = '#2f2a2e'; c.beginPath(); c.arc(dx, dy, 2.2, 0, TAU); c.fill(); }
+  pp(c, poly([[0, -106], [18, -103], [0, -100]]), '#f08a3c', 0.1);
+  for (const d of [-1, 1]) pp(c, slab([d * 20, -78], [d * 46, -96], 3), '#7a5a3a', 0.1);
+  pp(c, rectP(-16, -128, 32, 6), '#3a3a4a', 0.15); pp(c, rectP(-10, -150, 20, 24), '#3a3a4a', 0.15);
+  blush(c, [[-11, -104], [11, -104]], 3, 0.5); c.restore();
+}
+function pcXmasFront(c, W, H, res) {
+  pcXmas(c, W, H);
+  for (let i = 0; i < 7; i++) pp(c, ell(240 + i * 34, 590 - i * 6, 5, 2.4), '#d6e0f2', 0);                         // his paw prints in the snow
+  snowman(c, 730, 580, 1.0);
+  pcParker(c, res, BOX_SIT, 0.86, p => drawSitB(p, 'calm', 0.1, { pack: true, scarf: true, mouth: 'gift' }), 520, 590);
+  snowFall(c, W, H, 1409);
+  vignette(c, W, H, '80,90,140', 0.42, 1.0);
+}
+
+// ---- New Year's Day: the first sunrise of the year, right on the summit of Mt Fuji ----
+function kadomatsu(c, x, y, s) {
+  c.save(); c.translate(x, y); c.scale(s, s);
+  for (const [dx, h] of [[-12, 118], [0, 140], [12, 104]]) { pp(c, rectP(dx - 7, -h, 14, h), '#5fa55a', 0.2); pp(c, ell(dx, -h, 7, 3.4), '#d8eec0', 0); }
+  for (let i = 0; i < 8; i++) leaf(c, (i - 3.5) * 6, -36, 30, 6, -Math.PI / 2 + (i - 3.5) * 0.3, i % 2 ? '#2f6a4a' : '#3f7a52');
+  for (const [dx, dy] of [[-22, -46], [24, -52], [-16, -60]]) flower(c, dx, dy, 5, '#e85a6a', 1500 + dx, false);
+  pp(c, poly([[-30, -40], [30, -40], [26, 0], [-26, 0]]), '#d9c08a', 0.25); for (const yy of [-30, -14]) pp(c, rectP(-29, yy, 58, 4), '#a8864a', 0);
+  c.restore();
+}
+function kagamiMochi(c, x, y, s) {
+  c.save(); c.translate(x, y); c.scale(s, s);
+  pp(c, poly([[-26, 0], [26, 0], [22, -12], [-22, -12]]), '#e8d4a8', 0.2);
+  pp(c, ell(0, -22, 24, 11), '#fbfaf4', 0.2); pp(c, ell(0, -36, 18, 9), '#fbfaf4', 0.2);
+  pp(c, circ(0, -50, 9), '#f39a2a', 0.15); leaf(c, 2, -58, 12, 4, -0.6, '#4f8a52');
+  c.restore();
+}
+function pcNewYear(c, W, H) {
+  skyBands(c, W, ['#283070', '#433f86', '#7c5f9e', '#d9839c', '#f4ad86', '#fbd68e'], 50, 290, 1500);
+  // the rising sun sits exactly on the summit, rays fanning out behind
+  c.save(); c.globalCompositeOperation = 'screen';
+  for (let i = 0; i < 14; i++) { const a = -Math.PI + (i + 0.5) / 14 * Math.PI, L = 520; piece(c, poly([[450, 166], [450 + Math.cos(a - 0.04) * L, 166 + Math.sin(a - 0.04) * L], [450 + Math.cos(a + 0.04) * L, 166 + Math.sin(a + 0.04) * L]]), 'rgba(255,220,150,0.18)', { mul: 0, scr: 0 }); }
+  glow(c, 450, 166, 300, '255,214,140', 0.8); c.restore();
+  tornPiece(c, ellipsePts(450, 166, 30, 30, 48), '#fff0b8', { amp: 1, seed: 1501, shadow: 0, rimCol: '#fffbe8' });
+  fujiShape(c, 450, 330, 330, 162);
+  c.save(); c.globalCompositeOperation = 'screen'; glow(c, 450, 190, 110, '255,180,160', 0.5); c.restore();   // first light on the snow
+  strip(c, -20, W + 20, x => 318 - 16 * Math.max(0, fbm1(x / 90, 2) + 0.4), H, '#3f4a78', { seed: 1502, rimCol: '#8a90c0', shadow: 0.15 });
+  const lake = rectP(-20, 326, W + 40, 300); pp(c, lake, '#8a94c8', 0);
+  clipped(c, lake, () => { c.save(); c.globalAlpha = 0.4; fujiShape(c, 450, 330, 330, 150, true); c.restore(); c.save(); c.globalAlpha = 0.6; const r = rng(1503); for (let k = 0; k < 12; k++) piece(c, rectP(450 - (12 - k) * 3 - r() * 8, 336 + k * 12, (12 - k) * 6 + r() * 20, 2.5), '#fbe2a0', { mul: 0.2 }); c.restore(); });
+  pp(c, rectP(-20, 324, W + 40, 5), '#3f4a78', 0);
+  for (const [x, y, s] of [[620, 110, 1.6], [668, 132, 1.3]]) bird(c, x, y, s, '#fff6ea');                       // two cranes flying into the new year
+  strip(c, -20, W + 20, x => 486 + 6 * fbm1(x / 80, 4), H, '#e6e2ec', { seed: 1504, rimCol: '#ffffff', shadow: 0.2 });   // a dusting of snow on the shore
+}
+function pcNewYearFront(c, W, H, res) {
+  pcNewYear(c, W, H);
+  kadomatsu(c, 150, 590, 1.1); kagamiMochi(c, 720, 586, 1.2);
+  pcParker(c, res, BOX_WAVE, 0.92, p => drawWaveB(p, 0, { pack: true, paws: 'bow' }), 450, 590);
+  vignette(c, W, H, '120,90,140', 0.45, 1.05);
+}
+
+// ---- Chinese New Year: the Li River at dusk, red lanterns all along it, fireworks ----
+function redLantern(c, x, y, s) {
+  glow(c, x, y, 34 * s, '255,120,80', 0.55);
+  pp(c, slab([x, y - 22 * s], [x, y - 14 * s], 2 * s), ARCH.gold, 0);
+  pp(c, ell(x, y, 16 * s, 13 * s), '#d9332e', 0.2); clipped(c, ell(x, y, 16 * s, 13 * s), () => { for (const dx of [-8, 0, 8]) piece(c, ell(x + dx * s, y, 2 * s, 13 * s), '#b8282a', { mul: 0.4 }); });
+  pp(c, rectP(x - 8 * s, y - 15 * s, 16 * s, 4 * s), ARCH.gold, 0); pp(c, rectP(x - 8 * s, y + 11 * s, 16 * s, 4 * s), ARCH.gold, 0);
+  pp(c, rectP(x - 2 * s, y + 15 * s, 4 * s, 12 * s), '#e2a93d', 0);
+}
+function firework(c, x, y, r, col, seed) {
+  glow(c, x, y, r * 1.6, col, 0.35); const rr = rng(seed), p = new Path2D();
+  for (let i = 0; i < 16; i++) { const a = i / 16 * TAU + rr() * 0.1, L = r * (0.7 + rr() * 0.3); p.addPath(poly([[x + Math.cos(a) * 6, y + Math.sin(a) * 6], [x + Math.cos(a - 0.05) * L, y + Math.sin(a - 0.05) * L], [x + Math.cos(a) * (L + 6), y + Math.sin(a) * (L + 6)], [x + Math.cos(a + 0.05) * L, y + Math.sin(a + 0.05) * L]])); }
+  c.save(); c.globalCompositeOperation = 'screen'; piece(c, p, `rgb(${col})`, { mul: 0, scr: 0.2 }); c.restore();
+}
+function pcCNY(c, W, H) {
+  skyBands(c, W, ['#30244e', '#53305e', '#963e5a', '#d96a4a', '#f2a65e'], 40, 210, 1600);
+  firework(c, 220, 90, 60, '255,200,120', 1601); firework(c, 640, 70, 70, '255,140,160', 1602); firework(c, 790, 160, 44, '255,230,160', 1603);
+  karstRow(c, 236, '#8a5f86', 1604, 0, 60, 150, 0.35); karstRow(c, 270, '#6e4a72', 1605, 0, 90, 200, 0.3); karstRow(c, 304, '#55385c', 1606, 0, 110, 230, 0.25);
+  const river = rectP(-20, 306, W + 40, 300); pp(c, river, '#5a3e66', 0);
+  clipped(c, river, () => { c.save(); c.globalAlpha = 0.25; c.translate(0, 612); c.scale(1, -1); karstRow(c, 306, '#55385c', 1606, 0, 110, 230, 0); c.restore(); const r = rng(1607); for (let k = 0; k < 26; k++) piece(c, rectP(r() * W, 312 + r() * 200, 30 + r() * 60, 2), r() < 0.5 ? '#f2a65e' : '#e85a4a', { mul: 0.2 }); });
+  // a small boat with a lantern on the water
+  const hull = new Path2D(); hull.moveTo(560, 380); hull.quadraticCurveTo(620, 396, 700, 380); hull.lineTo(690, 392); hull.quadraticCurveTo(620, 404, 570, 392); hull.closePath(); pp(c, hull, '#3a2a30', 0.2);
+  pp(c, slab([660, 382], [660, 346], 2), '#3a2a30', 0); redLantern(c, 660, 340, 0.6);
+  // strings of red lanterns across the top
+  for (const [y0, sag, n, s] of [[16, 60, 7, 0.9], [-6, 40, 6, 0.75]]) {
+    c.save(); c.strokeStyle = '#3a2a30'; c.lineWidth = 2; c.beginPath(); c.moveTo(-20, y0); c.quadraticCurveTo(450, y0 + sag * 2, 920, y0); c.stroke(); c.restore();
+    for (let i = 0; i < n; i++) { const u = (i + 0.5) / n, x = lerp(-20, 920, u), y = (1 - u) * (1 - u) * y0 + 2 * u * (1 - u) * (y0 + sag * 2) + u * u * y0 + 22 * s; redLantern(c, x, y, s); }
+  }
+  // the riverside pier
+  pp(c, rectP(-20, 506, W + 40, 100), '#7a4a3a', 0.25); for (let k = 0; k < 9; k++) piece(c, rectP(-20, 512 + k * 11, W + 40, 2), '#5e3628', { mul: 0.4 });
+  for (const x of [60, 840]) { pp(c, rectP(x - 5, 440, 10, 70), '#5e3628', 0.2); redLantern(c, x, 436, 1.0); }
+}
+function mandarins(c, x, y, s) { c.save(); c.translate(x, y); c.scale(s, s); pp(c, ell(0, 0, 40, 10), '#e8d4a8', 0.2); for (const [dx, dy] of [[-18, -10], [0, -12], [18, -10], [-9, -26], [9, -26]]) { pp(c, circ(dx, dy, 11), '#f39a2a', 0.15); leaf(c, dx + 2, dy - 10, 10, 3, -0.8, '#4f8a52'); } c.restore(); }
+function firecrackers(c, x, y, s) { c.save(); c.translate(x, y); c.scale(s, s); pp(c, slab([0, -120], [0, -8], 2), '#7a5a3a', 0); for (let i = 0; i < 9; i++) pp(c, rectP(-10 + (i % 2) * 8, -110 + i * 11, 8, 12), '#d9332e', 0.12); pp(c, rectP(-8, -122, 16, 8), ARCH.gold, 0.1); c.restore(); }
+function pcCNYFront(c, W, H, res) {
+  pcCNY(c, W, H);
+  mandarins(c, 250, 584, 1.2); firecrackers(c, 680, 590, 1.1);
+  pcParker(c, res, BOX_WAVE, 0.92, p => drawWaveB(p, 0, { pack: true, paws: 'gong' }), 450, 590);
+  vignette(c, W, H, '120,70,90', 0.45, 1.05);
+}
+
+// ---- Songkran: Tha Phae Gate in Chiang Mai, water flying everywhere; Parker soaked and delighted ----
+function waterArc(c, x0, y0, x1, y1, h, w, seed) {
+  const p = new Path2D(), mx = (x0 + x1) / 2, my = Math.min(y0, y1) - h;
+  p.moveTo(x0, y0 - w / 2); p.quadraticCurveTo(mx, my - w / 2, x1, y1); p.quadraticCurveTo(mx, my + w / 2, x0, y0 + w / 2); p.closePath();
+  c.save(); c.globalAlpha = 0.75; fp(c, p, '#8fd0f0', { sh: 0.12, mul: 0.2 }); c.restore();
+  const r = rng(seed); for (let k = 0; k < 10; k++) { const u = 0.7 + r() * 0.35, x = lerp(x0, x1, u) + (r() - 0.5) * 40, y = lerp(y0, y1, u) - (1 - u) * h + (r() - 0.5) * 30; drop(c, x, y, 3 + r() * 3); }
+}
+function drop(c, x, y, s) { const p = new Path2D(); p.moveTo(x, y - s * 1.8); p.quadraticCurveTo(x + s, y, x, y + s); p.quadraticCurveTo(x - s, y, x, y - s * 1.8); fp(c, p, '#7cc4ec', { sh: 0.08, mul: 0.3 }); }
+function waterGun(c, x, y, s, col) { c.save(); c.translate(x, y); c.scale(s, s); pp(c, rectP(-26, -14, 52, 14), col, 0.2); pp(c, rectP(-20, 0, 12, 20), col, 0.15); pp(c, rectP(18, -10, 16, 6), '#3a3a4a', 0); pp(c, circ(-6, -22, 10), '#8fd0f0', 0.12); c.restore(); }
+function silverBowl(c, x, y, s) { c.save(); c.translate(x, y); c.scale(s, s); pp(c, poly([[-30, -20], [30, -20], [22, 0], [-22, 0]]), '#d6dae2', 0.22); pp(c, ell(0, -20, 30, 7), '#8fd0f0', 0); for (const dx of [-14, -2, 10]) pp(c, circ(dx, -22, 4), '#fff8ee', 0); for (let i = 0; i < 4; i++) piece(c, rectP(-24 + i * 14, -16, 6, 12), '#eef0f4', { mul: 0.3 }); c.restore(); }
+function pcSongkran(c, W, H) {
+  skyBands(c, W, ['#4fb0ea', '#68bcee', '#8acbf0', '#b4dcf2'], 40, 200, 1700);
+  glow(c, 760, 70, 160, '255,250,220', 0.5);
+  strip(c, -20, W + 20, x => 268 - 12 * Math.max(0, fbm1(x / 70, 9) + 0.4) * 1.6, H, '#5f9a80', { seed: 1701, rimCol: '#a8d0b8', shadow: 0.14, amp: 3 });
+  // festival bunting strung across the sky
+  for (const [y0, sag, seed] of [[30, 30, 1711], [96, 26, 1712]]) {
+    c.save(); c.strokeStyle = '#7a5a48'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(-20, y0); c.quadraticCurveTo(450, y0 + sag * 2, 920, y0); c.stroke(); c.restore();
+    const cols = ['#e2463c', '#f7c234', '#5fae5a', '#3f8fd0', '#f58cbf', '#ffffff'];
+    for (let i = 0; i < 22; i++) { const u = (i + 0.5) / 22, x = lerp(-20, 920, u), y = (1 - u) * (1 - u) * y0 + 2 * u * (1 - u) * (y0 + sag * 2) + u * u * y0; pp(c, poly([[x - 12, y], [x + 12, y], [x, y + 22]]), cols[(i + seed) % 6], 0.12); }
+  }
+  cityWall(c, W, 300, 420, 450);
+  [[140, 294, 56], [760, 294, 60]].forEach(([x, y, w], j) => { const r2 = rng(1702 + j); for (let k = 0; k < 9; k++) leaf(c, x + (r2() - 0.5) * w, y + r2() * 10, 14, 5, r2() * TAU, '#4f9a52'); for (let k = 0; k < 18; k++) pp(c, circ(x + (r2() - 0.5) * w * 1.1, y - 6 + r2() * 26, 4.5 + r2() * 3), r2() < 0.5 ? '#e8559a' : '#f58cbf', 0); });
+  // the wet street in front of the gate, with puddles
+  strip(c, -20, W + 20, x => 420 + 2 * fbm1(x / 90, 3), H, '#d8c4a8', { seed: 1703, rimCol: '#f2e6d4', shadow: 0.2 });
+  for (const [x, y, w] of [[200, 520, 70], [660, 540, 90], [420, 470, 60]]) { pp(c, ell(x, y, w, w * 0.18), '#9fcfe6', 0); piece(c, ell(x - w * 0.3, y - 2, w * 0.3, 2), '#e8f6fc', { mul: 0.2 }); }
+  // water flying in from both sides
+  waterArc(c, -20, 260, 380, 470, 150, 26, 1704); waterArc(c, 920, 240, 560, 470, 170, 28, 1705); waterArc(c, -20, 420, 330, 520, 90, 20, 1706); waterArc(c, 920, 400, 620, 520, 80, 22, 1707);
+}
+function pcSongkranFront(c, W, H, res) {
+  pcSongkran(c, W, H);
+  waterGun(c, 170, 590, 1.2, '#f39a2a'); waterGun(c, 760, 586, 1.1, '#5fae5a'); silverBowl(c, 300, 594, 1.1);
+  const rb = rng(1712); c.save(); c.globalAlpha = 0.8; for (let k = 0; k < 26; k++) { const a = -Math.PI + rb() * Math.PI, R = 110 + rb() * 70; drop(c, 470 + Math.cos(a) * R * 1.2, 470 + Math.sin(a) * R * 0.9, 4 + rb() * 4); } c.restore();   // a burst of spray behind him
+  pcParker(c, res, BOX_SHAKE, 1.0, p => drawShakeB(p, 1, { pack: true }), 470, 592);
+  const r = rng(1710); for (let k = 0; k < 14; k++) drop(c, 330 + r() * 280, 380 + r() * 200, 3 + r() * 3);
+  vignette(c, W, H, '120,160,190', 0.45, 1.05);
+}
+
+
+// ================= ISTANBUL + "WE MET" CARDS + friends added to ordinary cards =================
+function galataTower(c, x, by, s) {
+  c.save(); c.translate(x, by); c.scale(s, s);
+  pp(c, rectP(-26, -170, 52, 170), '#d9c8ae', 0.25); clipped(c, rectP(-26, -170, 52, 170), () => { piece(c, rectP(8, -170, 18, 170), '#c4b094', { mul: 0.4 }); for (const y of [-120, -70]) piece(c, rectP(-26, y, 52, 4), '#bca888', { mul: 0.4 }); });
+  for (const [wy, n] of [[-150, 3], [-100, 3], [-48, 2]]) for (let i = 0; i < n; i++) { const wx = -14 + i * (28 / Math.max(1, n - 1)); const w = new Path2D(); w.moveTo(wx - 3, wy + 10); w.lineTo(wx - 3, wy); w.arc(wx, wy, 3, Math.PI, 0); w.lineTo(wx + 3, wy + 10); w.closePath(); piece(c, w, '#4a3a38', { mul: 0.4 }); }
+  pp(c, rectP(-32, -182, 64, 12), '#e6d6bc', 0.2); for (let i = 0; i < 7; i++) piece(c, rectP(-29 + i * 9, -180, 4, 8), '#8a7a6a', { mul: 0.4 });   // the balcony
+  pp(c, poly([[-30, -182], [0, -246], [30, -182]]), '#4a5a7a', 0.25); pp(c, slab([0, -246], [0, -258], 2), ARCH.gold, 0);
+  c.restore();
+}
+function mosque(c, x, by, s, col) {
+  c.save(); c.translate(x, by); c.scale(s, s);
+  for (const dx of [-70, -46, 46, 70]) { pp(c, rectP(dx - 3, -120, 6, 120), col, 0.08); pp(c, poly([[dx - 4, -120], [dx, -138], [dx + 4, -120]]), col, 0.05); }
+  pp(c, rectP(-56, -40, 112, 40), col, 0.12);
+  for (const [dx, r] of [[-34, 16], [34, 16]]) { const d = new Path2D(); d.moveTo(dx - r, -40); d.arc(dx, -40, r, Math.PI, 0); d.closePath(); pp(c, d, col, 0.08); }
+  const dome = new Path2D(); dome.moveTo(-32, -54); dome.arc(0, -54, 32, Math.PI, 0); dome.closePath(); pp(c, rectP(-34, -56, 68, 18), col, 0.08); pp(c, dome, col, 0.1);
+  pp(c, slab([0, -86], [0, -96], 1.5), col, 0); c.restore();
+}
+function ferry(c, x, y, s) {
+  c.save(); c.translate(x, y); c.scale(s, s);
+  piece(c, poly([[-80, 8], [80, 8], [60, 14], [-70, 14]]), 'rgba(255,255,255,0.7)', { mul: 0, scr: 0 });
+  pp(c, poly([[-70, 0], [74, 0], [64, 10], [-62, 10]]), '#fbfaf4', 0.2); pp(c, rectP(-66, 0, 136, 3), '#2f4a6a', 0);
+  pp(c, rectP(-44, -18, 90, 18), '#fbfaf4', 0.15); for (let i = 0; i < 8; i++) piece(c, rectP(-40 + i * 11, -14, 7, 6), '#5a7a9a', { mul: 0.4 });
+  pp(c, rectP(-4, -34, 12, 16), '#2f2a2e', 0.12); pp(c, rectP(-4, -30, 12, 4), '#fbfaf4', 0);
+  c.restore();
+}
+function simitCart(c, x, by, s) {
+  c.save(); c.translate(x, by); c.scale(s, s);
+  for (const dx of [-30, 30]) pp(c, circ(dx, -10, 10), '#3a3a40', 0.15);
+  pp(c, rectP(-44, -54, 88, 40), '#d9332e', 0.25); pp(c, rectP(-40, -96, 80, 42), '#e8f2f6', 0.15); pp(c, rectP(-44, -100, 88, 6), '#d9332e', 0.1);
+  for (const [dx, dy] of [[-22, -80], [0, -84], [22, -80], [-11, -68], [11, -68]]) { c.save(); c.translate(dx, dy); drawItem(c, 'simit', 0.42); c.restore(); }
+  pp(c, slab([44, -40], [70, -54], 4), '#7a5a3a', 0.1);
+  c.restore();
+}
+function teaGlass(c, x, by, s) {
+  c.save(); c.translate(x, by); c.scale(s, s);
+  pp(c, ell(0, -2, 14, 4), '#d9332e', 0.15);
+  const g = new Path2D(); g.moveTo(-8, -32); g.quadraticCurveTo(-3, -18, -6, -4); g.lineTo(6, -4); g.quadraticCurveTo(3, -18, 8, -32); g.closePath();
+  pp(c, g, '#c25a2a', 0.15); piece(c, rectP(-8, -32, 16, 5), '#f3e6d4', { mul: 0.2 }); piece(c, rectP(-5, -28, 2, 20), 'rgba(255,255,255,0.4)', { mul: 0, scr: 0 });
+  c.restore();
+}
+function pcIstanbul(c, W, H, sunset) {
+  skyBands(c, W, sunset ? ['#5a4a8a', '#9a5a8a', '#e07a7a', '#f4a46a', '#f8cc84'] : ['#78bde8', '#90caec', '#acd8ee', '#cfe6ee', '#efe2d0'], 50, 220, sunset ? 1910 : 1900);
+  if (sunset) { glow(c, 640, 230, 300, '255,190,130', 0.6); tornPiece(c, ellipsePts(640, 236, 36, 36, 40), '#ffd98a', { amp: 1.2, seed: 1911, shadow: 0, rimCol: '#fff3cc' }); }
+  // the old city across the water: domes and minarets
+  const far = sunset ? '#7a5a86' : '#a6a6c4';
+  strip(c, -20, W + 20, x => 296 + 4 * fbm1(x / 60, 2), H, far, { seed: 1901, rim: 0, shadow: 0.08, amp: 2 });
+  mosque(c, 170, 298, 0.9, far); mosque(c, 360, 300, 0.6, far);
+  // Galata hill: houses stepping up to the tower
+  const hill = x => 300 - 70 * Math.exp(-(((x - 650) / 170) ** 2));
+  const hp = strip(c, 440, W + 20, hill, H, sunset ? '#6a5a7a' : '#c9b8a0', { seed: 1902, rimCol: '#e8dcc8', shadow: 0.15 });
+  const rh = rng(1903), cols = sunset ? ['#c98a7a', '#d9a080', '#b07a8a', '#e0b090'] : ['#f2c48a', '#e8907a', '#f6e2b8', '#a8c8d8', '#d9a6c0'];
+  for (let k = 0; k < 26; k++) { const x = 460 + rh() * 440, top = hill(x) + 6 + rh() * 20, w = 18 + rh() * 16, h = 22 + rh() * 18; pp(c, rectP(x, top, w, h), cols[k % cols.length], 0.15); pp(c, poly([[x - 2, top], [x + w / 2, top - 8], [x + w + 2, top]]), '#c45a3a', 0.1); piece(c, rectP(x + 4, top + 6, 4, 6), '#5a4a48', { mul: 0.4 }); }
+  galataTower(c, 650, 236, 0.85);
+  // the Bosphorus
+  strip(c, -20, W + 20, x => 312 + 1.5 * fbm1(x / 80, 3), H, sunset ? '#5a5a8a' : '#3f8fb0', { seed: 1904, rimCol: sunset ? '#e8a07a' : '#a6d6e6', amp: 1.5, shadow: 0.12 });
+  wavyGlints(c, sunset ? 640 : 300, 330, 5, 110, 1905, sunset ? '#ffd98a' : '#ffffff', sunset ? '#f6b06a' : '#d6eef6');
+  ferry(c, 300, 372, 1.0);
+  [[140, 140, 1.2], [176, 120, 1], [520, 100, 1.1], [760, 160, 0.9], [420, 200, 0.8]].forEach(([x, y, s]) => bird(c, x, y, s, '#fbfaf4'));
+  // the quay
+  strip(c, -20, W + 20, x => 450 + 3 * fbm1(x / 120, 4), H, sunset ? '#b89a8a' : '#d8c8b0', { seed: 1906, rimCol: '#f2e6d4', shadow: 0.22 });
+  for (let k = 0; k < 10; k++) piece(c, rectP(-20, 470 + k * 14, W + 40, 1.5), sunset ? '#a08070' : '#c4b094', { mul: 0.4 });
+  pp(c, rectP(560, 494, 360, 40), sunset ? '#a88a7a' : '#cbb89a', 0.25); for (let k = 0; k < 6; k++) piece(c, rectP(560 + k * 60, 494, 2, 40), sunset ? '#8a6a5a' : '#b09a7a', { mul: 0.4 });   // a low stone wall
+}
+function pcIstanbulFront(c, W, H, res) {
+  pcIstanbul(c, W, H, false);
+  simitCart(c, 170, 580, 1.0); teaGlass(c, 290, 588, 1.2);
+  pp(c, rectP(800, 470, 12, 30), '#5a5a62', 0.2); bird(c, 806, 462, 1.4, '#fbfaf4');                        // a gull on a bollard
+  pcParker(c, res, BOX_SIT, 0.82, p => drawSitB(p, 'calm', 0.1, { pack: true, mouth: 'simit' }), 440, 588);
+  vignette(c, W, H, '140,160,190', 0.45, 1.05);
+}
+const fr = (c, res, id, pose, x, y, k, flip) => pcParker(c, res, id === 'peafowl' && pose === 'display' ? { w: 320, h: 230, ox: 160, oy: 210 } : BOX_FRIEND[id], k, p => FRIEND_DRAW[id](p, pose), x, y, flip);
+// --- we met: Simit, on the Bosphorus wall at sunset, sharing a sesame ring
+function pcMeetCatFront(c, W, H, res) {
+  pcIstanbul(c, W, H, true);
+  fr(c, res, 'cat', 'loaf', 650, 500, 1.0, true);
+  c.save(); c.translate(560, 486); drawItem(c, 'simit', 0.7); c.restore(); teaGlass(c, 610, 494, 0.9); teaGlass(c, 520, 494, 0.9);
+  pcParker(c, res, BOX_SIT, 0.84, p => drawSitB(p, 'happy', 0.2, { pack: true }), 420, 588);
+  vignette(c, W, H, '140,100,130', 0.45, 1.05);
+}
+// --- we met: Jade, in the misty Inthanon forest by a waterfall
+function pcMeetPeafowl(c, W, H) {
+  skyBands(c, W, ['#b8d6c8', '#c8e0d0', '#d8e8da', '#e8f0e4'], 40, 180, 2000);
+  for (const [base, col, seed, mist] of [[200, '#9fc0ac', 2001, 0.5], [270, '#7aa68a', 2002, 0.4], [340, '#5a8a6a', 2003, 0.3]]) {
+    strip(c, -20, W + 20, x => base - 40 * Math.abs(Math.sin(x / 60 + seed)) - 10 * fbm1(x / 30, seed), H, col, { seed, rimCol: shade(col, 1.2), shadow: 0.12 });
+    c.save(); c.globalAlpha = mist; strip(c, -20, W + 20, x => base + 8 + 4 * Math.sin(x / 50), H, '#f2f6f0', { seed: seed + 5, rim: 0, shadow: 0, amp: 3 }); c.restore();
+  }
+  // the waterfall
+  // mossy cliffs either side of the fall
+  tornPiece(c, [[540, 440], [560, 200], [610, 130], [640, 150], [636, 440]], '#4a5e52', { amp: 3, seed: 2004, rimCol: '#7a9a80', shadow: 0.2 });
+  tornPiece(c, [[700, 440], [704, 150], [740, 120], [800, 190], [820, 440]], '#435648', { amp: 3, seed: 2005, rimCol: '#7a9a80', shadow: 0.2 });
+  for (const [x, y] of [[570, 230], [600, 300], [760, 220], [790, 320], [720, 380]]) tornPiece(c, ellipsePts(x, y, 18, 9, 16), '#6f9a5a', { amp: 2, seed: 2006 + x, rim: 0, shadow: 0.1 });
+  // the white curtain of water, then the plunge pool and its spray
+  const fall = poly([[632, 146], [708, 146], [714, 432], [626, 432]]); pp(c, fall, '#e8f4f6', 0.15);
+  clipped(c, fall, () => { const rw = rng(2007); for (let k = 0; k < 16; k++) piece(c, rectP(628 + rw() * 84, 140 + rw() * 40, 2 + rw() * 4, 300), rw() < 0.5 ? '#b8dce6' : '#ffffff', { mul: 0.2 }); });
+  pp(c, ell(670, 444, 110, 16), '#8fc8d6', 0.1);
+  for (let k = 0; k < 9; k++) tornPiece(c, ellipsePts(600 + k * 18, 436 - (k % 2) * 6, 22, 10, 18), '#ffffff', { amp: 2, seed: 2010 + k, rim: 0, shadow: 0.04, mul: 0.3 });
+  strip(c, -20, W + 20, x => 440 + 5 * fbm1(x / 90, 2), H, '#5f9a5a', { seed: 2006, rimCol: '#a6d08a', shadow: 0.2 });
+  const rf = rng(2007); for (let k = 0; k < 10; k++) { const x = rf() * W; for (let i = 0; i < 5; i++) leaf(c, x, 470 + rf() * 40, 40, 8, -Math.PI / 2 + (i - 2) * 0.5, i % 2 ? '#3f7a4a' : '#4f8a52'); }
+}
+function pcMeetPeafowlFront(c, W, H, res) {
+  pcMeetPeafowl(c, W, H);
+  rhodo(c, 90, 520, 1.4, 2010); rhodo(c, 820, 530, 1.3, 2011);
+  fr(c, res, 'peafowl', 'display', 590, 586, 1.05, true);
+  pcParker(c, res, BOX_WAVE, 0.9, p => drawWaveB(p, 0, { pack: true, paws: 'bow' }), 300, 590);
+  vignette(c, W, H, '120,150,130', 0.45, 1.05);
+}
+// --- we met: Kinako, playing in the torii tunnel
+function pcMeetKinakoFront(c, W, H, res) {
+  pcFushimi(c, W, H);
+  stoneLantern(c, 820, 600, 1.4);
+  fr(c, res, 'kinako', 'play', 590, 592, 1.25, true);
+  pcParker(c, res, BOX_BOW, 0.82, p => drawPlayBowB(p, 'pant', { pack: true, wag: 0.25 }), 330, 590);
+  bigTorii(c);
+  vignette(c, W, H, '90,60,60', 0.4, 1.0);
+}
+// --- we met: Sasa, under the crescent moon and the stars in the dunes
+function pcMeetFennec(c, W, H) {
+  skyBands(c, W, ['#131a3e', '#1a2350', '#232e60', '#2e3a6e', '#3e4678'], 50, 260, 2100);
+  const rs = rng(2101); for (let k = 0; k < 160; k++) { c.fillStyle = `rgba(255,248,226,${0.3 + rs() * 0.6})`; c.beginPath(); c.arc(rs() * W, rs() * 320, 0.5 + rs() * 1.2, 0, TAU); c.fill(); }
+  glow(c, 230, 110, 160, '255,240,200', 0.4);
+  const m = mk(120, 120), mc = m.getContext('2d'); piece(mc, circ(60, 60, 34), '#fff1c8', { mul: 0.3 }); mc.globalCompositeOperation = 'destination-out'; mc.fill(circ(76, 50, 30)); c.drawImage(m, 170, 50);   // a crescent moon, like the lake
+  dune(c, -120, 160, 230, 460, 380, '#5a5a8a', '#3e3e6a', 2102);
+  dune(c, 320, 620, 200, 1000, 380, '#62629a', '#44447a', 2103);
+  dune(c, -200, 300, 400, 1100, 600, '#7070a8', '#55558a', 2104);
+}
+function pcMeetFennecFront(c, W, H, res) {
+  pcMeetFennec(c, W, H);
+  fr(c, res, 'fennec', 'sit', 600, 560, 1.25, true);
+  pcParker(c, res, BOX_LIE, 0.82, p => drawLieB(p, 'calm', { headRot: -0.05 }), 380, 572);
+  c.save(); c.globalCompositeOperation = 'screen'; glow(c, 480, 540, 200, '160,170,255', 0.2); c.restore();
+  vignette(c, W, H, '50,50,100', 0.45, 1.0);
+}
+// where a friend stands when they show up on an ordinary card from their place
+const FRIEND_SPOT = {
+  istanbul: { pose: 'loaf', x: 700, y: 500, k: 0.8, flip: true },
+  inthanon: { pose: 'stand', x: 150, y: 452, k: 0.55, flip: false },
+  fushimi: { pose: 'sit', x: 660, y: 592, k: 0.85, flip: true },
+  dunhuang: { pose: 'sit', x: 680, y: 556, k: 0.85, flip: true },
+};
+
 const POSTCARDS = [
   { id: 'chiangmai', rare: false, front: pcChiangMaiFront, scene: pcChiangMai, stamp: '#c4533f', ink: '#6c4a6e' },
   { id: 'pai', front: pcPaiFront, scene: pcPai, ink: '#7a4a6e' },
@@ -901,7 +1206,16 @@ const POSTCARDS = [
   { id: 'furano', rare: true, front: pcFuranoFront, scene: pcFurano, ink: '#6a4a9a' },
   { id: 'dunhuang', rare: true, front: pcDunhuangFront, scene: pcDunhuang, ink: '#9a5a2a' },
   { id: 'tekapo', rare: true, front: pcTekapoFront, scene: pcTekapo, ink: '#2a3a6a' },
+  { id: 'istanbul', front: pcIstanbulFront, scene: (c, W, H) => pcIstanbul(c, W, H, false), ink: '#2f4a6a' },
+  { id: 'meet-cat', meet: 'cat', front: pcMeetCatFront, scene: (c, W, H) => pcIstanbul(c, W, H, true), ink: '#6a3a5a' },
+  { id: 'meet-peafowl', meet: 'peafowl', front: pcMeetPeafowlFront, scene: pcMeetPeafowl, ink: '#2f6a5a' },
+  { id: 'meet-kinako', meet: 'kinako', front: pcMeetKinakoFront, scene: pcFushimi, ink: '#8a3a2e' },
+  { id: 'meet-fennec', meet: 'fennec', front: pcMeetFennecFront, scene: pcMeetFennec, ink: '#3a3a6a' },
   { id: 'fest-loykrathong', fest: 'loykrathong', front: pcLoyKrathongFront, scene: pcLoyKrathong, ink: '#3a3a7a' },
+  { id: 'fest-christmas', fest: 'christmas', front: pcXmasFront, scene: pcXmas, ink: '#2a4a3a' },
+  { id: 'fest-newyear', fest: 'newyear', front: pcNewYearFront, scene: pcNewYear, ink: '#7a3a4a' },
+  { id: 'fest-cny', fest: 'cny', front: pcCNYFront, scene: pcCNY, ink: '#a8282a' },
+  { id: 'fest-songkran', fest: 'songkran', front: pcSongkranFront, scene: pcSongkran, ink: '#2a6a8a' },
 ];
 
 // ---- back: place name + a short line in both languages, stamp, postmark ----
@@ -918,7 +1232,7 @@ function pawPrint(c, x, y, s, col) {
   for (const [dx, dy] of [[-8, -4], [-3, -9], [3, -9], [8, -4]]) { c.beginPath(); c.ellipse(x + dx * s, y + dy * s, 2.6 * s, 3.2 * s, 0, 0, TAU); c.fill(); }
   c.restore();
 }
-function pcBack(c, W, H, pc, res, year) {
+function pcBack(c, W, H, pc, res, year, friend) {
   piece(c, rectP(0, 0, W, H), '#f8f0e1', { scr: 0.3 });
   tornPiece(c, [[W * 0.56 - 2, 60], [W * 0.56 + 2, 60], [W * 0.56 + 2, H - 60], [W * 0.56 - 2, H - 60]], '#dcc6a6', { amp: 0.8, seed: 5, rim: 0, shadow: 0.08 });
   const id = pc.id, L = 60, MW = W * 0.56 - 100;
@@ -928,6 +1242,7 @@ function pcBack(c, W, H, pc, res, year) {
   const hasMsg = STRINGS.zh[`pc.${id}.msg`] !== undefined;
   c.fillStyle = '#5b3f37'; c.font = `24px ${FONT}`; let y = wrapText(c, hasMsg ? T(`pc.${id}.msg`, 'zh') : T('pc.placeholder', 'zh'), L, 216, MW, 38);
   c.fillStyle = '#7d6155'; c.font = `italic 19px ${FONT}`; y = wrapText(c, hasMsg ? T(`pc.${id}.msg`, 'en') : T('pc.placeholder', 'en'), L, y + 14, MW, 30);
+  if (friend) { c.fillStyle = '#5b3f37'; c.font = `20px ${FONT}`; c.fillText(T('pc.withFriend', 'zh', { name: T('fr.' + friend, 'zh') }), L, y + 10); c.fillStyle = '#7d6155'; c.font = `italic 17px ${FONT}`; c.fillText(T('pc.withFriend', 'en', { name: T('fr.' + friend, 'en') }), L, y + 38); }
   c.fillStyle = '#5b3f37'; c.font = `22px ${FONT}`; c.textAlign = 'right'; c.fillText(T('pc.from', 'zh'), W * 0.56 - 70, H - 90);
   pawPrint(c, W * 0.56 - 48, H - 100, 1.1, '#9a6b5c');
   // stamp: perforated paper with a tiny scene of this place
@@ -964,9 +1279,10 @@ function pcPlaceholderFront(c, W, H) {
 }
 function pcEntry(id) { return POSTCARDS.find(p => p.id === id) || { id, ink: '#6c4a6e', front: pcPlaceholderFront }; }
 const _pcCache = new Map();
-function postcardCanvas(id, side, res, year) {
-  const key = `${id}:${side}:${res}:${LANG}:${year || ''}`; if (_pcCache.has(key)) return _pcCache.get(key);
+function postcardCanvas(id, side, res, year, friend) {
+  const key = `${id}:${side}:${res}:${LANG}:${year || ''}:${friend || ''}`; if (_pcCache.has(key)) return _pcCache.get(key);
   const pc = pcEntry(id), cv = mk(PC_W * res, PC_H * res), c = cv.getContext('2d'); c.scale(res, res);
-  if (side === 'front') pc.front.call(pc, c, PC_W, PC_H, res); else pcBack(c, PC_W, PC_H, pc, res, year);
+  if (side === 'front') pc.front.call(pc, c, PC_W, PC_H, res); else pcBack(c, PC_W, PC_H, pc, res, year, friend);
+  if (side === 'front' && friend && FRIEND_SPOT[id]) { const f = FRIEND_SPOT[id]; fr(c, res, friend, f.pose, f.x, f.y, f.k, f.flip); }
   _pcCache.set(key, cv); return cv;
 }

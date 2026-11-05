@@ -51,9 +51,9 @@ function closePanel() {
 }
 function renderPanel() {
   const body = $('panelBody'); body.innerHTML = '';
-  const titles = { shop: 'ui.shop', pack: 'ui.pack', mail: 'ui.mail', shelf: 'ui.shelf', album: 'ui.album', settings: 'ui.settings' };
+  const titles = { shop: 'ui.shop', pack: 'ui.pack', mail: 'ui.mail', shelf: 'ui.shelf', album: 'ui.album', settings: 'ui.settings', gifts: 'ui.gifts' };
   $('panelTitle').textContent = T(titles[UI.panel]);
-  ({ shop: renderShop, pack: renderPack, mail: renderMail, shelf: renderShelf, album: renderAlbum, settings: renderSettings })[UI.panel](body);
+  ({ shop: renderShop, pack: renderPack, mail: renderMail, shelf: renderShelf, album: renderAlbum, settings: renderSettings, gifts: renderGifts })[UI.panel](body);
 }
 function refreshCoins() { shown = S.dandelions; updateHUD(false); }
 
@@ -98,23 +98,23 @@ function renderPack(body) {
 }
 function renderMail(body) {
   if (!S.mail.length) { body.append(el('p', 'note', T('ui.mail.empty'))); return; }
-  const m = S.mail[0], wrap = flipCard(m.dest, renderPanel, m.year);
+  const m = S.mail[0], wrap = flipCard(m.dest, renderPanel, m.year, m.friend);
   body.append(wrap, el('p', 'note center', T('ui.mail.flip') + (S.mail.length > 1 ? `  ·  1 / ${S.mail.length}` : '')));
   const keep = el('button', 'pill btn wide', T('ui.mail.keep')); keep.onclick = () => { keepCard(); UI.side = 'front'; S.mail.length ? renderPanel() : closePanel(); };
   body.append(keep);
 }
 function renderShelf(body) {
   body.append(el('p', 'note', T('ui.shelf.note')));
-  const dpr = Math.min(2, window.devicePixelRatio || 1), W = 340, H = 350, c = document.createElement('canvas');
+  const rows = Math.ceil(DESTS.length / 4), dpr = Math.min(2, window.devicePixelRatio || 1), W = 340, H = 26 + rows * 108, c = document.createElement('canvas');
   c.width = W * dpr; c.height = H * dpr; c.className = 'shelf'; const x = c.getContext('2d'); x.scale(dpr, dpr);
   piece(x, rectP(0, 0, W, H), '#f3d9a8', { scr: 0.25 });
-  for (let k = 0; k < 9; k++) piece(x, rectP(0, k * 38, W, 2), '#e6c48d', { mul: 0.4 });
+  for (let k = 0; k < H / 38; k++) piece(x, rectP(0, k * 38, W, 2), '#e6c48d', { mul: 0.4 });
   const have = Object.fromEntries(S.shelf.map(s => [s.id, s]));
-  for (let r = 0; r < 3; r++) {
+  for (let r = 0; r < rows; r++) {
     const by = 92 + r * 108;
     pp(x, rectP(8, by, W - 16, 12), '#b57a4a', 0.3); piece(x, rectP(8, by, W - 16, 3), '#d39b66', { mul: 0.4 });
     for (let k = 0; k < 4; k++) {
-      const d = DESTS[r * 4 + k], cx = 48 + k * 81, s = have[d.id];
+      const d = DESTS[r * 4 + k]; if (!d) continue; const cx = 48 + k * 81, s = have[d.id];
       if (s) { if (s.isNew) glow(x, cx, by - 26, 44, '255,236,170', 0.7); x.save(); x.translate(cx, by); drawSouvenir(x, d.id, 1); x.restore(); }
       else { x.save(); x.setLineDash([3, 4]); x.strokeStyle = 'rgba(150,110,80,0.4)'; x.lineWidth = 1.5; x.strokeRect(cx - 22, by - 52, 44, 50); x.restore(); }
       x.fillStyle = s ? '#6b4a3f' : 'rgba(107,74,63,0.4)'; x.font = `600 11px ${FONT}`; x.textAlign = 'center';
@@ -124,20 +124,45 @@ function renderShelf(body) {
   body.append(c);
 }
 
+// the gift box: what the visitors left (counts), and who has come by (stage 4)
+function paperIcon(size, draw, box, k) {
+  const dpr = Math.min(2, window.devicePixelRatio || 1), c = document.createElement('canvas'); c.width = c.height = size * dpr; c.style.width = c.style.height = size + 'px';
+  const x = c.getContext('2d'); x.scale(dpr, dpr); x.translate(size / 2 - (box.w / 2 - box.ox) * k, size / 2 + (box.oy - box.h / 2) * k); x.scale(k, k); draw(x); return c;
+}
+function renderGifts(body) {
+  body.append(el('p', 'note', T('ui.gifts.note')));
+  const grid = el('div', 'gifts');
+  for (const g of GIFTS) {
+    const n = S.giftBox[g] || 0, cell = el('div', 'gift-cell' + (n ? '' : ' none'));
+    const ic = paperIcon(64, x => { if (!n) { x.globalAlpha = 0.18; x.filter = 'grayscale(1)'; } drawGift(x, g); }, BOX_GIFT, 1.7);
+    cell.append(ic, el('div', 'gift-name', n ? T('gift.' + g) : (g === 'clover' ? '★ ?' : '?')), el('div', 'gift-count', n ? '× ' + n : ''));
+    grid.append(cell);
+  }
+  body.append(grid);
+  body.append(el('h3', 'sub', T('ui.gifts.who')));
+  const who = el('div', 'gifts visitors');
+  for (const [v, draw, box, k] of [['sparrow', x => drawBird(x, 0), { w: 60, h: 60, ox: 30, oy: 48 }, 1.5], ['cat', x => drawNeighborCat(x, 'sit'), BOX_NCAT, 0.5], ['squirrel', x => drawSquirrel(x, 'nibble'), BOX_SQ, 0.8]]) {
+    const n = S.visits[v] || 0, cell = el('div', 'gift-cell' + (n ? '' : ' none'));
+    cell.append(paperIcon(72, x => { if (!n) x.globalAlpha = 0.25; draw(x); }, box, k), el('div', 'gift-name', T('vis.' + v)), el('div', 'gift-count', n ? T('ui.gifts.times').replace('{n}', n) : T('ui.gifts.notYet')));
+    who.append(cell);
+  }
+  body.append(who);
+}
 // a postcard that turns over when tapped (mailbox + album)
-function flipCard(id, onFlip, year) {
+function flipCard(id, onFlip, year, friend) {
   const dpr = Math.min(2, window.devicePixelRatio || 1), wrap = el('button', 'card'), cvs = document.createElement('canvas');
-  const src = postcardCanvas(id, UI.side, dpr, year); cvs.width = src.width; cvs.height = src.height; cvs.getContext('2d').drawImage(src, 0, 0);
+  const src = postcardCanvas(id, UI.side, dpr, year, friend); cvs.width = src.width; cvs.height = src.height; cvs.getContext('2d').drawImage(src, 0, 0);
   wrap.append(cvs); wrap.onclick = () => { UI.side = UI.side === 'front' ? 'back' : 'front'; wrap.classList.add('flip'); setTimeout(onFlip, 160); };
   return wrap;
 }
 function renderAlbum(body) {
   if (UI.view) return renderAlbumView(body);
   const tabs = el('div', 'tabs');
-  for (const t of ['places', 'fests']) { const b = el('button', 'tab' + ((UI.tab || 'places') === t ? ' on' : ''), T('ui.album.' + t)); b.onclick = () => { UI.tab = t; renderPanel(); }; tabs.append(b); }
+  for (const t of ['places', 'fests', 'friends']) { const b = el('button', 'tab' + ((UI.tab || 'places') === t ? ' on' : ''), T('ui.album.' + t)); b.onclick = () => { UI.tab = t; renderPanel(); }; tabs.append(b); }
   body.append(tabs);
   const grid = el('div', 'album'), jobs = [];
-  const thumb = (cell, id, year) => { const c = document.createElement('canvas'); c.width = 180; c.height = 120; cell.prepend(c); jobs.push(() => c.getContext('2d').drawImage(postcardCanvas(id, 'front', 0.4, year), 0, 0, 180, 120)); };
+  const thumb = (cell, id, year, friend) => { const c = document.createElement('canvas'); c.width = 180; c.height = 120; cell.prepend(c); jobs.push(() => c.getContext('2d').drawImage(postcardCanvas(id, 'front', 0.4, year, friend), 0, 0, 180, 120)); };
+  if (UI.tab === 'friends') return renderFriends(body);
   if (UI.tab === 'fests') {
     body.append(el('p', 'note', T('ui.album.festNote')));
     for (const f of FESTIVALS) {
@@ -147,10 +172,10 @@ function renderAlbum(body) {
       grid.append(cell);
     }
   } else {
-    body.append(el('p', 'note', T('ui.album.note', LANG, { n: DESTS.filter(d => S.album[d.id]).length })));
+    body.append(el('p', 'note', T('ui.album.note', LANG, { n: DESTS.filter(d => S.album[d.id]).length, t: DESTS.length })));
     for (const d of DESTS) {
       const cell = el('button', 'album-cell' + (S.album[d.id] ? '' : ' empty'));
-      if (S.album[d.id]) { thumb(cell, d.id); cell.onclick = () => { UI.view = d.id; UI.side = 'front'; renderPanel(); }; cell.append(el('span', 'album-name', T('pc.' + d.id + '.name'))); }
+      if (S.album[d.id]) { thumb(cell, d.id, undefined, S.albumFriend[d.id]); cell.onclick = () => { UI.view = d.id; UI.side = 'front'; renderPanel(); }; cell.append(el('span', 'album-name', T('pc.' + d.id + '.name'))); }
       else { cell.append(el('span', 'album-q', d.rare ? '★' : '?')); cell.title = T('ui.album.locked'); }
       grid.append(cell);
     }
@@ -158,30 +183,56 @@ function renderAlbum(body) {
   body.append(grid);
   const next = () => { const j = jobs.shift(); if (j) { j(); setTimeout(next, 16); } }; setTimeout(next, 30);   // draw thumbnails one by one
 }
+// the friends page: a card for each friend; the ones not met yet are blank paper silhouettes
+function friendPortrait(id, met) {
+  const dpr = Math.min(2, window.devicePixelRatio || 1), box = BOX_FRIEND[id], k = id === 'peafowl' ? 0.5 : 0.7;
+  const bx = { w: box.w * k, h: box.h * k, ox: box.ox * k, oy: box.oy * k };
+  const src = puppetCanvas(bx, dpr, p => { p.scale(k, k); FRIEND_DRAW[id](p, id === 'peafowl' ? 'stand' : 'sit'); });
+  const cv = mk(150 * dpr, 120 * dpr), x = cv.getContext('2d'); x.scale(dpr, dpr);
+  if (met) sticker(x, src, 75 - bx.ox, 112 - bx.oy, { res: dpr });
+  else { const sil = mk(src.width, src.height), sc = sil.getContext('2d'); sc.drawImage(src, 0, 0); sc.globalCompositeOperation = 'source-in'; sc.fillStyle = '#e6d8c2'; sc.fillRect(0, 0, sil.width, sil.height); x.globalAlpha = 0.9; x.drawImage(sil, 75 - bx.ox, 112 - bx.oy, bx.w, bx.h); }
+  cv.style.width = '150px'; cv.style.height = '120px'; return cv;
+}
+function renderFriends(body) {
+  body.append(el('p', 'note', T('ui.fr.note')));
+  const grid = el('div', 'friends');
+  for (const f of FRIENDS) {
+    const m = S.friends[f.id], card = el('button', 'friend' + (m ? '' : ' unknown'));
+    card.append(friendPortrait(f.id, !!m));
+    if (m) {
+      card.append(el('div', 'friend-name', `${T('fr.' + f.id, 'zh')} · ${T('fr.' + f.id, 'en')}`), el('div', 'friend-line', T('fr.' + f.id + '.kind') + ' · ' + T('ui.fr.where', LANG, { place: T('pc.' + f.place + '.name') })), el('div', 'friend-line', T('ui.fr.times', LANG, { n: Math.max(1, m.count) })));
+      if (m.card) { card.append(el('div', 'friend-hint', T('ui.fr.card'))); card.onclick = () => { UI.view = 'meet-' + f.id; UI.side = 'front'; renderPanel(); }; }
+    } else card.append(el('div', 'friend-name', '？'), el('div', 'friend-line', T('ui.fr.unknown')));
+    grid.append(card);
+  }
+  body.append(grid);
+}
 function renderAlbumView(body) {
-  const id = UI.view, fest = id.startsWith('fest-'), fid = fest ? id.slice(5) : null, year = fest ? UI.viewYear : undefined;
-  body.append(flipCard(id, renderPanel, year));
+  const id = UI.view, fest = id.startsWith('fest-'), fid = fest ? id.slice(5) : null, year = fest ? UI.viewYear : undefined, meet = id.startsWith('meet-');
+  const friend = !fest && !meet ? S.albumFriend[id] : undefined;
+  body.append(flipCard(id, renderPanel, year, friend));
   if (fest) {
     const years = (S.festAlbum[fid] || []).slice().sort();
     body.append(el('p', 'note center', `${T('fest.' + fid)} ${year} · ${T('pc.' + id + '.country')}`));
     if (years.length > 1) { const row = el('div', 'tabs center'); for (const y of years) { const b = el('button', 'tab' + (y === year ? ' on' : ''), String(y)); b.onclick = () => { UI.viewYear = y; renderPanel(); }; row.append(b); } body.append(row); }
-  } else body.append(el('p', 'note center', `${T('pc.' + id + '.name')} · ${T('pc.' + id + '.country')}  ·  ${T('ui.album.got', LANG, { n: S.album[id] })}`));
+  } else if (meet) body.append(el('p', 'note center', `${T('pc.' + id + '.name')} · ${T('pc.' + id + '.country')}`));
+  else body.append(el('p', 'note center', `${T('pc.' + id + '.name')} · ${T('pc.' + id + '.country')}  ·  ${T('ui.album.got', LANG, { n: S.album[id] })}`));
   body.append(el('p', 'note center', T('ui.mail.flip')));
   // save / share: a 1800×1200 PNG of the front, or front and back side by side
   const opt = el('div', 'tabs center');
   for (const both of [false, true]) { const b = el('button', 'tab' + (!!UI.shareBoth === both ? ' on' : ''), T(both ? 'ui.both' : 'ui.frontOnly')); b.onclick = () => { UI.shareBoth = both; renderPanel(); }; opt.append(b); }
   const row = el('div', 'share-row'), save = el('button', 'pill btn', T('ui.save.img')), share = el('button', 'pill btn', T('ui.share'));
   const name = `parker-${id}${year ? '-' + year : ''}${UI.shareBoth ? '-both' : ''}.png`;
-  const prep = { file: null }; setTimeout(() => cardBlob(id, year, !!UI.shareBoth).then(b => prep.file = new File([b], name, { type: 'image/png' })), 60);   // ready before the tap, so sharing stays inside the tap
-  save.onclick = async () => saveImage(prep.file || new File([await cardBlob(id, year, !!UI.shareBoth)], name, { type: 'image/png' }));
-  share.onclick = async () => shareImage(prep.file || new File([await cardBlob(id, year, !!UI.shareBoth)], name, { type: 'image/png' }));
+  const prep = { file: null }; setTimeout(() => cardBlob(id, year, !!UI.shareBoth, friend).then(b => prep.file = new File([b], name, { type: 'image/png' })), 60);   // ready before the tap, so sharing stays inside the tap
+  save.onclick = async () => saveImage(prep.file || new File([await cardBlob(id, year, !!UI.shareBoth, friend)], name, { type: 'image/png' }));
+  share.onclick = async () => shareImage(prep.file || new File([await cardBlob(id, year, !!UI.shareBoth, friend)], name, { type: 'image/png' }));
   row.append(save, share); body.append(opt, row);
   const back = el('button', 'pill btn wide', T('ui.album.back')); back.onclick = () => { UI.view = null; UI.side = 'front'; renderPanel(); }; body.append(back);
 }
-function cardBlob(id, year, both) {
-  const f = postcardCanvas(id, 'front', 2, year); let cv = f;
+function cardBlob(id, year, both, friend) {
+  const f = postcardCanvas(id, 'front', 2, year, friend); let cv = f;
   if (both) {
-    const b = postcardCanvas(id, 'back', 2, year), m = 60; cv = mk(f.width * 2 + m * 3, f.height + m * 2); const x = cv.getContext('2d');
+    const b = postcardCanvas(id, 'back', 2, year, friend), m = 60; cv = mk(f.width * 2 + m * 3, f.height + m * 2); const x = cv.getContext('2d');
     piece(x, rectP(0, 0, cv.width, cv.height), '#e8dcc8', { scr: 0.2 });
     for (const [img, dx] of [[f, m], [b, m * 2 + f.width]]) { castShadow(x, k => k.drawImage(img, dx, m), 16, 4, 10, 0.3); x.drawImage(img, dx, m); }
   }
@@ -290,15 +341,30 @@ function buildDebug(force) {
   dates.append(di, go, today);
   const fests = el('div', 'dbg-row');
   for (const f of FESTIVALS) { const b = el('button', 'dbg-b', T('fest.' + f.id)); b.onclick = () => { const y = new Date(Clock.now()).getFullYear(); let t = null; for (const yr of [y, y + 1, y + 2]) { t = festFirstDay(f.id, yr); if (t && t + 7 * 864e5 > Clock.now() - 864e5) break; } if (t) jumpTo(t + 18 * 3600000); }; fests.append(b); }
+  const mt = el('button', 'dbg-b', T('dbg.meet')); mt.onclick = () => { const f = (S.trip && friendAt(S.trip.dest)) || (FRIENDS.find(f => !(S.friends[f.id] && S.friends[f.id].card)) || FRIENDS[Math.floor(Math.random() * FRIENDS.length)]).id; metFriend(f, Clock.now()).count++; S.mail.push({ dest: 'meet-' + f, meet: f, at: Clock.now() }); writeSave(S); showToast('toast.mail', 3000); }; fests.append(mt);
+  const vr = el('div', 'dbg-row'); vr.append(el('b', '', T('dbg.visit')));
+  for (const v of ['sparrow', 'cat', 'squirrel']) { const b = el('button', 'dbg-b', T('vis.' + v)); b.onclick = () => { VIS.on = false; startVisit(v, true); }; vr.append(b); }
+  const off = el('button', 'dbg-b', T('dbg.away8')); off.onclick = () => { S.lastGiftAt = 0; const n = offlineVisits(Clock.now() - 8 * 3600000, Clock.now()); showToast(n ? 'toast.giftsWaiting' : 'dbg.noneLeft', 3000); }; vr.append(off);
   const fr = el('button', 'dbg-b', T('dbg.festReset')); fr.onclick = () => { S.festGot = {}; S.festPending = null; P.carrying = false; writeSave(S); worldTick(); }; fests.append(fr);
-  d.append(el('div', 'dbg-title', T('dbg.title')), row, acts, dates, fests, el('div', 'dbg-status'));
+  // season / weather override (stage 3)
+  const wxr = el('div', 'dbg-row');
+  const pick = (label, key, opts) => {
+    const sel = document.createElement('select'); sel.className = 'dbg-b';
+    for (const [v, t] of [['', T('dbg.auto')], ...opts]) { const o = document.createElement('option'); o.value = v; o.textContent = t; sel.append(o); }
+    sel.value = WX_FORCE[key] || ''; sel.onchange = () => { WX_FORCE[key] = sel.value; saveWxForce(); wxCheck(); debugRefresh(); };
+    wxr.append(el('b', '', T(label)), sel);
+  };
+  pick('dbg.season', 'season', SEASONS.map(k => [k, T('season.' + k)]));
+  pick('dbg.weather', 'kind', [...WEATHER_KINDS.map(k => [k, T('wx.' + k)]), ['heavy', T('wx.heavy')]]);
+  d.append(el('div', 'dbg-title', T('dbg.title')), row, acts, dates, fests, wxr, vr, el('div', 'dbg-status'));
   window.debugRefresh = () => {
     d.querySelectorAll('[data-sp]').forEach(b => b.classList.toggle('on', +b.dataset.sp === Clock.speed));
     try { localStorage.setItem(CLOCK_KEY, String(Clock.offset)); } catch (e) { }
     const now = Clock.now(), m = t => Math.max(0, Math.round((t - now) / 60000)) + ' min';
     const st = S.trip ? `${S.trip.dest} · home in ${m(S.trip.returnAt)} · cards ${S.trip.cards.length}` : S.leaveAt ? `leaves in ${m(S.leaveAt)}` : 'home';
     const fe = activeFestivals(now).map(f => f.id).join('+');
-    d.querySelector('.dbg-status').textContent = `${new Date(now).toLocaleString()} · ${st} · mail ${S.mail.length}${fe ? ' · 🎉 ' + fe : ''}${S.festPending ? ' (pending)' : ''}`;
+    const w = WX ? ` · ${T('season.' + WX.season)} ${T(WX.heavy ? 'wx.heavy' : 'wx.' + WX.kind)}${WX.hot ? ' 🔥' : ''}` : '';
+    d.querySelector('.dbg-status').textContent = `${new Date(now).toLocaleString()} · ${st} · mail ${S.mail.length}${fe ? ' · 🎉 ' + fe : ''}${S.festPending ? ' (pending)' : ''}${w}`;
   };
   debugRefresh();
 }
