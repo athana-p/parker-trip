@@ -172,14 +172,14 @@ function pickNext() {
 function faceThen(f, then) { if (f === P.face) then(); else setMode('turn', 2 / 12, { to: f, then }); }
 function goTo(x, d, then, o = {}) { const f = Math.sign(x - P.x) || P.face; faceThen(f, () => setMode('trot', null, { x, d, then, ...o })); }
 // you picked a toy from his toy list: he goes to play with it (waking up first if he was asleep)
-function toyWeatherOk(id) { const w = ITEM[id] && ITEM[id].weather; return !w || (w === 'wind' ? WX.kind === 'wind' : WX.kind === 'sunny' && WX.season !== 'winter'); }
+function toyWeatherOk(id) { const w = ITEM[id] && ITEM[id].weather; return !w || (w === 'wind' ? WX.kind === 'wind' : WX.kind === 'sunny' && WX.season !== 'winter' && currentTod() !== 'night'); }
 function playToy(id) {
   if (!P.present || P.pack || /packup|departLook|arrive|gift/.test(P.mode)) return;
   if (TOY_START[id]) return TOY_START[id]();
   wakeThen(() => { P.want = id; pickNext(); });
 }
 const TOY_START = {};
-const TOY_K = { ball: 0.6, duck: 0.55, bone: 0.55, bubbles: 0.95, yarn: 0.64, temari: 0.66, rope: 0.8, kite: 0.75 };      // how big each toy is drawn on the grass
+const TOY_K = { ball: 0.6, duck: 0.55, bone: 0.55, bubbles: 0.95, yarn: 0.64, temari: 0.66, rope: 0.8, kite: 0.75, sprinkler: 0.85 };      // how big each toy is drawn on the grass
 // toys you tap in the yard (bubble machine, kite, sprinkler…): toy id → what happens
 const TOY_TAP = {};
 function toyTapAt(x, y) {
@@ -268,6 +268,7 @@ function updateParker(dt) {
   if (P.mode === 'yarnchase') return yarnChase(dt);
   if (P.mode === 'tug') return tugUpdate(dt);
   if (P.mode === 'kitechase') return kiteChase(dt);
+  if (P.mode === 'sprinkplay') return sprinkUpdate(dt);
   if (P.mode === 'yarnbat') yarnBatTick();
   if (P.mode === 'temari') temariUpdate(dt);
   if (P.mode === 'bubblehop') bubbleHopTick();
@@ -301,7 +302,7 @@ function updateParker(dt) {
   else if (P.mode === 'present') fetchDrop();
   else if (P.mode === 'pant') { setMode('wag', HABITS.reactionTime.wag); SFX.pop(); }       // rested: ready to play again
   else if (P.mode === 'wet') shakeOff();
-  else if (P.mode === 'shakeoff') { P.wet = false; setMode('sigh', HABITS.sighTime, { lie: false }); }
+  else if (P.mode === 'shakeoff') { P.wet = false; const then = P.data.then; then ? then() : setMode('sigh', HABITS.sighTime, { lie: false }); }
   else if (P.mode === 'sunnap') { setMode('sunbelly', HABITS.wxTime.sunbelly); fx({ type: 'glow', x: P.x, y: Y(P.d) - 30, life: 0.8, r: 70, rgb: '255,236,180' }); }
   else if (P.mode === 'sunbelly') setMode('sigh', HABITS.sighTime, { lie: true });
   else if (P.mode === 'chase') { setMode('hop', HABITS.reactionTime.hop); SFX.pop(); }
@@ -444,6 +445,7 @@ function parkerDrawing() {
     case 'chase': case 'fetch': case 'bubblego': case 'yarnchase': key = `trot|${f % 6}`; break;
     case 'kitechase': { const h = P.data.hopT0 != null ? clamp((TT - P.data.hopT0) / 0.6) : 1; if (h < 1) { lift = 28 * Math.sin(Math.PI * h); key = 'sit|happy|0|-0.36'; } else key = P.data.run ? `trot|${f % 6}` : `sit|happy|${f % 4 < 2 ? 0.22 : -0.16}|-0.3`; break; }
     case 'twigput': key = (TT - P.t0) < 0.5 ? 'sit|happy|0|0.1|0|twig' : 'sit|happy|0.2|0.05'; break;
+    case 'sprinkplay': { const h = P.data.hopT0 != null ? clamp((TT - P.data.hopT0) / 0.55) : 1; if (h < 1) { lift = 24 * Math.sin(Math.PI * h); key = 'sit|happy|0|-0.3'; } else key = `trot|${f % 6}`; break; }
     case 'tug': key = `tug|${f % 4 < 2 ? 0 : 1}`; break;
     case 'ropewin': key = `sit|happy|0|${f % 4 < 2 ? -0.24 : 0.24}|0|rope`; break;      // shaking the rope he won
     case 'yarnbat': key = `bat|${(TT - P.t0) > 0.12 && (TT - P.t0) < 0.4 ? 1 : 0}`; break;
@@ -555,6 +557,7 @@ function drawScene() {
   }
   drawPrints();
   drawYarnThread();
+  drawRainbowArc();
   drawKiteShadow();
   const mail = S.mail.length > 0;
   if (mail) glow(ctx, MAILBOX.x, Y(MAILBOX.d) - 106, 46, '255,236,170', 0.35 + 0.1 * Math.sin(TT * 2));
@@ -607,6 +610,8 @@ function drawScene() {
       if (/^sun/.test(P.mode)) glow(ctx, P.x + 14 * P.face * s, Y(P.d) - 30 * s, 84, '255,232,170', 0.3 + 0.05 * Math.sin(TT * 1.3));   // warm in the sun
     }
   }
+  drawSprinklerArm();
+  drawSprinklerWater();
   drawTugRope();
   drawBubbles();
   if (CHASE.on) drawBit(ctx, CHASE.season, CHASE.i, CHASE.x, CHASE.y, CHASE.rot, 1.9);
@@ -743,7 +748,7 @@ function boot() {
     Clock.tick(dt);
     if (TT > todAt) { todAt = TT + 1; worldTick(); wxCheck(); }
     if (TT > saveAt) { saveAt = TT + 15; writeSave(S); }
-    checkRub(); updateParker(dt); updateBall(dt); updateVisitor(dt); updateBubbles(dt); updateYarn(dt); updateKite(dt); updateChase(dt); updateWeather(dt, WX, V.H, TT); parkerExtras(); catPlayTick(); sayTick(); noteTick(); sleepZ(); updateFX(dt); drawScene();
+    checkRub(); updateParker(dt); updateBall(dt); updateVisitor(dt); updateBubbles(dt); updateYarn(dt); updateKite(dt); updateSprinkler(dt); updateChase(dt); updateWeather(dt, WX, V.H, TT); parkerExtras(); catPlayTick(); sayTick(); noteTick(); sleepZ(); updateFX(dt); drawScene();
     if (!window.READY) window.READY = true;
     requestAnimationFrame(loop);
   };
@@ -755,7 +760,7 @@ function boot() {
   idle(step);
 }
 // test hook (screenshots): advance the simulation deterministically
-window.__advance = secs => { for (let i = 0; i < secs * 30; i++) { TT += 1 / 30; checkRub(); updateParker(1 / 30); updateBall(1 / 30); updateVisitor(1 / 30); updateBubbles(1 / 30); updateYarn(1 / 30); updateKite(1 / 30); updateChase(1 / 30); updateWeather(1 / 30, WX, V.H, TT); parkerExtras(); catPlayTick(); sayTick(); updateFX(1 / 30); } drawScene(); };
+window.__advance = secs => { for (let i = 0; i < secs * 30; i++) { TT += 1 / 30; checkRub(); updateParker(1 / 30); updateBall(1 / 30); updateVisitor(1 / 30); updateBubbles(1 / 30); updateYarn(1 / 30); updateKite(1 / 30); updateSprinkler(1 / 30); updateChase(1 / 30); updateWeather(1 / 30, WX, V.H, TT); parkerExtras(); catPlayTick(); sayTick(); updateFX(1 / 30); } drawScene(); };
 // time of day or weather changed: rebuild the backdrop (it cross-fades), switch the weather sounds
 function wxCheck() {
   snowmanTick();
@@ -1069,6 +1074,70 @@ function drawSnowmanItem() {
   const u = clamp((TT - SNOWPOP.t0) / 0.5), pop = u < 1 ? [0.5, 0.8, 1.08, 0.97, 1, 1][Math.floor(u * 6)] : 1;   // rolls in on twos
   drawSprite(sprite(`snowman|${m.stage}|${Math.round((m.melt || 0) * 10)}`), m.x, Y(m.d), { scale: s * pop });
 }
+// ---------- 7. the sprinkler (sunny days, not in winter): tap it on; paper-strip water arcs, he jumps about in it ----------
+const SPRINK = { on: false, drops: [], rainbow: null };
+function sprinklerTap() {
+  if (!toyWeatherOk('sprinkler')) { showToast('ui.toy.wait.sun', 2200); return; }
+  if (SPRINK.on) return sprinklerOff();
+  Object.assign(SPRINK, { on: true, t0: TT, until: TT + HABITS.sprinklerTime, rainbowAt: TT + rand([3, 6]) }); SFX.spray(true);
+  if (P.present && !P.pack && !/packup|departLook|arrive|gift/.test(P.mode)) { if (P.hold && P.hold !== 'ball') dropHeld(); wakeThen(() => sprinkPlay()); }
+}
+TOY_TAP.sprinkler = sprinklerTap; TOY_START.sprinkler = sprinklerTap;
+function sprinklerOff() { SPRINK.on = false; SFX.spray(false); if (P.mode === 'sprinkplay') sprinkOut(); }
+function sprinkPlay() { setMode('sprinkplay', rand(HABITS.sprinkPlay), { to: null, hopAt: TT + 0.6 }); }
+function sprinkOut() {                   // out of the water, a good shake, and back in if it's still on
+  const t = S.toyPos.sprinkler, side = P.x < t.x ? -1 : 1;
+  goTo(clamp(t.x + side * 110, 40, 360), clamp(P.d + (Math.random() - 0.5) * 30, 100, 224), () => {
+    setMode('shakeoff', HABITS.wxTime.shakeOff, { then: () => { P.rounds = (P.rounds || 0) + 1; if (SPRINK.on && P.rounds < 3) sprinkPlay(); else { P.rounds = 0; setMode('sigh', HABITS.sighTime, { lie: false }); } } });
+    SFX.shake(); const [hx, hy] = parkerCenter();
+    for (let i = 0; i < 10; i++) { const a = -Math.PI * (0.1 + 0.8 * i / 9); fx({ type: 'spr', key: 'drop', x: hx, y: hy - 10, vx: Math.cos(a) * 90, vy: Math.sin(a) * 70, g: 220, life: 0.7, rot: a + Math.PI / 2 }); }
+  }, { speed: 100 });
+}
+function sprinkUpdate(dt) {              // dashing in and out of the spray, jumping when he's in it
+  if (!SPRINK.on) return sprinkOut();
+  const t = S.toyPos.sprinkler;
+  if (!P.data.to || Math.hypot(P.data.to[0] - P.x, P.data.to[1] - P.d) < 6) { const a = Math.random() * TAU, r = rand([28, 70]); P.data.to = [clamp(t.x + Math.cos(a) * r * 1.4, 40, 360), clamp(t.d + Math.sin(a) * r * 0.6, 100, 224)]; }
+  const [tx, td] = P.data.to, dx = tx - P.x, dd = td - P.d, L = Math.hypot(dx, dd), step = Math.min(L, 92 * dt);
+  if (Math.abs(dx) > 6) P.face = Math.sign(dx);
+  if (L > 0.01) { P.x += dx / L * step; P.d += dd / L * step; }
+  const inside = Math.hypot((P.x - t.x) / 1.4, (P.d - t.d) / 0.6) < 70;
+  if (inside) { P.wet = true; if (TT > P.data.hopAt) { P.data.hopAt = TT + rand([0.9, 1.6]); P.data.hopT0 = TT; } if (TT > (P.dripAt || 0)) { P.dripAt = TT + 0.2; const [hx, hy] = parkerCenter(); fx({ type: 'spr', key: 'drop', x: hx + (Math.random() - 0.5) * 50, y: hy + 6, vy: 30, g: 200, life: 0.45 }); } }
+  if (TT > P.until) sprinkOut();
+}
+function updateSprinkler(dt) {
+  if (SPRINK.on && (TT > SPRINK.until || !toyWeatherOk('sprinkler'))) sprinklerOff();
+  const D = SPRINK.drops, t = S.toyPos.sprinkler;
+  if (SPRINK.on && t) {                  // two arms turning, each throwing an arc of water strips
+    const a0 = (TT - SPRINK.t0) * 2.4;
+    SPRINK.acc = (SPRINK.acc || 0) + dt * 76;                 // a steady stream: ~38 strips a second from each arm
+    while (SPRINK.acc >= 1 && D.length < 120) { SPRINK.acc--; SPRINK.arm = !SPRINK.arm; const a = a0 + (SPRINK.arm ? Math.PI : 0) + (Math.random() - 0.5) * 0.2, sp = rand([105, 130]); D.push({ x: t.x, d: t.d, z: 20, vx: Math.cos(a) * sp, vd: Math.sin(a) * sp * 0.45, vz: rand([125, 150]), age: 0 }); }
+    if (TT > SPRINK.rainbowAt) { SPRINK.rainbowAt = TT + rand([7, 12]); if (Math.random() < 0.6) SPRINK.rainbow = { t0: TT, x: clamp(t.x + rand([-30, 30]), 70, 330), d: Math.min(t.d + 40, 230) }; }
+  }
+  for (let i = D.length - 1; i >= 0; i--) { const p = D[i]; p.age += dt; p.vz -= 290 * dt; p.x += p.vx * dt; p.d += p.vd * dt; p.z += p.vz * dt; if (p.z <= 0) D.splice(i, 1); }
+  if (SPRINK.rainbow && TT - SPRINK.rainbow.t0 > 3.5) SPRINK.rainbow = null;
+}
+function drawSprinklerWater() {
+  const D = SPRINK.drops; if (!D.length) return;
+  ctx.save(); ctx.lineCap = 'round';
+  for (const p of D) {                   // each drop is a short paper strip pointing the way it flies
+    const x = p.x, y = Y(p.d) - p.z, vy = -p.vz + p.vd * -0.4, L = Math.hypot(p.vx, vy) || 1, l = 7;
+    ctx.strokeStyle = p.age < 0.35 ? 'rgba(240,248,255,0.95)' : 'rgba(170,214,244,0.92)'; ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.moveTo(x - p.vx / L * l, y - vy / L * l); ctx.lineTo(x, y); ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawSprinklerArm() {            // the yellow arm turns while it's on
+  if (!SPRINK.on) return; const t = S.toyPos.sprinkler, s = depthScale(t.d) * TOY_K.sprinkler, a = (TT - SPRINK.t0) * 2.4, cx = t.x, cy = Y(t.d) - 11 * s - 12 * s;
+  const ex = Math.cos(a) * 16 * s, ey = Math.sin(a) * 4 * s;
+  ctx.save(); ctx.strokeStyle = '#f5c04a'; ctx.lineWidth = 4 * s; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(cx - ex, cy - ey); ctx.lineTo(cx + ex, cy + ey); ctx.stroke();
+  ctx.fillStyle = '#e2a93d'; ctx.beginPath(); ctx.arc(cx, cy, 4 * s, 0, TAU); ctx.fill(); ctx.restore();
+}
+function drawRainbowArc() {
+  const R = SPRINK.rainbow; if (!R) return; const u = (TT - R.t0) / 3.5, a = u < 0.2 ? u / 0.2 : u > 0.75 ? (1 - u) / 0.25 : 1;
+  if (!_rb || _rb.res !== V.res) { const res = V.res, cv = mk(90 * res, 50 * res), c = cv.getContext('2d'); c.scale(res, res); c.translate(45, 46); drawRainbow(c, 40); _rb = { res, cv }; }
+  ctx.save(); ctx.globalAlpha = 0.8 * a; ctx.drawImage(_rb.cv, R.x - 70, Y(R.d) - 118, 140, 78); ctx.restore();
+}
+let _rb = null;
 // ---------- home from a trip: one short line in a little paper speech bubble above his head ----------
 const SAY = { on: false };
 function sayKey(h) {

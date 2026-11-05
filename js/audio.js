@@ -88,6 +88,12 @@ const SFX = {
     if (!this.ok()) return; const t = this.ctx.currentTime;
     for (let i = 0; i < 4; i++) this.noise(t + i * 0.06, { dur: 0.05, v: 0.04 * k, f: 1500 + i * 200, q: 1.5, a: 0.005 });
   },
+  spray(on) {                        // the sprinkler: a soft hiss of water while it's on
+    if (!this.ctx) return; this.wxNodes(); const c = this.ctx, t = c.currentTime;
+    if (!this.sprayG) { const s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain(); s.buffer = this.whiteBuf; s.loop = true; f.type = 'bandpass'; f.frequency.value = 2600; f.Q.value = 0.7; g.gain.value = 0; s.connect(f); f.connect(g); g.connect(this.master); s.start(); this.sprayG = g; }
+    this.sprayG.gain.setTargetAtTime(on ? 0.05 : 0, t, 0.4);
+    if (on && this.ok()) this.tone(880, t, { a: 0.01, d: 0.2, v: 0.04, to: 1320 });
+  },
   crunch() {                         // packing snow: a soft crunchy squeak
     if (!this.ok()) return; const t = this.ctx.currentTime;
     for (let i = 0; i < 3; i++) this.noise(t + i * 0.07, { dur: 0.08, v: 0.06, f: 2400 - i * 300, q: 2, a: 0.006 });
@@ -137,7 +143,7 @@ const SFX = {
     if (this.wxN) return; const c = this.ctx, n = c.sampleRate * 2, white = c.createBuffer(1, n, c.sampleRate), d = white.getChannelData(0);
     for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
     const rs = c.createBufferSource(), hp = c.createBiquadFilter(), lp = c.createBiquadFilter(), rg = c.createGain();
-    rs.buffer = white; rs.loop = true; hp.type = 'highpass'; hp.frequency.value = 800; lp.type = 'lowpass'; lp.frequency.value = 5000; rg.gain.value = 0;
+    this.whiteBuf = white; rs.buffer = white; rs.loop = true; hp.type = 'highpass'; hp.frequency.value = 800; lp.type = 'lowpass'; lp.frequency.value = 5000; rg.gain.value = 0;
     rs.connect(hp); hp.connect(lp); lp.connect(rg); rg.connect(this.master); rs.start();
     const ws = c.createBufferSource(), bp = c.createBiquadFilter(), gust = c.createGain(), wg = c.createGain();
     ws.buffer = this.noiseBuf; ws.loop = true; bp.type = 'bandpass'; bp.frequency.value = 380; bp.Q.value = 0.6; gust.gain.value = 0.6; wg.gain.value = 0;

@@ -12,6 +12,7 @@ const ITEMS = [
   { id: 'bubbles', cat: 'toy', price: 14 },
   { id: 'rope', cat: 'toy', price: 12 },
   { id: 'kite', cat: 'toy', price: 18, weather: 'wind' },        // only flies on windy days
+  { id: 'sprinkler', cat: 'toy', price: 22, weather: 'sun' },    // only on sunny days (not in winter, not at night)
   { id: 'yarn', cat: 'toy', friend: 'cat' },          // gifts from friends (not sold): after the second time he meets them
   { id: 'temari', cat: 'toy', friend: 'kinako' },
 ];

@@ -93,6 +93,13 @@ function drawItem(c, id, s = 1) {
       break;
     }
     case 'kite': drawKite(c, true); break;
+    case 'sprinkler': {                    // a little garden sprinkler: green base, yellow spinning arm, a curl of hose
+      c.save(); c.strokeStyle = '#4f9e58'; c.lineWidth = 3; c.lineCap = 'round'; c.beginPath(); c.moveTo(-14, 10); c.bezierCurveTo(-30, 14, -30, 0, -20, -2); c.stroke(); c.restore();
+      P(ell(0, 8, 18, 7), '#4f9e58'); P(rectP(-5, -10, 10, 18), '#6fbf72', 0.12); piece(c, rectP(-5, -10, 3, 18), '#94d49a', { mul: 0.3 });
+      P(circ(0, -12, 4.5), '#f5c04a', 0.1); P(slab([-16, -14], [16, -10], 4), '#f5c04a', 0.12);
+      for (const x of [-16, 16]) P(circ(x, x < 0 ? -14 : -10, 2.6), '#e2a93d', 0.05);
+      break;
+    }
     case 'twig': P(union(limb([-20, 4], [20, -4], 3, 2.2), limb([4, 0], [12, -10], 2, 1.4), limb([-8, 2], [-14, -6], 1.8, 1.2)), '#7a5236', 0.15); break;
     case 'rope': {                         // a tug rope: twisted blue-and-cream cotton with a fat knot at each end
       const path = [[-22, 2], [-8, -3], [8, 3], [22, -2]];
@@ -160,6 +167,11 @@ function drawSnowman(c, stage, melt = 0) {
     c.fillStyle = '#3a302c'; for (const y of [-30, -20]) { c.beginPath(); c.arc(0, y, 1.6, 0, TAU); c.fill(); }    // buttons
   }
   c.restore();
+}
+
+// a small paper rainbow: five strips in an arc
+function drawRainbow(c, r) {
+  ['#e98a8a', '#f2b56a', '#f5dc7a', '#9fd49a', '#8fbde8'].forEach((col, i) => { const R = r - i * 4, p = new Path2D(); p.arc(0, 0, R, Math.PI, TAU); p.arc(0, 0, R - 4, TAU, Math.PI, true); p.closePath(); piece(c, p, col, { mul: 0.25 }); });
 }
 
 // souvenirs on the shelf: base of the object at y = 0
