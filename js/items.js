@@ -10,6 +10,8 @@ const ITEMS = [
   { id: 'duck', cat: 'toy', price: 16 },
   { id: 'bone', cat: 'toy', price: 12 },
   { id: 'bubbles', cat: 'toy', price: 14 },
+  { id: 'yarn', cat: 'toy', friend: 'cat' },          // gifts from friends (not sold): after the second time he meets them
+  { id: 'temari', cat: 'toy', friend: 'kinako' },
 ];
 const ITEM = Object.fromEntries(ITEMS.map(i => [i.id, i]));
 const CATS = ['food', 'charm', 'toy'];
@@ -32,6 +34,7 @@ const TRIP = {
 const FRIENDS = [
   { id: 'cat', place: 'istanbul' }, { id: 'peafowl', place: 'inthanon' }, { id: 'kinako', place: 'fushimi' }, { id: 'fennec', place: 'dunhuang' },
 ];
+const FRIEND_TOY = { cat: 'yarn', kinako: 'temari' };     // the friend's present, brought home after they meet a second time
 const friendAt = place => (FRIENDS.find(f => f.place === place) || {}).id || null;
 // small visitors in the yard (stage 4): a sparrow, the neighbour's cat, a squirrel. They come mostly while he's away,
 // never at night or in heavy rain, and sometimes leave a little gift on the ground (tap to pick it up).

@@ -34,6 +34,8 @@ const SPRITES = {
   puff: () => [c => drawPuff(c), { w: 30, h: 22, ox: 15, oy: 11 }, 1, false],
   trot: a => [c => drawStandB(c, { ...trotPose(+a[0]), pack: a[1] === 'pack' }), BOX_STAND, K_DOG],
   stand: a => [c => drawStandB(c, { ...STAND0, expr: a[0], pack: a[1] === 'pack' }), BOX_STAND, K_DOG],
+  bat: a => [c => drawStandB(c, { ...STAND0, wag: 0.15, legs: { ...STAND0.legs, fn: +a[0] ? { a: 0.95, lift: 16 } : { a: 0.2, lift: 4 } }, head: { view: 'side', dx: 4, dy: 18, rot: 0.25 }, expr: 'happy' }), BOX_STAND, K_DOG],
+  nosepush: a => [c => drawStandB(c, { ...trotPose(+a[0]), head: { view: 'side', dx: 8, dy: 30, rot: 0.38 }, expr: 'happy' }), BOX_STAND, K_DOG],
   sniff: a => [c => drawStandB(c, sniffPose(+a[0])), BOX_STAND, K_DOG],
   look: a => [c => drawStandB(c, { ...lookBackPose(+a[0]), pack: a[1] === 'pack' }), BOX_STAND, K_DOG],
   lie: a => [c => drawLieB(c, a[0], { breath: +a[1], bone: a[2] === 'bone', headRot: a[3] != null ? +a[3] : undefined }), BOX_LIE, K_DOG],
@@ -148,6 +150,8 @@ function pickNext() {
   }
   const k = P.want && S.toys.includes(P.want) && !asleep ? P.want : pickWeighted(w); P.want = null;
   if (k === 'ball') return playBall(0);
+  if (k === 'yarn') return yarnGo(0);
+  if (k === 'temari') return temariGo();
   if (k === 'duck') { const t = S.toyPos.duck, side = Math.sign(t.x - P.x) || 1; return goTo(clamp(t.x - 36 * side, 40, 360), t.d, () => faceThen(side, () => { P.hold = 'duck'; setMode('shake', HABITS.shakeTime); })); }
   if (k === 'bone') { const t = S.toyPos.bone, side = Math.sign(t.x - P.x) || 1; return goTo(clamp(t.x - 64 * side, 40, 360), clamp(t.d, 100, 224), () => faceThen(side, () => { P.hold = 'bone'; setMode('chew', rand(HABITS.duration.chew)); })); }
   if (k === 'eat') return goTo(160, 226, () => faceThen(1, () => setMode('eat', rand(HABITS.duration.eat))));
@@ -168,7 +172,7 @@ function playToy(id) {
   wakeThen(() => { P.want = id; pickNext(); });
 }
 const TOY_START = {};
-const TOY_K = { ball: 0.6, duck: 0.55, bone: 0.55, bubbles: 0.95 };      // how big each toy is drawn on the grass
+const TOY_K = { ball: 0.6, duck: 0.55, bone: 0.55, bubbles: 0.95, yarn: 0.64, temari: 0.66 };      // how big each toy is drawn on the grass
 // toys you tap in the yard (bubble machine, kite, sprinkler…): toy id → what happens
 const TOY_TAP = {};
 function toyTapAt(x, y) {
@@ -254,6 +258,9 @@ function updateParker(dt) {
   }
   if (P.mode === 'fetch') return fetchUpdate(dt);
   if (P.mode === 'bubblego') return bubbleUpdate(dt);
+  if (P.mode === 'yarnchase') return yarnChase(dt);
+  if (P.mode === 'yarnbat') yarnBatTick();
+  if (P.mode === 'temari') temariUpdate(dt);
   if (P.mode === 'bubblehop') bubbleHopTick();
   if (P.mode === 'chase') {
     const tx = CHASE.x - 52 * P.data.dir, step = HABITS.chaseSpeed * dt;
@@ -277,6 +284,8 @@ function updateParker(dt) {
   else if (P.mode === 'belly') setMode('sigh', HABITS.sighTime, { lie: true });
   else if (/^cat(boop|bow|side)$/.test(P.mode)) catPlayEnd();
   else if (P.mode === 'bubblehop' || P.mode === 'bubblewait') bubbleNext();
+  else if (P.mode === 'yarnbat') yarnAfter();
+  else if (P.mode === 'temari') setMode('wag', HABITS.reactionTime.wag);
   else if (P.mode === 'pickup') fetchReturn();
   else if (P.mode === 'present') fetchDrop();
   else if (P.mode === 'pant') { setMode('wag', HABITS.reactionTime.wag); SFX.pop(); }       // rested: ready to play again
@@ -421,7 +430,9 @@ function parkerDrawing() {
   let key, sx = P.face, lift = 0;
   switch (P.mode) {
     case 'trot': key = `trot|${(P.data.slow ? Math.floor(f / 2) : f) % 6}${pk}`; break;
-    case 'chase': case 'fetch': case 'bubblego': key = `trot|${f % 6}`; break;
+    case 'chase': case 'fetch': case 'bubblego': case 'yarnchase': key = `trot|${f % 6}`; break;
+    case 'yarnbat': key = `bat|${(TT - P.t0) > 0.12 && (TT - P.t0) < 0.4 ? 1 : 0}`; break;
+    case 'temari': key = `nosepush|${Math.floor(f / 2) % 6}`; break;
     case 'bubblewait': key = `sit|happy|${f % 4 < 2 ? 0.2 : -0.15}|-0.32`; break;
     case 'bubblehop': { const u = clamp((TT - P.t0) / 0.62); lift = 30 * Math.sin(Math.PI * u); key = lift > 6 ? 'sit|happy|0|-0.36' : 'sit|calm|0|-0.24'; break; }
     case 'pickup': key = 'sniff|1'; break;
@@ -528,6 +539,7 @@ function drawScene() {
     ctx.fillStyle = g; ctx.fillRect(-110, -110, 220, 220); ctx.restore();
   }
   drawPrints();
+  drawYarnThread();
   const mail = S.mail.length > 0;
   if (mail) glow(ctx, MAILBOX.x, Y(MAILBOX.d) - 106, 46, '255,236,170', 0.35 + 0.1 * Math.sin(TT * 2));
   mailboxFlag(ctx, MAILBOX.x, Y(MAILBOX.d), mail);
@@ -557,7 +569,7 @@ function drawScene() {
         const hk = 1 / (1 + BALL.z / 40);
         ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = `rgba(110,100,115,${0.32 * hk})`; ctx.beginPath(); ctx.ellipse(t.x + 2, Y(t.d) + 1, 13 * s * (0.5 + 0.5 * hk), 4 * s * (0.5 + 0.5 * hk), 0, 0, TAU); ctx.fill(); ctx.restore();
         drawSprite(sprite(`item|ball|${k}`), t.x, Y(t.d) - 11 * s - BALL.z, { scale: s, rot: BALL.rot, shA: BALL.z > 2 ? 0 : 0.22 });
-      } else drawSprite(sprite(`item|${it.toy}|${k}`), t.x, Y(t.d) - 11 * s, { scale: s });
+      } else drawSprite(sprite(`item|${it.toy}|${k}`), t.x, Y(t.d) - 11 * s, { scale: s, rot: it.toy === 'yarn' ? YARN.rot : it.toy === 'temari' ? TEMARI.rot : 0 });
     } else if (it.f) {
       const f = it.f, s = depthScale(f.d), grow = smooth(clamp((now - f.born) / 1200)), sw = 0.035 * Math.sin(TT * 1.1 + f.id * 1.7);
       if (grow > 0) drawSprite(sprite(`dand|${f.kind}`), f.x, Y(f.d), { scale: s * lerp(0.2, 1, grow), alpha: Math.min(1, grow * 3), rot: sw });
@@ -705,7 +717,7 @@ function boot() {
     Clock.tick(dt);
     if (TT > todAt) { todAt = TT + 1; worldTick(); wxCheck(); }
     if (TT > saveAt) { saveAt = TT + 15; writeSave(S); }
-    checkRub(); updateParker(dt); updateBall(dt); updateVisitor(dt); updateBubbles(dt); updateChase(dt); updateWeather(dt, WX, V.H, TT); parkerExtras(); catPlayTick(); sayTick(); sleepZ(); updateFX(dt); drawScene();
+    checkRub(); updateParker(dt); updateBall(dt); updateVisitor(dt); updateBubbles(dt); updateYarn(dt); updateChase(dt); updateWeather(dt, WX, V.H, TT); parkerExtras(); catPlayTick(); sayTick(); noteTick(); sleepZ(); updateFX(dt); drawScene();
     if (!window.READY) window.READY = true;
     requestAnimationFrame(loop);
   };
@@ -717,7 +729,7 @@ function boot() {
   idle(step);
 }
 // test hook (screenshots): advance the simulation deterministically
-window.__advance = secs => { for (let i = 0; i < secs * 30; i++) { TT += 1 / 30; checkRub(); updateParker(1 / 30); updateBall(1 / 30); updateVisitor(1 / 30); updateBubbles(1 / 30); updateChase(1 / 30); updateWeather(1 / 30, WX, V.H, TT); parkerExtras(); catPlayTick(); sayTick(); updateFX(1 / 30); } drawScene(); };
+window.__advance = secs => { for (let i = 0; i < secs * 30; i++) { TT += 1 / 30; checkRub(); updateParker(1 / 30); updateBall(1 / 30); updateVisitor(1 / 30); updateBubbles(1 / 30); updateYarn(1 / 30); updateChase(1 / 30); updateWeather(1 / 30, WX, V.H, TT); parkerExtras(); catPlayTick(); sayTick(); updateFX(1 / 30); } drawScene(); };
 // time of day or weather changed: rebuild the backdrop (it cross-fades), switch the weather sounds
 function wxCheck() {
   const tod = currentTod(), wx = weatherNow();
@@ -829,6 +841,73 @@ function bubbleImg() {                   // a disc of tracing paper with a littl
   _bub = { res, cv }; return cv;
 }
 function tapBubble(x, y) { for (const b of BUBBLES) { if (TT < b.born) continue; const [bx, by] = bubblePos(b); if (Math.hypot(x - bx, y - by) < b.r + 10) { popBubble(b, false); return true; } } return false; }
+// ---------- 3. toys from friends: Simit's ball of yarn, Kinako's temari ball ----------
+// yarn: he pats it with a paw, it rolls off unwinding a thread behind it, he chases it and pats it again
+const YARN = { vx: 0, vd: 0, rot: 0, trail: [], rewind: 0 };
+function yarnGo(n) {
+  const t = S.toyPos.yarn, side = Math.sign(t.x - P.x) || P.face;
+  goTo(clamp(t.x - 46 * side, 30, 370), clamp(t.d, 100, 224), () => faceThen(side, () => setMode('yarnbat', 0.55, { n, hit: false })));
+}
+function yarnBatTick() {
+  if (P.data.hit || TT - P.t0 < 0.25) return;
+  P.data.hit = true; const t = S.toyPos.yarn, sp = rand([110, 160]), a = (Math.random() - 0.5) * 0.8;
+  let dir = P.face; if ((dir > 0 && t.x > 300) || (dir < 0 && t.x < 100)) dir = -dir;      // never straight into the fence
+  YARN.vx = Math.cos(a) * sp * dir; YARN.vd = Math.sin(a) * sp * 0.7; YARN.rewind = 0;
+  if (!YARN.trail.length) YARN.trail.push([t.x, t.d]);
+  SFX.pat(); fx({ type: 'glow', x: t.x, y: Y(t.d) - 10, life: 0.4, r: 22, rgb: '255,230,220' });
+}
+function yarnAfter() {
+  const n = P.data.n + 1;
+  if (n < HABITS.yarnRounds) setMode('yarnchase', null, { n }); else { YARN.rewind = TT + 2; setMode('watch', 1.6, { next: () => setMode('sigh', HABITS.sighTime, { lie: false }) }); }
+}
+function yarnChase(dt) {                // trotting after the rolling ball of yarn
+  const t = S.toyPos.yarn, side = Math.sign(t.x - P.x) || P.face, tx = t.x - 46 * side, dx = tx - P.x, dd = clamp(t.d, 100, 224) - P.d, L = Math.hypot(dx, dd);
+  if (Math.abs(t.x - P.x) > 8) P.face = side;
+  if (L < 6 && Math.hypot(YARN.vx, YARN.vd) < 20) return setMode('yarnbat', 0.55, { n: P.data.n, hit: false });
+  const step = Math.min(L, 100 * dt); if (L > 0.01) { P.x += dx / L * step; P.d += dd / L * step; }
+}
+function updateYarn(dt) {
+  const t = S.toyPos.yarn; if (!t) return;
+  const v = Math.hypot(YARN.vx, YARN.vd);
+  if (v > 1) {
+    const k = Math.max(0, v - 130 * dt) / v; YARN.vx *= k; YARN.vd *= k;
+    t.x += YARN.vx * dt; t.d += YARN.vd * dt; YARN.rot += YARN.vx * dt / 8;
+    if (t.x < 30 || t.x > 370) { YARN.vx *= -0.5; t.x = clamp(t.x, 30, 370); }
+    if (t.d < 96 || t.d > 226) { YARN.vd *= -0.5; t.d = clamp(t.d, 96, 226); }
+    const last = YARN.trail[YARN.trail.length - 1]; if (!last || Math.hypot(t.x - last[0], t.d - last[1]) > 5) YARN.trail.push([t.x, t.d]);
+  } else { YARN.vx = YARN.vd = 0; }
+  if (YARN.rewind && TT > YARN.rewind && YARN.trail.length) { YARN.trail.splice(0, Math.max(1, Math.floor(YARN.trail.length * 2 * dt))); }   // the thread winds back up
+}
+function drawYarnThread() {
+  const T = YARN.trail, t = S.toyPos.yarn; if (T.length < 1 || !t) return;
+  ctx.save(); ctx.strokeStyle = '#c94a40'; ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath();
+  T.forEach(([x, d], i) => { const y = Y(d) - 1 + Math.sin(i * 1.3) * 1.2; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+  ctx.lineTo(t.x, Y(t.d) - 2); ctx.stroke(); ctx.restore();
+}
+// temari: he nudges it along with his nose, round the yard
+function temariGo() {
+  const t = S.toyPos.temari, side = Math.sign(t.x - P.x) || P.face;
+  goTo(clamp(t.x - 58 * side, 30, 370), clamp(t.d, 100, 224), () => faceThen(side, () => { SFX.jingle(); setMode('temari', rand(HABITS.temariTime), { to: null, bell: TT + 2.5 }); }));
+}
+function temariUpdate(dt) {
+  const t = S.toyPos.temari, s = depthScale(P.d);
+  if (!P.data.to || Math.hypot(P.data.to[0] - P.x, P.data.to[1] - P.d) < 10) { const [x, d] = randomSpot(); P.data.to = [clamp(x, 70, 330), d]; }
+  const [tx, td] = P.data.to, dx = tx - P.x, dd = td - P.d, L = Math.hypot(dx, dd), step = Math.min(L, 38 * dt);
+  if (Math.abs(dx) > 6 && Math.sign(dx) !== P.face) { P.face = Math.sign(dx); }
+  if (L > 0.01) { P.x += dx / L * step; P.d += dd / L * step; }
+  const nx = P.x + 58 * P.face * s, nd = P.d; TEMARI.rot += (nx - t.x) / 9; t.x = clamp(nx, 30, 370); t.d = clamp(nd, 96, 226);
+  if (TT > P.data.bell) { P.data.bell = TT + rand([2, 3.5]); SFX.jingle(); }     // the bell inside jingles as it rolls
+  if (WX.look === 'snow' && (P.walked = (P.walked || 0) + step) > HABITS.printEvery) leavePrint();
+}
+const TEMARI = { rot: 0 };
+// the note that comes with a friend's toy
+function noteTick() {
+  const n = S.toyNote; if (!n || SAY.on || S.homeSay || !P.present || (typeof UI !== 'undefined' && UI.panel) || /^(sleep|nap|stir|packup|departLook)$/.test(P.mode) || document.getElementById('toyNote')) return;
+  const box = document.createElement('div'); box.id = 'toyNote'; box.className = 'toy-note';
+  box.append(itemIcon(n.toy, 64), el('p', 'toy-note-text', T('note.' + n.friend)), el('p', 'toy-note-hint', T('note.tap')));
+  box.onclick = () => { box.remove(); S.toyNote = null; writeSave(S); const t = S.toyPos[n.toy]; fx({ type: 'glow', x: t.x, y: Y(t.d) - 12, life: 1.6, r: 50, rgb: '255,236,170' }); P.want = n.toy; };
+  document.getElementById('game').append(box); SFX.mail();
+}
 // ---------- home from a trip: one short line in a little paper speech bubble above his head ----------
 const SAY = { on: false };
 function sayKey(h) {

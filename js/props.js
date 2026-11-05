@@ -92,6 +92,23 @@ function drawItem(c, id, s = 1) {
       c.save(); c.globalAlpha = 0.45; piece(c, circ(7, -23, 5.6), '#dff3ff', { mul: 0.2 }); c.restore();
       break;
     }
+    case 'yarn': {                         // a ball of red yarn from Simit, with a loose end
+      const B = circ(0, 0, 17); P(B, '#d9564a', 0.25);
+      clipped(c, B, () => { c.strokeStyle = 'rgba(150,40,40,0.55)'; c.lineWidth = 1.3; for (let i = -3; i <= 3; i++) { c.beginPath(); c.ellipse(0, 0, 18, 6 + Math.abs(i) * 2, 0.5 + i * 0.32, 0, TAU); c.stroke(); } piece(c, ell(-6, -7, 6, 3, -0.6), '#f08a7e', { mul: 0.2 }); });
+      c.save(); c.strokeStyle = '#d9564a'; c.lineWidth = 2.2; c.lineCap = 'round'; c.beginPath(); c.moveTo(14, 8); c.quadraticCurveTo(24, 14, 20, 20); c.stroke(); c.restore();
+      break;
+    }
+    case 'temari': {                       // a temari ball from Kinako: navy cloth wound with bright threads in a star pattern
+      const B = circ(0, 0, 18); P(B, '#2f3f78', 0.25);
+      clipped(c, B, () => {
+        const cols = ['#e2574a', '#f5c04a', '#f7f0e0', '#6fb6a6'];
+        for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI; c.save(); c.rotate(a); piece(c, ell(0, 0, 18, 4.2), cols[i % 4], { mul: 0.3 }); c.restore(); }
+        piece(c, rectP(-18, -2, 36, 4), '#f5c04a', { mul: 0.3 });
+        P(circ(0, 0, 5), '#e2574a', 0.05); piece(c, circ(0, 0, 2.2), '#f7f0e0', { mul: 0.3 });
+        piece(c, ell(-7, -9, 6, 3, -0.6), 'rgba(255,255,255,0.35)', { mul: 0 });
+      });
+      break;
+    }
     case 'bone':
       P(union(limb([-14, 0], [14, 0], 9, 9), circ(-16, -5, 6), circ(-16, 5, 6), circ(16, -5, 6), circ(16, 5, 6)), '#fbf4e6');
       break;

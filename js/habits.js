@@ -34,7 +34,9 @@ const HABITS = {
   bellyRub: { hold: 0.55, rubDistance: 40, endTime: 0.5 },   // press this long, or rub this far, to start
   fluffChase: 0.8,                     // chance he runs over to boop the seeds of a puff you gathered
   // toys he owns join his free-time choices (not at night), plus a snack at his bowl
-  toys: { ball: 2.5, duck: 2, bone: 1.5 }, eat: 0.8,
+  toys: { ball: 2.5, duck: 2, bone: 1.5, yarn: 2.2, temari: 2.2 }, eat: 0.8,
+  yarnRounds: 3,                       // paw-swats at the yarn ball before he's done
+  temariTime: [7, 11],                 // seconds of nosing the temari ball around
   ballRounds: 3,                       // pushes of the ball before he flops down for a sigh
   // throw and fetch (you drag the ball and let go)
   fetchSpeed: 112,                     // he runs faster after a thrown ball

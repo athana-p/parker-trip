@@ -77,6 +77,14 @@ const SFX = {
     if (!this.ok()) return; const t = this.ctx.currentTime;
     this.tone(150 + 60 * k, t, { a: 0.004, d: 0.13, v: 0.05 + 0.08 * k, to: 85 }); this.noise(t, { dur: 0.06, v: 0.03 * k, type: 'lowpass', f: 600, a: 0.003 });
   },
+  pat() {                            // a paw patting the yarn: a soft woolly "pff"
+    if (!this.ok()) return; const t = this.ctx.currentTime;
+    this.noise(t, { dur: 0.09, v: 0.07, type: 'lowpass', f: 700, a: 0.004 }); this.tone(240, t, { a: 0.003, d: 0.07, v: 0.03, to: 160 });
+  },
+  jingle() {                         // the temari ball's little bell
+    if (!this.ok()) return; const t = this.ctx.currentTime;
+    for (const [dt, f] of [[0, 2637], [0.11, 3136], [0.2, 2637]]) this.tone(f, t + dt, { a: 0.003, d: 0.25, v: 0.025 });
+  },
   blow() {                           // the bubble machine: a breathy hum and a few soft blips
     if (!this.ok()) return; const t = this.ctx.currentTime;
     this.noise(t, { dur: 0.9, v: 0.035, f: 1100, q: 0.8, a: 0.15 });

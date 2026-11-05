@@ -9,7 +9,7 @@ function buy(id) {
   else S.inv[id] = (S.inv[id] || 0) + 1;
   writeSave(S); return true;
 }
-const TOY_SPOTS = { ball: { x: 300, d: 118 }, duck: { x: 140, d: 112 }, bone: { x: 240, d: 214 }, bubbles: { x: 150, d: 206 } };
+const TOY_SPOTS = { ball: { x: 300, d: 118 }, duck: { x: 140, d: 112 }, bone: { x: 240, d: 214 }, bubbles: { x: 150, d: 206 }, yarn: { x: 262, d: 124 }, temari: { x: 128, d: 150 } };
 
 // put an item in its slot (food / charm); whatever was there goes back to the bag
 function packItem(id) {
@@ -54,7 +54,10 @@ function startTrip(at) {
 function endTrip(at) {
   const t = S.trip; let got = null;
   if (t.souvenir && !S.shelf.some(s => s.id === t.dest)) { got = t.dest; S.shelf.push({ id: t.dest, at, isNew: true }); }
-  if (t.friend) { const f = metFriend(t.friend, at); f.count++; }
+  if (t.friend) {
+    const f = metFriend(t.friend, at), toy = FRIEND_TOY[t.friend]; f.count++;
+    if (toy && f.count >= 2 && !S.toys.includes(toy)) { S.toys.push(toy); S.toyPos[toy] = { ...TOY_SPOTS[toy] }; S.toyNote = { friend: t.friend, toy }; }   // with a little note
+  }
   S.homeSay = { dest: t.dest, friend: t.friend || null };     // he says something about it once he's home and awake
   S.lastDest = t.dest; S.trip = null;
   return got;

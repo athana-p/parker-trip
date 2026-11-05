@@ -37,7 +37,8 @@ function addV4(s) {
   return Object.assign(s, { friends: {}, albumFriend: {}, ...s });
 }
 // v5: small visitors — gifts lying in the yard, the gift box ({ kind: count }), how often each visitor came, the last gift time;
-//     homeSay: the trip he still wants to say a word about ({ dest, friend } or null; optional, so older v5 saves need nothing)
+//     homeSay: the trip he still wants to say a word about ({ dest, friend } or null); toyNote: a friend's toy whose note
+//     hasn't been read yet ({ friend, toy } or null). Both optional, so older v5 saves need nothing.
 function addV5(s) {
-  return Object.assign(s, { gifts: [], giftBox: {}, visits: {}, lastGiftAt: 0, homeSay: null, ...s });
+  return Object.assign(s, { gifts: [], giftBox: {}, visits: {}, lastGiftAt: 0, homeSay: null, toyNote: null, ...s });
 }
