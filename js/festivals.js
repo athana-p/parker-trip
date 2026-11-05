@@ -10,10 +10,11 @@ const FESTIVALS = [
   { id: 'newyear', every: ['01-01'] },
   { id: 'cny', dates: { 2027: ['2027-02-06'], 2028: ['2028-01-26'], 2029: ['2029-02-13'], 2030: ['2030-02-03'] } },
   { id: 'songkran', every: ['04-13', '04-15'] },
-  // family birthdays: the card comes on the day itself (not before), any time in the week after
-  { id: 'bday-parker', every: ['11-13'], window: { before: 0, after: 7 } },
-  { id: 'bday-sister', every: ['05-02'], window: { before: 0, after: 7 } },
-  { id: 'bday-mom', every: ['01-25'], window: { before: 0, after: 7 } },
+  // family birthdays: the card comes on the day itself (not before), any time in the week after.
+  // secret: the album shows only a "?" until the first card has come
+  { id: 'bday-parker', every: ['11-13'], window: { before: 0, after: 7 }, secret: true },
+  { id: 'bday-sister', every: ['05-02'], window: { before: 0, after: 7 }, secret: true },
+  { id: 'bday-mom', every: ['01-25'], window: { before: 0, after: 7 }, secret: true },
 ];
 const festCard = id => 'fest-' + id;
 function festDays(f, year) { return f.dates ? f.dates[year] || null : f.every.map(md => `${year}-${md}`); }
