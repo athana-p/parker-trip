@@ -85,3 +85,11 @@ body { font-family: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsof
 .file { margin-top: 8px; font: inherit; font-size: 13px; max-width: 100%; }
 .wide + .wide { margin-top: 8px; }
 .btn:focus-visible, .tab:focus-visible, .slot:focus-visible, .inv-item:focus-visible, .album-cell:focus-visible { outline: 3px solid #f6c96a; outline-offset: 2px; }
+/* ---- festival album, save / share ---- */
+.tabs.center { justify-content: center; flex-wrap: wrap; }
+.album-q.album-fest { font-size: 12px; padding: 4px; text-align: center; }
+.share-row { display: flex; justify-content: center; gap: 10px; margin-top: 8px; }
+.share-row .btn { background: #f6c96a; }
+.img-overlay { position: absolute; inset: 0; z-index: 50; background: rgba(40, 30, 40, 0.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; }
+.img-overlay img { max-width: 100%; max-height: 70%; border-radius: 6px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4); -webkit-touch-callout: default; user-select: auto; -webkit-user-select: auto; }
+.img-hint { color: #fff6e6; font-size: 15px; margin: 0; }

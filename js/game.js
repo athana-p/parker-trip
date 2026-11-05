@@ -20,7 +20,7 @@ function makeSprite(fn, box, k, stick = true) {
   return { img, sh, ox: bx.ox + PAD, oy: bx.oy + PAD, w, h, stick };
 }
 const SPRITES = {
-  sit: a => [c => drawSitB(c, a[0], +a[1], { headRot: +a[2], headDy: +(a[3] || 0), pack: a[4] === 'pack', mouth: a[4] === 'duck' ? 'duck' : null }), BOX_SIT, K_DOG],
+  sit: a => [c => drawSitB(c, a[0], +a[1], { headRot: +a[2], headDy: +(a[3] || 0), pack: a[4] === 'pack', mouth: ['duck', 'card'].includes(a[4]) ? a[4] : null }), BOX_SIT, K_DOG],
   item: a => [c => drawItem(c, a[0], +a[1]), { w: 44, h: 44, ox: 22, oy: 22 }, 1, false],
   bird: a => [c => drawBird(c, +a[0]), { w: 60, h: 60, ox: 30, oy: 48 }, 1, false],
   belly: a => [c => drawBellyB(c, +a[0]), BOX_BELLY, K_DOG],
@@ -196,6 +196,7 @@ function bagRustle() {          // the sound of a plastic bag: he comes running
 }
 function tapParker() {
   if (/packup|departLook|arrive/.test(P.mode) || P.pack) return;
+  if (P.mode === 'gift') return receiveGift();
   if (/^(sleep|nap|stir)$/.test(P.mode)) {
     // a few quick taps wake him up; one tap just makes him stir
     P.wakeTaps = TT - (P.lastTap || -9) < 1.5 ? (P.wakeTaps || 0) + 1 : 1; P.lastTap = TT;
@@ -228,6 +229,7 @@ function parkerDrawing() {
     case 'sigh': { const inhale = (TT - P.t0) < HABITS.sighTime * 0.45; key = P.data.lie ? `lie|content|${inhale ? 2.4 : 0}` : (inhale ? 'sit|content|0|-0.05|-2.5' : 'sit|content|0|0.07|2'); break; }
     case 'belly': key = P.data.ending ? 'belly|0' : `belly|${Math.floor(f / 3) % 2}`; break;
     case 'drowsy': key = (TT - P.t0) < 0.9 ? 'sit|sleepy|0|0.08' : 'sit|blink|0|-0.05'; break;
+    case 'gift': key = `sit|happy|${f % 6 < 3 ? 0.2 : -0.12}|0|0|card`; break;
     case 'packup': key = `sit|calm|0|0|0|pack`; break;
     case 'departLook': key = `look|${Math.floor(f / 6) % 2}|pack`; break;
     case 'arrive': key = `sit|happy|${f % 2 ? 0.3 : -0.25}|0|0|pack`; break;
@@ -319,6 +321,8 @@ function drawScene() {
       ctx.beginPath(); ctx.ellipse(P.x + (lying ? 14 * P.face : 0) * s, Y(P.d) + 1, (lying ? 70 : 52) * s * Math.max(0.6, Math.abs(dr.sx)), 6 * s, 0, 0, TAU); ctx.fill(); ctx.restore();
       drawSprite(sprite(dr.key), P.x, Y(P.d) - dr.lift, { sx: dr.sx, scale: s });
       if (P.mode === 'turn') glow(ctx, P.x, Y(P.d) - 50 * s, 46, '255,240,200', 0.5);
+      if (P.carrying && P.mode !== 'gift') drawSprite(sprite('item|card|0.5'), P.x + 64 * P.face * s * Math.abs(dr.sx), Y(P.d) - 72 * s - dr.lift, { scale: s, rot: 0.15 * P.face });   // the card in his mouth on the way
+      if (P.mode === 'gift') glow(ctx, P.x, Y(P.d) - 70 * s, 70, '255,236,170', 0.25 + 0.08 * Math.sin(TT * 2.5));
     }
   }
   drawVisitor();
@@ -358,7 +362,7 @@ cv.addEventListener('pointermove', e => {
 cv.addEventListener('pointerup', e => { if (!press || e.pointerId !== press.id) return; press.rub ? endBelly() : tapParker(); press = null; });
 cv.addEventListener('pointercancel', () => { if (press && press.rub) endBelly(); press = null; });
 function checkRub() {
-  if (!press || press.rub || /sleep|nap|stir|packup|departLook|arrive/.test(P.mode) || P.pack) return;
+  if (!press || press.rub || /sleep|nap|stir|packup|departLook|arrive|gift/.test(P.mode) || P.pack) return;
   if (TT - press.t0 > HABITS.bellyRub.hold || press.dist > HABITS.bellyRub.rubDistance) {
     press.rub = true; setMode('belly', null, { nextHeart: TT + 0.3 });
     const [hx, hy] = parkerCenter(); fx({ type: 'glow', x: hx, y: hy, life: 0.6, r: 60, rgb: '255,240,200' });
@@ -462,7 +466,27 @@ function worldTick() {
     }
   }
   if (!P.present) birdTick();
+  festGiftTick();
   if (window.debugRefresh) debugRefresh();
+}
+// ---------- festival cards handed over in person ----------
+function festGiftTick() {
+  const f = S.festPending; if (!f || S.trip || !P.present || (typeof UI !== 'undefined' && UI.panel)) return;
+  if (P.mode === 'gift' || (P.carrying && /trot|turn/.test(P.mode))) return;
+  if (/^(sleep|nap|stir)$/.test(P.mode)) { if (!P.giftHinted) { P.giftHinted = true; showToast('toast.giftLater', 4500); } return; }   // he'll give it when he's up
+  if (P.pack || !/^(sit|lie|look|sniff|trot|sigh|eat|expect|watch|wag|tilt|hop|drowsy)$/.test(P.mode)) return;
+  if (P.hold === 'duck') S.toyPos.duck = { x: clamp(P.x + 30 * P.face, 30, 370), d: P.d };
+  if (P.hold === 'bone') S.toyPos.bone = { x: clamp(P.x + 60 * P.face, 30, 370), d: P.d };
+  P.hold = null; P.carrying = true;
+  goTo(200, 160, () => { setMode('gift', null); showToast('toast.gift', 6000); });
+}
+function receiveGift() {
+  const f = S.festPending; if (!f) return;
+  addFestCard(f.id, f.year); S.festPending = null; P.carrying = false; P.giftHinted = false; writeSave(S);
+  SFX.mail(); const [hx, hy] = parkerCenter(); fx({ type: 'glow', x: hx, y: hy - 20, life: 0.8, r: 80, rgb: '255,236,170' });
+  for (let i = 0; i < 3; i++) fx({ type: 'spr', key: 'heart', x: hx + (i - 1) * 22, y: hy - 40, vx: (i - 1) * 8, vy: -34, delay: i * 0.18, sway: i, life: 1.4 });
+  setMode('sigh', HABITS.sighTime, { lie: false }); showToast('toast.giftGot', 3000);
+  UI.tab = 'fests'; openPanel('album'); UI.view = festCard(f.id); UI.viewYear = f.year; renderPanel();
 }
 // ---------- the bird (only while he's away) ----------
 const BIRD = { on: false, next: 0 };

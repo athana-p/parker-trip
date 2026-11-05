@@ -815,6 +815,79 @@ function pcTekapoFront(c, W, H, res) {
   vignette(c, W, H, '40,40,80', 0.45, 1.0);
 }
 
+// ================= FESTIVAL CARDS =================
+// ---- Loy Krathong: Sukhothai Historical Park at night, krathongs on the pond, a full moon ----
+function krathong(c, x, y, s, seed) {
+  const r = rng(seed);
+  glow(c, x, y + 4 * s, 80 * s, '255,180,100', 0.6);                                            // warm light on the water
+  piece(c, rectP(x - 3 * s, y + 6 * s, 6 * s, 26 * s), 'rgba(255,214,140,0.35)', { mul: 0, scr: 0 });   // its reflection
+  pp(c, ell(x, y, 26 * s, 8 * s), '#4f7a44', 0.2);                                               // banana-trunk raft
+  const petals = new Path2D();                                                                    // folded banana-leaf petals, lotus style
+  for (let i = 0; i < 9; i++) { const a = Math.PI + (i / 8) * Math.PI, px = x + Math.cos(a) * 22 * s; petals.addPath(poly([[px - 5 * s, y - 2 * s], [px + Math.cos(a) * 3 * s, y - 16 * s - Math.abs(Math.sin(a)) * 3 * s], [px + 5 * s, y - 2 * s]])); }
+  pp(c, petals, '#7fae5a', 0.15);
+  for (let k = 0; k < 6; k++) pp(c, circ(x + (r() - 0.5) * 30 * s, y - 8 * s - r() * 6 * s, (3 + r() * 2) * s), ['#f39a2a', '#f6c234', '#f58cbf', '#fff3e6'][k % 4], 0.08);   // marigolds and orchids
+  pp(c, rectP(x - 2.5 * s, y - 30 * s, 5 * s, 18 * s), '#fff6e6', 0.1);                           // candle
+  for (const dx of [-7, 7]) { pp(c, slab([x + dx * s, y - 10 * s], [x + dx * 1.3 * s, y - 34 * s], 1.4 * s), '#8a4a3a', 0); glow(c, x + dx * 1.3 * s, y - 34 * s, 4 * s, '255,120,80', 0.8); }   // incense
+  glow(c, x, y - 36 * s, 40 * s, '255,214,140', 0.95);
+  pp(c, ell(x, y - 36 * s, 3 * s, 6 * s), '#ffd36a', 0); pp(c, ell(x, y - 35 * s, 1.5 * s, 3 * s), '#fff6d6', 0);
+}
+function lotusChedi(c, x, by, s, col, lit) {                                                       // the Sukhothai lotus-bud chedi
+  c.save(); c.translate(x, by); c.scale(s, s);
+  for (const [w, y, h] of [[120, -26, 26], [96, -46, 20], [76, -62, 16]]) { pp(c, rectP(-w / 2, y, w, h), col, 0.25); piece(c, rectP(-w / 2, y + h - 5, w, 5), lit, { mul: 0.4 }); }
+  pp(c, rectP(-26, -130, 52, 68), col, 0.2); piece(c, rectP(-26, -72, 52, 10), lit, { mul: 0.4 });
+  for (const [w, y] of [[64, -136], [56, -144], [48, -150]]) pp(c, rectP(-w / 2, y, w, 7), col, 0.12);
+  const bud = new Path2D(); bud.moveTo(-24, -150); bud.bezierCurveTo(-30, -186, -12, -214, 0, -234); bud.bezierCurveTo(12, -214, 30, -186, 24, -150); bud.closePath();
+  pp(c, bud, col, 0.22); clipped(c, bud, () => { piece(c, ell(14, -180, 14, 40), shade(col, 0.8), { mul: 0.3 }); for (let k = 0; k < 3; k++) piece(c, rectP(-30, -160 - k * 18, 60, 3), shade(col, 0.82), { mul: 0.3 }); });
+  pp(c, slab([0, -232], [0, -270], 3.5), col, 0.1);
+  c.restore();
+}
+function prang(c, x, by, s, col) {                                                                  // a smaller corn-cob tower
+  c.save(); c.translate(x, by); c.scale(s, s);
+  pp(c, rectP(-34, -24, 68, 24), col, 0.22); pp(c, rectP(-24, -74, 48, 50), col, 0.2); pp(c, rectP(-8, -64, 16, 40), '#2a2238', 0);
+  const cob = new Path2D(); cob.moveTo(-24, -74); cob.bezierCurveTo(-26, -120, -8, -140, 0, -150); cob.bezierCurveTo(8, -140, 26, -120, 24, -74); cob.closePath();
+  pp(c, cob, col, 0.2); clipped(c, cob, () => { for (let k = 0; k < 5; k++) piece(c, rectP(-30, -84 - k * 13, 60, 3), shade(col, 0.82), { mul: 0.3 }); });
+  c.restore();
+}
+function pcLoyKrathong(c, W, H) {
+  skyBands(c, W, ['#0d1536', '#121c46', '#192757', '#213266', '#2b3e74'], 50, 250, 1300);
+  const rs = rng(1301); for (let k = 0; k < 110; k++) { c.fillStyle = `rgba(255,248,226,${0.25 + rs() * 0.5})`; c.beginPath(); c.arc(rs() * W, rs() * 260, 0.5 + rs() * 1.1, 0, TAU); c.fill(); }
+  // the full moon
+  glow(c, 700, 108, 260, '255,236,190', 0.45);
+  tornPiece(c, ellipsePts(700, 108, 50, 50, 60), '#fff1c8', { amp: 1.2, seed: 1302, shadow: 0, rimCol: '#fffbe8' });
+  c.save(); c.globalAlpha = 0.18; for (const [dx, dy, r] of [[-14, -10, 12], [12, 8, 9], [-4, 18, 7], [18, -16, 6]]) piece(c, circ(700 + dx, 108 + dy, r), '#d8c08a', { mul: 0.3 }); c.restore();
+  [[170, 130, 0.7], [250, 70, 0.55], [460, 50, 0.6], [560, 150, 0.5], [860, 210, 0.55]].forEach(([x, y, s]) => lantern(c, x, y, s));
+  // trees and sugar palms against the sky
+  strip(c, -20, W + 20, x => 306 - 22 * Math.abs(Math.sin(x / 48)) - 8 * fbm1(x / 30, 2), H, '#16203e', { seed: 1303, rimCol: '#2e3d66', shadow: 0.15 });
+  for (const [x, h] of [[90, 120], [150, 96], [780, 130], [840, 104]]) { pp(c, slab([x, 300], [x + 4, 300 - h], 4), '#1a2342', 0.1); for (let i = 0; i < 9; i++) leaf(c, x + 4, 300 - h, 30, 6, -Math.PI / 2 + (i - 4) * 0.42, '#1a2648'); }
+  // the temple platform, rows of laterite columns, the chedi and two prangs, warm light from the candles below
+  const brick = '#7a5f74', lit = '#c99a7a';
+  pp(c, rectP(150, 380, 600, 30), brick, 0.25); piece(c, rectP(150, 404, 600, 6), lit, { mul: 0.4 });
+  prang(c, 300, 384, 0.95, '#6e566c'); prang(c, 600, 384, 0.95, '#6e566c');
+  lotusChedi(c, 450, 384, 1.0, brick, lit);
+  for (let i = 0; i < 9; i++) { const x = 190 + i * 62, h = 54 + (i * 37) % 30; if (i === 4) continue; pp(c, rectP(x - 7, 380 - h, 14, h), '#8a6a74', 0.2); piece(c, rectP(x - 7, 380 - h, 14, 4), shade('#8a6a74', 0.85), { mul: 0.3 }); }
+  c.save(); c.globalCompositeOperation = 'screen'; glow(c, 450, 390, 240, '255,190,120', 0.3); c.restore();
+  // the pond: the temple and the moon mirrored in it
+  const pond = rectP(-20, 412, W + 40, 200); pp(c, pond, '#142450', 0);
+  clipped(c, pond, () => {
+    c.save(); c.globalAlpha = 0.28; c.translate(0, 824); c.scale(1, -1); lotusChedi(c, 450, 412, 1.0, brick, lit); prang(c, 300, 412, 0.95, '#6e566c'); prang(c, 600, 412, 0.95, '#6e566c'); c.restore();
+    const rm = rng(1304); c.save(); c.globalAlpha = 0.55; for (let k = 0; k < 14; k++) piece(c, rectP(700 - (14 - k) * 2 - rm() * 10, 420 + k * 11, (14 - k) * 4 + rm() * 20, 2.5), '#e8d6a0', { mul: 0.2 }); c.restore();
+    for (let k = 0; k < 30; k++) piece(c, rectP(rm() * W, 420 + rm() * 180, 20 + rm() * 50, 1.6), '#2a4078', { mul: 0.3 });
+  });
+  pp(c, rectP(-20, 410, W + 40, 4), '#1d2f5e', 0);
+  // krathongs drifting, far to near
+  [[230, 442, 0.6, 1], [390, 448, 0.62, 2], [560, 440, 0.58, 3], [830, 452, 0.7, 4], [300, 470, 0.75, 9], [650, 478, 0.9, 5], [130, 490, 0.95, 6], [480, 508, 1.05, 7], [770, 536, 1.25, 8]].forEach(([x, y, s, k]) => krathong(c, x, y, s, 1310 + k));
+}
+function pcLoyKrathongFront(c, W, H, res) {
+  pcLoyKrathong(c, W, H);
+  // the near bank Parker lies on
+  const bank = tornPiece(c, [[-20, 600], [-20, 520], [80, 508], [200, 512], [300, 530], [360, 560], [380, 600]], '#1e3a32', { amp: 2.5, seed: 1320, rimCol: '#3f6a5a', shadow: 0.25 });
+  for (const [x, y] of [[520, 590], [580, 578], [870, 584]]) { const pad = new Path2D(); pad.moveTo(x, y); pad.ellipse(x, y, 26, 9, 0, 0.4, TAU - 0.4); pad.closePath(); pp(c, pad, '#2f5a46', 0.15); }
+  pcParker(c, res, BOX_LIE, 0.82, p => drawLieB(p, 'content', { headRot: 0.04 }), 210, 548);
+  krathong(c, 336, 568, 1.4, 1330);                                     // the one he just set on the water
+  vignette(c, W, H, '40,40,90', 0.42, 1.0);
+}
+
+
 const POSTCARDS = [
   { id: 'chiangmai', rare: false, front: pcChiangMaiFront, scene: pcChiangMai, stamp: '#c4533f', ink: '#6c4a6e' },
   { id: 'pai', front: pcPaiFront, scene: pcPai, ink: '#7a4a6e' },
@@ -828,6 +901,7 @@ const POSTCARDS = [
   { id: 'furano', rare: true, front: pcFuranoFront, scene: pcFurano, ink: '#6a4a9a' },
   { id: 'dunhuang', rare: true, front: pcDunhuangFront, scene: pcDunhuang, ink: '#9a5a2a' },
   { id: 'tekapo', rare: true, front: pcTekapoFront, scene: pcTekapo, ink: '#2a3a6a' },
+  { id: 'fest-loykrathong', fest: 'loykrathong', front: pcLoyKrathongFront, scene: pcLoyKrathong, ink: '#3a3a7a' },
 ];
 
 // ---- back: place name + a short line in both languages, stamp, postmark ----
@@ -844,13 +918,13 @@ function pawPrint(c, x, y, s, col) {
   for (const [dx, dy] of [[-8, -4], [-3, -9], [3, -9], [8, -4]]) { c.beginPath(); c.ellipse(x + dx * s, y + dy * s, 2.6 * s, 3.2 * s, 0, 0, TAU); c.fill(); }
   c.restore();
 }
-function pcBack(c, W, H, pc, res) {
+function pcBack(c, W, H, pc, res, year) {
   piece(c, rectP(0, 0, W, H), '#f8f0e1', { scr: 0.3 });
   tornPiece(c, [[W * 0.56 - 2, 60], [W * 0.56 + 2, 60], [W * 0.56 + 2, H - 60], [W * 0.56 - 2, H - 60]], '#dcc6a6', { amp: 0.8, seed: 5, rim: 0, shadow: 0.08 });
   const id = pc.id, L = 60, MW = W * 0.56 - 100;
   c.textAlign = 'left'; c.textBaseline = 'alphabetic';
-  c.fillStyle = '#5b3f37'; c.font = `600 40px ${FONT}`; c.fillText(T(`pc.${id}.name`, 'zh'), L, 120);
-  c.fillStyle = '#8a6a5c'; c.font = `20px ${FONT}`; c.fillText(`${T(`pc.${id}.name`, 'en')} · ${T(`pc.${id}.country`, 'en')}`, L, 154);
+  c.fillStyle = '#5b3f37'; c.font = `600 40px ${FONT}`; c.fillText(T(`pc.${id}.name`, 'zh') + (year ? '  ' + year : ''), L, 120);
+  c.fillStyle = '#8a6a5c'; c.font = `20px ${FONT}`; c.fillText(`${T(`pc.${id}.name`, 'en')}${year ? ' ' + year : ''} · ${T(`pc.${id}.country`, 'en')}`, L, 154);
   const hasMsg = STRINGS.zh[`pc.${id}.msg`] !== undefined;
   c.fillStyle = '#5b3f37'; c.font = `24px ${FONT}`; let y = wrapText(c, hasMsg ? T(`pc.${id}.msg`, 'zh') : T('pc.placeholder', 'zh'), L, 216, MW, 38);
   c.fillStyle = '#7d6155'; c.font = `italic 19px ${FONT}`; y = wrapText(c, hasMsg ? T(`pc.${id}.msg`, 'en') : T('pc.placeholder', 'en'), L, y + 14, MW, 30);
@@ -862,7 +936,7 @@ function pcBack(c, W, H, pc, res) {
   piece(sc, rectP(0, 0, sw, sh), '#fffaf0', { mul: 0.4 });
   piece(sc, rectP(10, 10, sw - 20, sh - 34), '#efc9a8', { mul: 0.5 });
   sc.save(); sc.beginPath(); sc.rect(10, 10, sw - 20, sh - 34); sc.clip(); sc.translate(10, 10); sc.scale((sw - 20) / PC_W * 1.6, (sh - 34) / PC_H * 1.1); sc.translate(-180, -150); (pc.scene || pc.front).call(pc, sc, PC_W, PC_H, res); sc.restore();
-  sc.fillStyle = '#6b4a3f'; sc.font = `600 13px ${FONT}`; sc.textAlign = 'center'; sc.fillText(T(`pc.${id}.country`, 'en').toUpperCase(), sw / 2, sh - 10);
+  sc.fillStyle = '#6b4a3f'; sc.font = `600 13px ${FONT}`; sc.textAlign = 'center'; sc.fillText(T(`pc.${id}.country`, 'en').split(', ').pop().toUpperCase(), sw / 2, sh - 10);
   sc.globalCompositeOperation = 'destination-out';
   for (let x = 0; x <= sw; x += 10) { sc.beginPath(); sc.arc(x, 0, 3.4, 0, TAU); sc.arc(x, sh, 3.4, 0, TAU); sc.fill(); }
   for (let yy = 0; yy <= sh; yy += 10) { sc.beginPath(); sc.arc(0, yy, 3.4, 0, TAU); sc.arc(sw, yy, 3.4, 0, TAU); sc.fill(); }
@@ -890,9 +964,9 @@ function pcPlaceholderFront(c, W, H) {
 }
 function pcEntry(id) { return POSTCARDS.find(p => p.id === id) || { id, ink: '#6c4a6e', front: pcPlaceholderFront }; }
 const _pcCache = new Map();
-function postcardCanvas(id, side, res) {
-  const key = `${id}:${side}:${res}:${LANG}`; if (_pcCache.has(key)) return _pcCache.get(key);
+function postcardCanvas(id, side, res, year) {
+  const key = `${id}:${side}:${res}:${LANG}:${year || ''}`; if (_pcCache.has(key)) return _pcCache.get(key);
   const pc = pcEntry(id), cv = mk(PC_W * res, PC_H * res), c = cv.getContext('2d'); c.scale(res, res);
-  if (side === 'front') pc.front.call(pc, c, PC_W, PC_H, res); else pcBack(c, PC_W, PC_H, pc, res);
+  if (side === 'front') pc.front.call(pc, c, PC_W, PC_H, res); else pcBack(c, PC_W, PC_H, pc, res, year);
   _pcCache.set(key, cv); return cv;
 }

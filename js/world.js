@@ -62,10 +62,28 @@ function advanceWorld(now) {
     while (S.trip.cards.length && S.trip.cards[0] <= now) { const at = S.trip.cards.shift(); S.mail.push({ dest: S.trip.dest, at }); ev.push({ type: 'card', at }); }
     if (now >= S.trip.returnAt) { const at = S.trip.returnAt, got = endTrip(at); ev.push({ type: 'home', at, souvenir: got }); }
   }
+  const fe = festivalTick(now); if (fe) ev.push(fe);
   if (ev.length) writeSave(S);
   return ev;
 }
 function keepCard() {
   const m = S.mail.shift(); if (!m) return;
-  S.album[m.dest] = (S.album[m.dest] || 0) + 1; writeSave(S);
+  if (m.fest) addFestCard(m.fest, m.year); else S.album[m.dest] = (S.album[m.dest] || 0) + 1;
+  writeSave(S);
+}
+// ---- festivals ----
+function addFestCard(id, year) { const a = S.festAlbum[id] = S.festAlbum[id] || []; if (!a.includes(year)) a.push(year); }
+// inside a festival window, set aside that year's card (once); it is handed over by mail or by Parker himself
+function festivalTick(now) {
+  if (!S.festPending) for (const f of activeFestivals(now)) {
+    const key = `${f.id}-${f.year}`;
+    if (S.festGot[key] || !POSTCARDS.some(p => p.id === festCard(f.id))) continue;   // cards not drawn yet wait for their art
+    S.festGot[key] = now; S.festPending = { id: f.id, year: f.year }; writeSave(S); break;
+  }
+  if (S.festPending && S.trip) {                    // he's away: it comes in the post
+    const f = S.festPending; S.festPending = null;
+    S.mail.push({ dest: festCard(f.id), fest: f.id, year: f.year, at: now }); writeSave(S);
+    return { type: 'card', at: now };
+  }
+  return null;
 }

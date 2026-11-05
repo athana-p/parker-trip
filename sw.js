@@ -1,8 +1,8 @@
 // Offline play: cache the game's own files; serve from cache first, refresh in the background.
 // Bump CACHE when files change so players get the new version.
-const CACHE = 'parker-trip-v4';
+const CACHE = 'parker-trip-v5';
 const ASSETS = ['./', 'index.html', 'manifest.webmanifest', 'css/style.css',
-  'js/paper.js', 'js/bg.js', 'js/parker.js', 'js/strings.js', 'js/postcards.js', 'js/items.js', 'js/props.js', 'js/yard.js',
+  'js/paper.js', 'js/bg.js', 'js/parker.js', 'js/strings.js', 'js/postcards.js', 'js/items.js', 'js/festivals.js', 'js/props.js', 'js/yard.js',
   'js/habits.js', 'js/audio.js', 'js/save.js', 'js/world.js', 'js/ui.js', 'js/game.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting())); });

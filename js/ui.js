@@ -98,7 +98,7 @@ function renderPack(body) {
 }
 function renderMail(body) {
   if (!S.mail.length) { body.append(el('p', 'note', T('ui.mail.empty'))); return; }
-  const m = S.mail[0], wrap = flipCard(m.dest, renderPanel);
+  const m = S.mail[0], wrap = flipCard(m.dest, renderPanel, m.year);
   body.append(wrap, el('p', 'note center', T('ui.mail.flip') + (S.mail.length > 1 ? `  ·  1 / ${S.mail.length}` : '')));
   const keep = el('button', 'pill btn wide', T('ui.mail.keep')); keep.onclick = () => { keepCard(); UI.side = 'front'; S.mail.length ? renderPanel() : closePanel(); };
   body.append(keep);
@@ -125,34 +125,85 @@ function renderShelf(body) {
 }
 
 // a postcard that turns over when tapped (mailbox + album)
-function flipCard(id, onFlip) {
+function flipCard(id, onFlip, year) {
   const dpr = Math.min(2, window.devicePixelRatio || 1), wrap = el('button', 'card'), cvs = document.createElement('canvas');
-  const src = postcardCanvas(id, UI.side, dpr); cvs.width = src.width; cvs.height = src.height; cvs.getContext('2d').drawImage(src, 0, 0);
+  const src = postcardCanvas(id, UI.side, dpr, year); cvs.width = src.width; cvs.height = src.height; cvs.getContext('2d').drawImage(src, 0, 0);
   wrap.append(cvs); wrap.onclick = () => { UI.side = UI.side === 'front' ? 'back' : 'front'; wrap.classList.add('flip'); setTimeout(onFlip, 160); };
   return wrap;
 }
 function renderAlbum(body) {
-  const got = DESTS.filter(d => S.album[d.id]).length;
-  if (UI.view) {
-    const d = UI.view;
-    body.append(flipCard(d, renderPanel), el('p', 'note center', `${T('pc.' + d + '.name')} · ${T('pc.' + d + '.country')}  ·  ${T('ui.album.got', LANG, { n: S.album[d] })}`), el('p', 'note center', T('ui.mail.flip')));
-    const back = el('button', 'pill btn wide', T('ui.album.back')); back.onclick = () => { UI.view = null; UI.side = 'front'; renderPanel(); }; body.append(back);
-    return;
-  }
-  body.append(el('p', 'note', T('ui.album.note', LANG, { n: got })));
+  if (UI.view) return renderAlbumView(body);
+  const tabs = el('div', 'tabs');
+  for (const t of ['places', 'fests']) { const b = el('button', 'tab' + ((UI.tab || 'places') === t ? ' on' : ''), T('ui.album.' + t)); b.onclick = () => { UI.tab = t; renderPanel(); }; tabs.append(b); }
+  body.append(tabs);
   const grid = el('div', 'album'), jobs = [];
-  for (const d of DESTS) {
-    const cell = el('button', 'album-cell' + (S.album[d.id] ? '' : ' empty'));
-    if (S.album[d.id]) {
-      const c = document.createElement('canvas'); c.width = 180; c.height = 120; cell.append(c);
-      jobs.push(() => { const src = postcardCanvas(d.id, 'front', 0.4); c.getContext('2d').drawImage(src, 0, 0, 180, 120); });
-      cell.onclick = () => { UI.view = d.id; UI.side = 'front'; renderPanel(); };
-      cell.append(el('span', 'album-name', T('pc.' + d.id + '.name')));
-    } else { cell.append(el('span', 'album-q', d.rare ? '★' : '?')); cell.title = T('ui.album.locked'); }
-    grid.append(cell);
+  const thumb = (cell, id, year) => { const c = document.createElement('canvas'); c.width = 180; c.height = 120; cell.prepend(c); jobs.push(() => c.getContext('2d').drawImage(postcardCanvas(id, 'front', 0.4, year), 0, 0, 180, 120)); };
+  if (UI.tab === 'fests') {
+    body.append(el('p', 'note', T('ui.album.festNote')));
+    for (const f of FESTIVALS) {
+      const years = (S.festAlbum[f.id] || []).slice().sort(), got = years.length > 0, cell = el('button', 'album-cell' + (got ? '' : ' empty'));
+      if (got) { thumb(cell, festCard(f.id), years[years.length - 1]); cell.onclick = () => { UI.view = festCard(f.id); UI.viewYear = years[years.length - 1]; UI.side = 'front'; renderPanel(); }; }
+      cell.append(el('span', got ? 'album-name' : 'album-q album-fest', T('fest.' + f.id) + (got ? ' · ' + years.join(' ') : '')));
+      grid.append(cell);
+    }
+  } else {
+    body.append(el('p', 'note', T('ui.album.note', LANG, { n: DESTS.filter(d => S.album[d.id]).length })));
+    for (const d of DESTS) {
+      const cell = el('button', 'album-cell' + (S.album[d.id] ? '' : ' empty'));
+      if (S.album[d.id]) { thumb(cell, d.id); cell.onclick = () => { UI.view = d.id; UI.side = 'front'; renderPanel(); }; cell.append(el('span', 'album-name', T('pc.' + d.id + '.name'))); }
+      else { cell.append(el('span', 'album-q', d.rare ? '★' : '?')); cell.title = T('ui.album.locked'); }
+      grid.append(cell);
+    }
   }
   body.append(grid);
   const next = () => { const j = jobs.shift(); if (j) { j(); setTimeout(next, 16); } }; setTimeout(next, 30);   // draw thumbnails one by one
+}
+function renderAlbumView(body) {
+  const id = UI.view, fest = id.startsWith('fest-'), fid = fest ? id.slice(5) : null, year = fest ? UI.viewYear : undefined;
+  body.append(flipCard(id, renderPanel, year));
+  if (fest) {
+    const years = (S.festAlbum[fid] || []).slice().sort();
+    body.append(el('p', 'note center', `${T('fest.' + fid)} ${year} · ${T('pc.' + id + '.country')}`));
+    if (years.length > 1) { const row = el('div', 'tabs center'); for (const y of years) { const b = el('button', 'tab' + (y === year ? ' on' : ''), String(y)); b.onclick = () => { UI.viewYear = y; renderPanel(); }; row.append(b); } body.append(row); }
+  } else body.append(el('p', 'note center', `${T('pc.' + id + '.name')} · ${T('pc.' + id + '.country')}  ·  ${T('ui.album.got', LANG, { n: S.album[id] })}`));
+  body.append(el('p', 'note center', T('ui.mail.flip')));
+  // save / share: a 1800×1200 PNG of the front, or front and back side by side
+  const opt = el('div', 'tabs center');
+  for (const both of [false, true]) { const b = el('button', 'tab' + (!!UI.shareBoth === both ? ' on' : ''), T(both ? 'ui.both' : 'ui.frontOnly')); b.onclick = () => { UI.shareBoth = both; renderPanel(); }; opt.append(b); }
+  const row = el('div', 'share-row'), save = el('button', 'pill btn', T('ui.save.img')), share = el('button', 'pill btn', T('ui.share'));
+  const name = `parker-${id}${year ? '-' + year : ''}${UI.shareBoth ? '-both' : ''}.png`;
+  const prep = { file: null }; setTimeout(() => cardBlob(id, year, !!UI.shareBoth).then(b => prep.file = new File([b], name, { type: 'image/png' })), 60);   // ready before the tap, so sharing stays inside the tap
+  save.onclick = async () => saveImage(prep.file || new File([await cardBlob(id, year, !!UI.shareBoth)], name, { type: 'image/png' }));
+  share.onclick = async () => shareImage(prep.file || new File([await cardBlob(id, year, !!UI.shareBoth)], name, { type: 'image/png' }));
+  row.append(save, share); body.append(opt, row);
+  const back = el('button', 'pill btn wide', T('ui.album.back')); back.onclick = () => { UI.view = null; UI.side = 'front'; renderPanel(); }; body.append(back);
+}
+function cardBlob(id, year, both) {
+  const f = postcardCanvas(id, 'front', 2, year); let cv = f;
+  if (both) {
+    const b = postcardCanvas(id, 'back', 2, year), m = 60; cv = mk(f.width * 2 + m * 3, f.height + m * 2); const x = cv.getContext('2d');
+    piece(x, rectP(0, 0, cv.width, cv.height), '#e8dcc8', { scr: 0.2 });
+    for (const [img, dx] of [[f, m], [b, m * 2 + f.width]]) { castShadow(x, k => k.drawImage(img, dx, m), 16, 4, 10, 0.3); x.drawImage(img, dx, m); }
+  }
+  return new Promise(r => cv.toBlob(r, 'image/png'));
+}
+const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+// iPhone (and the home-screen app) can't download into Photos: show the picture full screen to press-and-hold
+function showImage(file) {
+  const url = URL.createObjectURL(file), o = el('div', 'img-overlay'), img = document.createElement('img'), close = el('button', 'pill btn', T('ui.close'));
+  img.src = url; img.alt = T('title'); o.append(img, el('p', 'img-hint', T('ui.longPress')), close);
+  close.onclick = () => { o.remove(); URL.revokeObjectURL(url); }; $('game').append(o);
+}
+function saveImage(file) {
+  if (isIOS()) return showImage(file);
+  try { const a = document.createElement('a'), url = URL.createObjectURL(file); a.href = url; a.download = file.name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000); }
+  catch (e) { showImage(file); }
+}
+async function shareImage(file) {
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: T('title') }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  showToast('ui.shareFail', 3000); saveImage(file);
 }
 
 // ---------- settings: language, sound, export / import the save ----------
@@ -231,13 +282,23 @@ function buildDebug(force) {
     if (!sure) { sure = true; rb.textContent = T('dbg.resetSure'); setTimeout(() => { sure = false; rb.textContent = T('dbg.reset'); }, 3000); return; }
     try { localStorage.removeItem(SAVE_KEY); localStorage.removeItem(CLOCK_KEY); } catch (e) { } window.onpagehide = null; S = null; location.reload();
   });
-  d.append(el('div', 'dbg-title', T('dbg.title')), row, acts, el('div', 'dbg-status'));
+  const dates = el('div', 'dbg-row'); dates.append(el('b', '', T('dbg.date')));
+  const di = document.createElement('input'); di.type = 'date'; di.id = 'dbgDate'; di.className = 'dbg-b';
+  const jumpTo = t => { Clock.offset = t - Date.now(); worldTick(); };
+  const go = el('button', 'dbg-b', T('dbg.jump')); go.onclick = () => { if (di.value) { const [y, m, dd] = di.value.split('-').map(Number); jumpTo(new Date(y, m - 1, dd, 20, 0).getTime()); } };
+  const today = el('button', 'dbg-b', T('dbg.today')); today.onclick = () => { Clock.offset = 0; worldTick(); };
+  dates.append(di, go, today);
+  const fests = el('div', 'dbg-row');
+  for (const f of FESTIVALS) { const b = el('button', 'dbg-b', T('fest.' + f.id)); b.onclick = () => { const y = new Date(Clock.now()).getFullYear(); let t = null; for (const yr of [y, y + 1, y + 2]) { t = festFirstDay(f.id, yr); if (t && t + 7 * 864e5 > Clock.now() - 864e5) break; } if (t) jumpTo(t + 18 * 3600000); }; fests.append(b); }
+  const fr = el('button', 'dbg-b', T('dbg.festReset')); fr.onclick = () => { S.festGot = {}; S.festPending = null; P.carrying = false; writeSave(S); worldTick(); }; fests.append(fr);
+  d.append(el('div', 'dbg-title', T('dbg.title')), row, acts, dates, fests, el('div', 'dbg-status'));
   window.debugRefresh = () => {
     d.querySelectorAll('[data-sp]').forEach(b => b.classList.toggle('on', +b.dataset.sp === Clock.speed));
     try { localStorage.setItem(CLOCK_KEY, String(Clock.offset)); } catch (e) { }
     const now = Clock.now(), m = t => Math.max(0, Math.round((t - now) / 60000)) + ' min';
     const st = S.trip ? `${S.trip.dest} · home in ${m(S.trip.returnAt)} · cards ${S.trip.cards.length}` : S.leaveAt ? `leaves in ${m(S.leaveAt)}` : 'home';
-    d.querySelector('.dbg-status').textContent = `${new Date(now).toLocaleTimeString()} · ${st} · mail ${S.mail.length}`;
+    const fe = activeFestivals(now).map(f => f.id).join('+');
+    d.querySelector('.dbg-status').textContent = `${new Date(now).toLocaleString()} · ${st} · mail ${S.mail.length}${fe ? ' · 🎉 ' + fe : ''}${S.festPending ? ' (pending)' : ''}`;
   };
   debugRefresh();
 }

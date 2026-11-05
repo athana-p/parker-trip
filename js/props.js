@@ -64,6 +64,13 @@ function drawItem(c, id, s = 1) {
       c.fillStyle = PK.eye; c.beginPath(); c.arc(-12, -13, 1.7, 0, TAU); c.fill();
       blush(c, [[-6, -7]], 2.6, 0.6);
       break;
+    case 'card': {
+      c.rotate(-0.12);
+      pp(c, rectP(-24, -16, 48, 32), '#fffaf0', 0.22); pp(c, rectP(-21, -13, 27, 26), '#24366c', 0);
+      glow(c, -8, -2, 10, '255,214,140', 0.6); piece(c, circ(-6, -4, 4), '#ffd98a', { mul: 0.3 }); piece(c, ell(-8, 8, 8, 2.5), '#7fae5a', { mul: 0.3 });
+      pp(c, rectP(10, -12, 9, 10), '#e2574a', 0); for (let k = 0; k < 3; k++) piece(c, rectP(9, 2 + k * 4, 11, 1.4), '#c9b49a', { mul: 0.3 });
+      break;
+    }
     case 'bone':
       P(union(limb([-14, 0], [14, 0], 9, 9), circ(-16, -5, 6), circ(-16, 5, 6), circ(16, -5, 6), circ(16, 5, 6)), '#fbf4e6');
       break;
