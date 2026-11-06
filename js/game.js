@@ -37,6 +37,7 @@ const SPRITES = {
   puff: () => [c => drawPuff(c), { w: 30, h: 22, ox: 15, oy: 11 }, 1, false],
   trot: a => [c => drawStandB(c, { ...trotPose(+a[0]), pack: a[1] === 'pack' }), BOX_STAND, K_DOG],
   stand: a => [c => drawStandB(c, { ...STAND0, expr: a[0], pack: a[1] === 'pack' }), BOX_STAND, K_DOG],
+  door: a => [c => drawDoorNap(c, a[0], +a[1]), BOX_DOOR, 1, false],
   bat: a => [c => drawStandB(c, { ...STAND0, wag: 0.15, legs: { ...STAND0.legs, fn: +a[0] ? { a: 0.95, lift: 16 } : { a: 0.2, lift: 4 } }, head: { view: 'side', dx: 4, dy: 18, rot: 0.25 }, expr: 'happy' }), BOX_STAND, K_DOG],
   tug: a => [c => drawStandB(c, { ...STAND0, tilt: -0.1 - (+a[0]) * 0.03, bob: 3, wag: 0.2 * (+a[0] ? 1 : -1), legs: { fn: { a: 0.55, lift: 0 }, ff: { a: 0.45, lift: 0 }, hn: { a: -0.45, lift: 0 }, hf: { a: -0.38, lift: 0 } }, head: { view: 'side', dx: 6, dy: 14, rot: 0.18 + (+a[0]) * 0.06 }, expr: 'happy' }), BOX_STAND, K_DOG],
   nosepush: a => [c => drawStandB(c, { ...trotPose(+a[0]), head: { view: 'side', dx: 8, dy: 30, rot: 0.38 }, expr: 'happy' }), BOX_STAND, K_DOG],
@@ -135,7 +136,8 @@ function depthScale(d) { return lerp(1, 0.86, clamp((d - 90) / 150)); }
 const P = { x: 230, d: 150, face: -1, mode: 'sit', t0: 0, until: 6, data: {}, lastReact: null, blinkAt: 2, present: true, pack: false, hold: null, want: null };
 const rand = ([a, b]) => a + Math.random() * (b - a);
 function setMode(mode, dur, data = {}) { P.mode = mode; P.t0 = TT; P.until = dur == null ? Infinity : TT + dur; P.data = data; }
-function pickWeighted(w) { const ks = Object.keys(w); let s = ks.reduce((a, k) => a + w[k], 0) * Math.random(); for (const k of ks) { s -= w[k]; if (s <= 0) return k; } return ks[0]; }
+// (a missing or broken weight is skipped, so one bad entry can never leave him stuck doing the first thing on the list)
+function pickWeighted(w) { const ks = Object.keys(w).filter(k => Number.isFinite(w[k]) && w[k] > 0); let s = ks.reduce((a, k) => a + w[k], 0) * Math.random(); for (const k of ks) { s -= w[k]; if (s <= 0) return k; } return ks[0] || Object.keys(w)[0]; }
 function randomSpot() {
   for (let i = 0; i < 30; i++) { const x = 50 + Math.random() * 300, d = 100 + Math.random() * 120; if (Math.abs(x - P.x) > 50) return [x, d]; }
   return [200, 150];
@@ -166,6 +168,8 @@ function pickNext() {
   if (WX_ACTS[k]) return WX_ACTS[k]();
   if (k === 'sniffsnowman') { const m = S.snowman, side = Math.sign(m.x - P.x) || 1; return goTo(clamp(m.x - 62 * side, 30, 370), clamp(m.d - 2, 100, 224), () => faceThen(side, () => setMode('sniff', rand([2.5, 4])))); }
   if (k === 'sniffgift') { const g = S.gifts[Math.floor(Math.random() * S.gifts.length)], side = Math.sign(g.x - P.x) || 1; return goTo(clamp(g.x - 46 * side, 40, 360), clamp(g.d, 100, 224), () => faceThen(side, () => setMode('sniff', rand([2.5, 4])))); }
+  if (k === 'inhouse') return goInHouse(rand(HABITS.duration.inhouse));
+  if (k === 'sleep' && WX.kind === 'rain') return goInHouse(rand(HABITS.duration.sleep));     // a rainy night: he sleeps inside
   if (k === 'sleep') { if (Math.hypot(P.x - BED[0], P.d - BED[1]) > 6) return goTo(BED[0], BED[1], () => faceThen(1, () => setMode('sleep', rand(HABITS.duration.sleep)))); return setMode('sleep', rand(HABITS.duration.sleep)); }
   setMode(k, rand(HABITS.duration[k]));
 }
@@ -200,10 +204,21 @@ function toyPick(x, y, id) {
 }                    // toys that start with a tap of yours (filled in by each toy below)
 // asleep when you want to play: he wakes slowly first (stretchy blink), then joins in. Returns true if he had to wake.
 function wakeThen(fn) {
+  if (P.mode === 'inhouse' || P.mode === 'goin') { if (sleepTime()) P.awakeUntil = TT + HABITS.companyTime; comeOut(fn); return true; }
   if (!/^(sleep|nap|stir|sunnap|sunbelly)$/.test(P.mode)) { fn(); return false; }
   if (sleepTime()) P.awakeUntil = TT + HABITS.companyTime;        // up at night to play: stays up a while, like when you wake him
   setMode('drowsy', 1.8, { then: fn }); const [hx, hy] = parkerCenter(); fx({ type: 'glow', x: hx, y: hy, life: 0.8, r: 70, rgb: '255,240,200' });
   return true;
+}
+// ---- napping inside the doghouse ----
+const DOOR = { x: HOUSE.x + 60, d: HOUSE.d };
+function goInHouse(dur) {
+  if (P.hold && P.hold !== 'ball') dropHeld(); if (P.hold === 'ball') P.hold = null;
+  goTo(DOOR.x, DOOR.d - 14, () => setMode('goin', 0.5, { dur }));
+}
+function comeOut(then) {                 // out through the door, a stretchy blink, then whatever you wanted
+  P.x = DOOR.x; P.d = DOOR.d - 4; P.face = 1;
+  setMode('trot', null, { x: DOOR.x + 30, d: DOOR.d - 22, speed: 50, then: () => setMode('drowsy', 1.4, { then }) });
 }
 // a little puff of paper dust where he lands
 function dustPuff(x, y, n = 6) {
@@ -274,6 +289,7 @@ function updateParker(dt) {
   }
   if (P.mode === 'fetch') return fetchUpdate(dt);
   if (P.mode === 'bubblego') return bubbleUpdate(dt);
+  if (P.mode === 'bubblewait') return bubbleWaitUpdate(dt);
   if (P.mode === 'yarnchase') return yarnChase(dt);
   if (P.mode === 'tug') return tugUpdate(dt);
   if (P.mode === 'kitechase') return kiteChase(dt);
@@ -302,11 +318,12 @@ function updateParker(dt) {
   else if (P.mode === 'chew') { S.toyPos.bone = { x: clamp(P.x + 64 * P.face, 30, 370), d: P.d }; P.hold = null; writeSave(S); setMode('sigh', HABITS.sighTime, { lie: true }); }
   else if (P.mode === 'belly') setMode('sigh', HABITS.sighTime, { lie: true });
   else if (/^cat(boop|bow|side)$/.test(P.mode)) catPlayEnd();
-  else if (P.mode === 'bubblehop' || P.mode === 'bubblewait') bubbleNext();
+  else if (P.mode === 'bubblehop') bubbleNext();
   else if (P.mode === 'yarnbat') yarnAfter();
   else if (P.mode === 'ropewin') ropeDrop();
   else if (P.mode === 'twigput') twigPut();
   else if (P.mode === 'temari') setMode('wag', HABITS.reactionTime.wag);
+  else if (P.mode === 'goin') { P.x = DOOR.x; P.d = DOOR.d; P.face = 1; setMode('inhouse', P.data.dur); }
   else if (P.mode === 'pickup') fetchReturn();
   else if (P.mode === 'present') fetchDrop();
   else if (P.mode === 'pant') { setMode('wag', HABITS.reactionTime.wag); SFX.pop(); }       // rested: ready to play again
@@ -422,6 +439,7 @@ function startArrival() {
 }
 function bagRustle() {          // the sound of a plastic bag: he comes running
   if (!P.present || P.pack || /packup|departLook|arrive|belly/.test(P.mode)) return;
+  if (P.mode === 'inhouse') return wakeThen(() => goTo(200, 104, () => setMode('expect', HABITS.expectTime)));     // the bag! out he comes
   if (/sleep|nap/.test(P.mode)) return setMode('stir', HABITS.stirTime, { back: P.mode, left: Math.max(10, P.until - TT) });
   if (P.hold === 'duck') S.toyPos.duck = { x: clamp(P.x + 30 * P.face, 30, 370), d: P.d };
   if (P.hold === 'bone') S.toyPos.bone = { x: clamp(P.x + 60 * P.face, 30, 370), d: P.d };
@@ -430,6 +448,11 @@ function bagRustle() {          // the sound of a plastic bag: he comes running
 function tapParker() {
   if (/packup|departLook|arrive|fetch|pickup|present|bubble|tug|ropewin|twigput/.test(P.mode) || P.hold === 'twig' || P.pack) return;
   if (P.mode === 'gift') return receiveGift();
+  if (P.mode === 'inhouse') {             // one tap: he opens an eye at you. A few quick taps: he comes out to keep you company
+    P.wakeTaps = TT - (P.lastTap || -9) < 1.5 ? (P.wakeTaps || 0) + 1 : 1; P.lastTap = TT;
+    if (P.wakeTaps >= HABITS.wakeTaps) { P.wakeTaps = 0; return wakeThen(() => { setMode('wag', HABITS.reactionTime.wag); SFX.pop(); }); }
+    P.data.peekUntil = TT + 1.6; return;
+  }
   if (/^(sleep|nap|stir)$/.test(P.mode)) {
     // a few quick taps wake him up; one tap just makes him stir
     P.wakeTaps = TT - (P.lastTap || -9) < 1.5 ? (P.wakeTaps || 0) + 1 : 1; P.lastTap = TT;
@@ -452,6 +475,8 @@ function parkerDrawing() {
   switch (P.mode) {
     case 'trot': key = `trot|${(P.data.slow ? Math.floor(f / 2) : f) % 6}${pk}`; break;
     case 'chase': case 'fetch': case 'bubblego': case 'yarnchase': key = `trot|${f % 6}`; break;
+    case 'goin': key = `trot|${f % 6}`; break;
+    case 'inhouse': key = `door|${TT < (P.data.peekUntil || 0) ? (TT - P.data.peekUntil > -0.25 ? 'blink' : 'calm') : 'sleepy'}|${[0, 0.8, 1.6, 0.8][Math.floor(TT / 0.75) % 4]}`; sx = 1; break;
     case 'kitechase': { const h = P.data.hopT0 != null ? clamp((TT - P.data.hopT0) / 0.6) : 1; if (h < 1) { lift = 28 * Math.sin(Math.PI * h); key = 'sit|happy|0|-0.36'; } else key = P.data.run ? `trot|${f % 6}` : `sit|happy|${f % 4 < 2 ? 0.22 : -0.16}|-0.3`; break; }
     case 'twigput': key = (TT - P.t0) < 0.5 ? 'sit|happy|0|0.1|0|twig' : 'sit|happy|0.2|0.05'; break;
     case 'sprinkplay': { const h = P.data.hopT0 != null ? clamp((TT - P.data.hopT0) / 0.55) : 1; if (h < 1) { lift = 24 * Math.sin(Math.PI * h); key = 'sit|happy|0|-0.3'; } else key = `trot|${f % 6}`; break; }
@@ -459,7 +484,7 @@ function parkerDrawing() {
     case 'ropewin': key = `sit|happy|0|${f % 4 < 2 ? -0.24 : 0.24}|0|rope`; break;      // shaking the rope he won
     case 'yarnbat': key = `bat|${(TT - P.t0) > 0.12 && (TT - P.t0) < 0.4 ? 1 : 0}`; break;
     case 'temari': key = `nosepush|${Math.floor(f / 2) % 6}`; break;
-    case 'bubblewait': key = `sit|happy|${f % 4 < 2 ? 0.2 : -0.15}|-0.32`; break;
+    case 'bubblewait': key = `sit|happy|${f % 6 < 3 ? 0.2 : -0.15}|-0.32`; break;      // wagging, nose up at the bubble
     case 'bubblehop': { const u = clamp((TT - P.t0) / 0.62); lift = 30 * Math.sin(Math.PI * u); key = lift > 6 ? 'sit|happy|0|-0.36' : 'sit|calm|0|-0.24'; break; }
     case 'pickup': key = 'sniff|1'; break;
     case 'present': key = (TT - P.t0) < 0.35 ? 'sit|happy|0|0.1|0|ball' : 'sit|happy|0|0.05'; break;
@@ -502,7 +527,7 @@ function parkerDrawing() {
   if (P.noseSnowUntil > TT && !/^(shake|belly)/.test(key)) key += '|sn';
   return { key, sx, lift };
 }
-function parkerCenter() { const s = depthScale(P.d), lying = isLying(); return [P.x + (lying ? 20 : 4) * P.face * s, Y(P.d) - (lying ? 34 : 64) * s]; }
+function parkerCenter() { if (P.mode === 'inhouse') return [DOOR.x, Y(DOOR.d) - 18]; const s = depthScale(P.d), lying = isLying(); return [P.x + (lying ? 20 : 4) * P.face * s, Y(P.d) - (lying ? 34 : 64) * s]; }
 
 // ---------- particles ----------
 const FX = [];
@@ -529,7 +554,7 @@ function drawFX() {
   }
 }
 function sleepZ() {
-  if (!P.present || !/sleep|nap/.test(P.mode)) return;
+  if (!P.present || !/sleep|nap|inhouse/.test(P.mode) || (P.mode === 'inhouse' && TT < (P.data.peekUntil || 0))) return;
   const k = Math.floor(TT / 2.2);
   if (k !== P.lastZ) { P.lastZ = k; const [x, y] = parkerCenter(); fx({ type: 'spr', key: 'z', x: x + 30 * P.face, y: y - 26, vx: 6 * P.face, vy: -14, sway: k, life: 2.6, rot: -0.15 }); }
 }
@@ -605,12 +630,13 @@ function drawScene() {
       if (grow > 0) drawSprite(sprite(`dand|${f.kind}`), f.x, Y(f.d), { scale: s * lerp(0.2, 1, grow), alpha: Math.min(1, grow * 3), rot: sw });
     } else {
       const s = depthScale(P.d), dr = parkerDrawing(), lying = isLying();
+      if (P.mode === 'inhouse') { drawSprite(sprite(dr.key), DOOR.x, Y(DOOR.d), { shA: 0 }); continue; }        // only his face in the doorway
       const hk = 1 / (1 + dr.lift / 34);                               // the higher he jumps, the smaller and paler his shadow
       ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = `rgba(120,110,120,${0.35 * hk})`;
       ctx.beginPath(); ctx.ellipse(P.x + (lying ? 14 * P.face : 0) * s, Y(P.d) + 1, (lying ? 70 : 52) * s * Math.max(0.6, Math.abs(dr.sx)) * (0.5 + 0.5 * hk), 6 * s * (0.5 + 0.5 * hk), 0, 0, TAU); ctx.fill(); ctx.restore();
       if ((P.prevLift || 0) > 5 && dr.lift < 1) dustPuff(P.x, Y(P.d));
       P.prevLift = dr.lift;
-      drawSprite(sprite(dr.key), P.x, Y(P.d) - dr.lift, { sx: dr.sx, scale: s });
+      drawSprite(sprite(dr.key), P.x, Y(P.d) - dr.lift, { sx: dr.sx, scale: s * (P.mode === 'goin' ? 1 - 0.3 * clamp((TT - P.t0) / 0.5) : 1), alpha: P.mode === 'goin' ? 1 - clamp((TT - P.t0) / 0.5) : 1 });
       if (P.mode === 'turn') glow(ctx, P.x, Y(P.d) - 50 * s, 46, '255,240,200', 0.5);
       if (P.hold === 'twig' && !/^(twigput)$/.test(P.mode)) drawSprite(sprite('item|twig|0.55'), P.x + (P.mode === 'sniff' ? 66 : 70) * P.face * s * Math.abs(dr.sx), Y(P.d) - (P.mode === 'sniff' ? 26 : 56) * s - dr.lift, { scale: s, sx: P.face, rot: 0.1 });
       if (P.hold === 'ball' && !/^(sit|present|wag|tilt|sigh)$/.test(P.mode)) drawSprite(sprite('item|ball|0.42'), P.x + (P.mode === 'pickup' ? 66 : 70) * P.face * s * Math.abs(dr.sx), Y(P.d) - (P.mode === 'pickup' ? 26 : 56) * s - dr.lift, { scale: s, rot: BALL.rot });   // the ball in his mouth
@@ -674,7 +700,7 @@ cv.addEventListener('pointermove', e => {
 cv.addEventListener('pointerup', e => { if (FETCH.drag && e.pointerId === FETCH.drag.id) return ballThrow(); if (TUG.on && e.pointerId === TUG.id) return ropeRelease(); if (KITE.drag && e.pointerId === KITE.drag.id) return kiteUp(); if (!press || e.pointerId !== press.id) return; press.rub ? endBelly() : tapParker(); press = null; });
 cv.addEventListener('pointercancel', () => { if (FETCH.drag) { FETCH.drag = null; } KITE.drag = null; if (TUG.on) ropeRelease(); if (press && press.rub) endBelly(); press = null; });
 function checkRub() {
-  if (!press || press.rub || /sleep|nap|stir|packup|departLook|arrive|gift/.test(P.mode) || P.pack) return;
+  if (!press || press.rub || /sleep|nap|stir|packup|departLook|arrive|gift|inhouse|goin/.test(P.mode) || P.pack) return;
   if (TT - press.t0 > HABITS.bellyRub.hold || press.dist > HABITS.bellyRub.rubDistance) {
     press.rub = true; setMode('belly', null, { nextHeart: TT + 0.3 });
     const [hx, hy] = parkerCenter(); fx({ type: 'glow', x: hx, y: hy, life: 0.6, r: 60, rgb: '255,240,200' });
@@ -745,7 +771,7 @@ function boot() {
   buildDebug(); wireDebugTaps();
   const pose = DEV.get('pose');
   if (pose) { if (pose === 'sleep') { P.x = BED[0]; P.d = BED[1]; P.face = 1; } setMode(pose, 9999); }
-  else if (P.present && sleepTime()) { P.x = BED[0]; P.d = BED[1]; P.face = 1; setMode('sleep', rand(HABITS.duration.sleep)); }
+  else if (P.present && sleepTime()) { if (WX.kind === 'rain') { P.x = DOOR.x; P.d = DOOR.d; P.face = 1; setMode('inhouse', rand(HABITS.duration.sleep)); } else { P.x = BED[0]; P.d = BED[1]; P.face = 1; setMode('sleep', rand(HABITS.duration.sleep)); } }
   let t0 = performance.now(), last = t0, saveAt = 0, todAt = 0, rz = 0;
   addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(layout, 200); });
   addEventListener('visibilitychange', () => { if (document.hidden) writeSave(S); else tickSpawns(); });
@@ -797,7 +823,7 @@ function worldTick() {
 function festGiftTick() {
   const f = S.festPending; if (!f || S.trip || !P.present || (typeof UI !== 'undefined' && UI.panel)) return;
   if (P.mode === 'gift' || (P.carrying && /trot|turn/.test(P.mode))) return;
-  if (/^(sleep|nap|stir)$/.test(P.mode)) { if (!P.giftHinted) { P.giftHinted = true; showToast('toast.giftLater', 4500); } return; }   // he'll give it when he's up
+  if (/^(sleep|nap|stir|inhouse|goin)$/.test(P.mode)) { if (!P.giftHinted) { P.giftHinted = true; showToast('toast.giftLater', 4500); } return; }   // he'll give it when he's up
   if (P.pack || !/^(sit|lie|look|sniff|trot|sigh|eat|expect|watch|wag|tilt|hop|drowsy|shelter|flat|sunnap|waitthrow|pant)$/.test(P.mode)) return;
   if (P.hold === 'duck') S.toyPos.duck = { x: clamp(P.x + 30 * P.face, 30, 370), d: P.d };
   if (P.hold === 'bone') S.toyPos.bone = { x: clamp(P.x + 60 * P.face, 30, 370), d: P.d };
@@ -842,21 +868,33 @@ function bubbleNext() {                  // pick the lowest bubble he can reach 
   const b = ok.reduce((a, c) => c.z < a.z ? c : a);
   setMode('bubblego', null, { b });
 }
+// where to stand for a bubble: just behind it on the side he's facing (he only turns round once it's clearly behind him)
+function bubbleSpot(b) {
+  const side = Math.abs(b.x - P.x) > 14 ? Math.sign(b.x - P.x) : P.face, tx = clamp(b.x - 30 * side, 20, 380), dx = tx - P.x, dd = clamp(b.d, 100, 224) - P.d;
+  return { side, dx, dd, L: Math.hypot(dx, dd) };
+}
 function bubbleUpdate(dt) {
   const b = P.data.b; if (!BUBBLES.includes(b)) return bubbleNext();
-  const side = Math.sign(b.x - P.x) || P.face, tx = b.x - 30 * side, dx = tx - P.x, dd = clamp(b.d, 100, 224) - P.d, L = Math.hypot(dx, dd);
-  if (Math.abs(b.x - P.x) > 8) P.face = side;
-  if (L < 8) {                           // underneath: jump when it's in reach, otherwise wait looking up at it
-    const reach = 118 * depthScale(P.d);
-    return b.z > reach - 40 ? setMode('bubblehop', 0.62, { b, popped: false }) : setMode('bubblewait', 0.25, { b });
-  }
+  const { side, dx, dd, L } = bubbleSpot(b); P.face = side;
+  if (L < 8) return setMode('bubblewait', null, { b });           // underneath it: sit and look up
   const step = Math.min(L, 96 * dt); if (L > 0.01) { P.x += dx / L * step; P.d += dd / L * step; }
+}
+// sitting under a bubble that's still too low: stay sat (shuffling along under it) until it's in reach, then jump.
+// Only if it drifts well away does he get up and trot again — no flicking between sitting and standing.
+function bubbleWaitUpdate(dt) {
+  const b = P.data.b; if (!BUBBLES.includes(b)) return bubbleNext();
+  const { side, dx, dd, L } = bubbleSpot(b);
+  if (L > 34) return setMode('bubblego', null, { b });
+  if (side !== P.face) P.face = side;
+  const step = Math.min(L, 30 * dt); if (L > 0.5) { P.x += dx / L * step; P.d += dd / L * step; }
+  if (b.z > 118 * depthScale(P.d) - 40 && L < 14) setMode('bubblehop', 0.62, { b, popped: false });
 }
 function bubbleHopTick() {
   const u = (TT - P.t0) / 0.62, b = P.data.b;
   if (!P.data.popped && u > 0.45 && BUBBLES.includes(b)) {
     const s = depthScale(P.d), mx = P.x + 36 * P.face * s, my = Y(P.d) - 118 * s - 30, [bx, by] = bubblePos(b);
-    if (Math.hypot(bx - mx, by - my) < 64) { P.data.popped = true; popBubble(b, true); }
+    P.data.popped = true;                // one try per jump; now and then he just misses (so there are some left for you)
+    if (Math.hypot(bx - mx, by - my) < 64 && Math.random() < HABITS.bubbleCatch) popBubble(b, true);
   }
 }
 function drawBubbles() {

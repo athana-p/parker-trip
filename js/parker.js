@@ -435,6 +435,17 @@ function drawLieB(c, expr = 'sleepy', o = {}) {
   c.save(); c.translate(84, -58 - br * 0.5); c.rotate(o.headRot ?? 0.06); c.scale(0.86, 0.86); head3q(c, DESIGNS.B.q.G, expr); c.restore();
 }
 const BOX_LIE = { w: 280, h: 170, ox: 110, oy: 150 };
+// asleep inside his doghouse: just his face, resting on two front paws, in the dark doorway (origin = middle of the door sill).
+// Clipped to the arch of the door, so the rest of him is inside.
+function drawDoorNap(c, expr = 'sleepy', br = 0) {
+  const door = new Path2D(); door.moveTo(-24, 0); door.lineTo(-24, -34); door.arc(0, -34, 24, Math.PI, 0); door.lineTo(24, 0); door.closePath();
+  clipped(c, door, () => {
+    fp(c, union(ell(0, -6, 26, 9), ell(0, -12 - br, 22, 10)), PK.furS, { sh: 0.2 });                 // his back, curled up behind
+    c.save(); c.translate(0, -19 - br * 0.6); c.scale(0.42, 0.42); head3q(c, DESIGNS.B.q.G, expr); c.restore();
+    for (const d of [-1, 1]) fp(c, ell(d * 9, -3, 7.5, 4.6), PK.fur, { sh: 0.18 });                   // front paws on the sill, chin on top
+  });
+}
+const BOX_DOOR = { w: 60, h: 66, ox: 30, oy: 62 };
 // flat out on a hot afternoon (stage 3): belly on the cool ground, hind legs stretched out behind, panting
 function drawFlatB(c, k = 0) {
   const br = k ? 1.2 : 0;

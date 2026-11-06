@@ -15,15 +15,15 @@
 const HABITS = {
   // what he does next when he's free, per time of day
   idle: {
-    morning: { sit: 3, trot: 4, sniff: 2, look: 2, lie: 1, nap: 0.5, sigh: 1 },
-    day:     { sit: 3, trot: 3, sniff: 2, look: 2, lie: 2, nap: 1, sigh: 1 },
-    dusk:    { sit: 4, trot: 2, sniff: 1, look: 2, lie: 3, nap: 1, sigh: 1.5 },
-    evening: { sit: 3, lie: 3, look: 2, sniff: 1, trot: 1, sigh: 2, nap: 1 },   // 19:00–22:00: night sky, but he's still up
+    morning: { sit: 3, trot: 4, sniff: 2, look: 2, lie: 1, nap: 0.5, sigh: 1, inhouse: 0.25 },
+    day:     { sit: 3, trot: 3, sniff: 2, look: 2, lie: 2, nap: 1, sigh: 1, inhouse: 0.35 },
+    dusk:    { sit: 4, trot: 2, sniff: 1, look: 2, lie: 3, nap: 1, sigh: 1.5, inhouse: 0.4 },
+    evening: { sit: 3, lie: 3, look: 2, sniff: 1, trot: 1, sigh: 2, nap: 1, inhouse: 0.5 },   // 19:00–22:00: night sky, but he's still up
     company: { sit: 3, lie: 3, sigh: 2, look: 1 },                   // woken up at night to keep you company: stays close
     night:   { sleep: 1 },            // from bedtime he goes to his door and sleeps
   },
   bedtime: [22, 5],                    // he sleeps from 22:00 to 05:00 (real time)
-  duration: { sit: [5, 10], sniff: [2, 4], look: [2.5, 4], lie: [8, 16], nap: [15, 30], sleep: [60, 120], chew: [8, 14], eat: [3, 5], pant: [14, 22] },
+  duration: { inhouse: [40, 90], sit: [5, 10], sniff: [2, 4], look: [2.5, 4], lie: [8, 16], nap: [15, 30], sleep: [60, 120], chew: [8, 14], eat: [3, 5], pant: [14, 22] },
   trotSpeed: 62,                       // scene units per second
   blinkEvery: [2.5, 5],                // a blink now and then while his eyes are open
   // tapped while awake: one of these (never the same twice in a row)
@@ -35,7 +35,8 @@ const HABITS = {
   fluffChase: 0.8,                     // chance he runs over to boop the seeds of a puff you gathered
   // toys he owns join his free-time choices (not at night), plus a snack at his bowl
   toys: { ball: 2.5, duck: 2, bone: 1.5, yarn: 2.2, temari: 2.2, rope: 1.8 },
-  ropeShake: 2.4,                      // shaking the rope he won, side to side eat: 0.8,
+  eat: 0.8,                            // a snack at his bowl
+  ropeShake: 2.4,                      // shaking the rope he won, side to side
   yarnRounds: 3,                       // paw-swats at the yarn ball before he's done
   temariTime: [7, 11],                 // seconds of nosing the temari ball around
   ballRounds: 3,                       // pushes of the ball before he flops down for a sigh
@@ -47,11 +48,13 @@ const HABITS = {
   expectTime: 6,                       // sitting in front of you after hearing the bag
   // tapped while asleep: he stirs, sighs, and keeps sleeping
   stirTime: 1.4,
+  // napping inside his doghouse (only his face shows in the doorway): rain makes it likely, any time a small chance.
+  // Any toy you play with brings him out; tap him and he opens an eye; tap a few times quickly and he comes out to you.
   wakeTaps: 3,                         // tap him this many times quickly while he sleeps and he gets up to keep you company
   companyTime: 150,                    // …for this many seconds, then back to bed
   // weather: extra free-time choices on top of the usual ones; `calm` scales the usual ones (not at night)
   weather: {
-    rain:  { add: { shelter: 7, splash: 1.2 }, calm: 0.25 },   // under the eave watching; now and then a dash out into it
+    rain:  { add: { inhouse: 6, shelter: 3, splash: 1.2 }, calm: 0.25 },   // mostly a nap inside his house; or under the eave watching; now and then a dash out
     sunny: { add: { sunbathe: 1.6 }, calm: 1 },                // a nap in the sun, then belly-up (morning and day only)
     wind:  { add: { chase: 2.6 }, calm: 0.8 },                 // chases a leaf or petal blowing past
     snow:  { add: { snap: 2.6, snowwalk: 2.2 }, calm: 0.6 },   // snaps at flakes; walks about leaving paw prints
@@ -65,6 +68,7 @@ const HABITS = {
   noseSnow: 9,                         // seconds the snow stays on his nose
   giftSniff: 1.2,
   snowmanSniff: 0.8,
+  bubbleCatch: 0.6,                    // chance a jump at a bubble actually gets it
   sprinklerTime: 25,                   // seconds the sprinkler runs after you turn it on
   sprinkPlay: [7, 11],                 // seconds of jumping about in the spray before he runs out to shake                   // the snowman you built: he goes to sniff it now and then
   // the neighbour's cat comes by while he's home: they say hello (nose boop / he play-bows, she pats his nose / sit side by side)

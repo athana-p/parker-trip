@@ -80,7 +80,7 @@ function drawSquirrel(c, pose = 'sit') {
   pp(c, limb([6, -28], [13, ny + 2], 3.6, 3), SQ.fur, 0.1);
   sqHead(c, 7, -40, nib, nib);
 }
-const BOX_SQ = { w: 90, h: 90, ox: 50, oy: 80 };
+const BOX_SQ = { w: 106, h: 96, ox: 64, oy: 84 };   // wide enough for the tail streaming out behind a hop
 
 // ---------- gifts: feather, pine cone, smooth pebble, little flower, four-leaf clover (rare) ----------
 const GIFTS = ['feather', 'pinecone', 'pebble', 'flower', 'clover'];
