@@ -1062,9 +1062,11 @@ function kiteShadow() { const [top, low] = kiteSky(), u = clamp((low - KITE.y) /
 function kiteChase(dt) {
   if (!KITE.on || KITE.landing) return setMode('wag', HABITS.reactionTime.wag);
   const [sx, sd] = kiteShadow(), dx = sx - P.x, dd = clamp(sd, 100, 224) - P.d, L = Math.hypot(dx, dd);
-  if (Math.abs(dx) > 10) P.face = Math.sign(dx);
-  const step = Math.min(L, 104 * dt); if (L > 4) { P.x += dx / L * step; P.d += dd / L * step; P.data.run = true; } else P.data.run = false;
-  if (L < 30 && TT > P.data.hopAt) { P.data.hopAt = TT + rand([1.2, 2.2]); P.data.hopT0 = TT; }       // a jump up at it
+  if (Math.abs(dx) > 16) P.face = Math.sign(dx);                       // only turn round once the shadow is clearly behind him
+  // run when the shadow has got away, sit (shuffling along under it) once he's caught up: no flicking between the two
+  if (P.data.run ? L < 6 : L > 26) P.data.run = !P.data.run;
+  const step = Math.min(L, (P.data.run ? 104 : 26) * dt); if (L > 0.5) { P.x += dx / L * step; P.d += dd / L * step; }
+  if (!P.data.run && L < 30 && TT > P.data.hopAt) { P.data.hopAt = TT + rand([1.2, 2.2]); P.data.hopT0 = TT; }   // a jump up at it
   if (WX.look === 'snow' && (P.walked = (P.walked || 0) + step) > HABITS.printEvery) leavePrint();
 }
 function drawKiteShadow() {

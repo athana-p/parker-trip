@@ -7,9 +7,9 @@ const Clock = {
 };
 const CLOCK_KEY = 'parker-trip-debug-clock';
 
-const SAVE_KEY = 'parker-trip-save', LANG_KEY = 'parker-trip-lang', SAVE_VERSION = 5;
+const SAVE_KEY = 'parker-trip-save', LANG_KEY = 'parker-trip-lang', SAVE_VERSION = 6;
 function defaultSave(now) {
-  return addV5(addV4(addV3(addV2({ v: SAVE_VERSION, createdAt: now, lastSeen: now, dandelions: 0, field: [], nextSpawnAt: now, seq: 0, seenHint: false }))));
+  return addV6(addV5(addV4(addV3(addV2({ v: SAVE_VERSION, createdAt: now, lastSeen: now, dandelions: 0, field: [], nextSpawnAt: now, seq: 0, seenHint: false })))));
 }
 // upgrade older saves step by step here when the format changes (v1 → v2 → …)
 function migrateSave(s) {
@@ -18,6 +18,7 @@ function migrateSave(s) {
   if (s.v === 2) { addV3(s); s.v = 3; }
   if (s.v === 3) { addV4(s); s.v = 4; }
   if (s.v === 4) { addV5(s); s.v = 5; }
+  if (s.v === 5) { addV6(s); s.v = 6; }
   return s;
 }
 function loadSave() { try { return migrateSave(JSON.parse(localStorage.getItem(SAVE_KEY))); } catch (e) { return null; } }
@@ -42,4 +43,10 @@ function addV4(s) {
 //     All optional, so older v5 saves need nothing.
 function addV5(s) {
   return Object.assign(s, { gifts: [], giftBox: {}, visits: {}, lastGiftAt: 0, homeSay: null, toyNote: null, snowman: null, ...s });
+}
+// v6: albumSolo — places whose card he sent on his own (not with a friend), so the album can show both versions.
+//     Older saves can't tell which one arrived, so every place already in the album counts (better one too many than one lost).
+function addV6(s) {
+  if (!s.albumSolo) { s.albumSolo = {}; for (const id in (s.album || {})) s.albumSolo[id] = true; }
+  return s;
 }

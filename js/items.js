@@ -23,7 +23,8 @@ const CATS = ['food', 'charm', 'toy'];
 const DESTS = [
   { id: 'chiangmai' }, { id: 'pai' }, { id: 'krabi' }, { id: 'floatingmarket' }, { id: 'inthanon' }, { id: 'fuji' },
   { id: 'fushimi' }, { id: 'guilin' }, { id: 'swiss' }, { id: 'istanbul' }, { id: 'egypt' },
-  { id: 'furano', rare: true }, { id: 'dunhuang', rare: true }, { id: 'tekapo', rare: true },
+  { id: 'hoian' }, { id: 'bali' }, { id: 'venice' }, { id: 'santorini' }, { id: 'holland' }, { id: 'paris' },
+  { id: 'furano', rare: true }, { id: 'dunhuang', rare: true }, { id: 'tekapo', rare: true }, { id: 'kenya', rare: true }, { id: 'antarctica', rare: true },
 ];
 const TRIP = {
   baseRare: 0.08,                 // chance of a ★ place without a charm

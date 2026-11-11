@@ -93,6 +93,12 @@ function drawItem(c, id, s = 1) {
       break;
     }
     case 'kite': drawKite(c, true); break;
+    case 'lantern': silkLantern(c, 0, -2, 0.95, '#e2574a', false); break;          // a little silk lantern to carry
+    case 'croissant': {                    // a buttery croissant
+      for (let i = -2; i <= 2; i++) { const a = i * 0.42, r = 14 - Math.abs(i) * 2.6; P(ell(Math.sin(a) * 14, -Math.cos(a) * 6 + 6, r * 0.62, r, a), i % 2 ? '#d99a4a' : '#e8b05a', 0.12); }
+      for (let i = -2; i <= 2; i++) piece(c, ell(Math.sin(i * 0.42) * 14 - 2, -Math.cos(i * 0.42) * 6 + 2, 3, 1.4, i * 0.42), '#f6d890', { mul: 0.3 });
+      break;
+    }
     case 'bouquet': {                      // a little bunch of flowers wrapped in pink paper (for Mommy)
       for (const [x, y, col] of [[-8, -18, '#e2574a'], [6, -22, '#f5c04a'], [-1, -28, '#fff7ee'], [12, -12, '#f2a0c0'], [-14, -8, '#c8a6df']]) { leaf(c, x, y + 8, 10, 3, -1.4 + x * 0.05, '#5f9a52'); fp(c, circ(x, y, 7), col, { sh: 0.12, mul: 0.4 }); piece(c, circ(x, y, 2.4), '#f6c453', { mul: 0.3 }); }
       fp(c, poly([[-20, -8], [20, -8], [4, 26], [-4, 26]]), '#f6c3d2', { sh: 0.18, mul: 0.4 }); piece(c, poly([[-20, -8], [0, -8], [0, 26], [-4, 26]]), '#fbd8e2', { mul: 0.3 });
@@ -228,6 +234,46 @@ function drawSouvenir(c, id, s = 1) {
       const b = new Path2D(); b.moveTo(-6, -36); b.lineTo(6, -36); b.lineTo(6, -28); b.quadraticCurveTo(16, -24, 16, -12); b.lineTo(16, 0); b.lineTo(-16, 0); b.lineTo(-16, -12); b.quadraticCurveTo(-16, -24, -6, -28); b.closePath();
       P(b, '#e8f2f0'); clipped(c, b, () => [['#e8a34a', -4], ['#f3cf6a', -9], ['#d9663f', -13], ['#f2b46a', -18]].forEach(([col, y]) => piece(c, rectP(-20, y - 5, 40, 6), col, { mul: 0.4 })));
       P(rectP(-5, -42, 10, 7), '#b07a50', 0.1); break;
+    }
+    case 'hoian':            // a red silk lantern on a little wooden stand
+      P(rectP(-14, -4, 28, 4), '#7a4a2a'); P(rectP(-1.5, -50, 3, 46), '#7a4a2a', 0.1); P(slab([0, -50], [12, -50], 2.4), '#7a4a2a', 0.05);
+      silkLantern(c, 12, -32, 0.85, '#e2574a', false); break;
+    case 'bali': canangSari(c, 0, -4, 1.3); break;       // a little palm-leaf offering tray with flowers
+    case 'venice': {         // a carnival mask: white and gold, with a feather
+      P(slab([10, -2], [12, -14], 2), '#7a5a3a', 0.05);
+      const m = new Path2D(); m.moveTo(-20, -24); m.quadraticCurveTo(0, -30, 20, -24); m.quadraticCurveTo(22, -10, 10, -10); m.quadraticCurveTo(0, -16, -10, -10); m.quadraticCurveTo(-22, -10, -20, -24); m.closePath();
+      P(m, '#fbf8f2'); clipped(c, m, () => { piece(c, rectP(-22, -26, 44, 4), ARCH.gold, { mul: 0.3 }); piece(c, ell(-14, -16, 6, 3), ARCH.gold, { mul: 0.3 }); });
+      for (const ex of [-8, 8]) P(ell(ex, -19, 4.6, 2.6), '#2a2a36', 0);
+      leaf(c, 16, -26, 26, 5, -1.1, '#5b8ed1'); leaf(c, 14, -26, 22, 4, -1.4, '#c86ad0');
+      break;
+    }
+    case 'santorini': {      // a tiny white house with a blue dome
+      P(rectP(-16, -26, 32, 26), '#fbf8f2'); piece(c, rectP(6, -26, 10, 26), '#e8e4ec', { mul: 0.3 });
+      P(rectP(-6, -16, 8, 16), '#3a6ab0', 0.05); P(rectP(8, -20, 5, 6), '#3a6ab0', 0.05);
+      const d = new Path2D(); d.moveTo(-14, -26); d.arc(0, -26, 14, Math.PI, 0); d.closePath(); P(d, '#2f63b8'); P(slab([0, -40], [0, -48], 1.6), '#fbf8f2', 0); P(slab([-3, -45], [3, -45], 1.4), '#fbf8f2', 0);
+      break;
+    }
+    case 'holland': {        // a wooden clog with a red tulip in it
+      P(limb([0, -16], [0, -38], 2, 1.6), '#5f9a4a', 0.05); leaf(c, 0, -20, 14, 4, -2.2, '#6fae5a');
+      P(poly([[-6, -38], [-5, -48], [0, -42], [5, -48], [6, -38], [0, -34]]), '#e2574a', 0.1);
+      const k = new Path2D(); k.moveTo(-22, -2); k.quadraticCurveTo(-24, -16, -12, -18); k.lineTo(10, -18); k.quadraticCurveTo(24, -16, 26, -4); k.quadraticCurveTo(20, 0, -18, 0); k.closePath();
+      P(k, '#f2c46a'); piece(c, ell(-8, -16, 12, 3), '#8a5a2a', { mul: 0.4 }); piece(c, slab([0, -10], [16, -10], 2), '#e2574a', { mul: 0.3 });
+      break;
+    }
+    case 'paris': eiffel(c, 0, 0, 0.15); break;       // a little Eiffel Tower
+    case 'kenya': {          // a carved wooden giraffe
+      giraffe(c, -4, 0, 0.36, '#c8843e', false);
+      c.save(); c.translate(-4, 0); c.scale(0.36, 0.36); c.fillStyle = '#7a4a22'; for (const [x, y] of [[-6, -44], [6, -50], [20, -82], [18, -104], [-10, -32]]) { c.beginPath(); c.ellipse(x, y, 5, 4, 0.4, 0, TAU); c.fill(); } c.restore();
+      break;
+    }
+    case 'antarctica': {     // a snow globe with a penguin inside
+      P(rectP(-18, -10, 36, 10), '#5b8ed1'); piece(c, rectP(-18, -10, 36, 3), '#8fb6e8', { mul: 0.3 });
+      penguin(c, 0, -12, 0.42, false, 0);
+      c.save(); c.globalAlpha = 0.35; piece(c, circ(0, -30, 20), '#e8f4fc', { mul: 0.1 }); c.restore();
+      c.save(); c.strokeStyle = 'rgba(255,255,255,0.9)'; c.lineWidth = 1.4; c.beginPath(); c.arc(0, -30, 20, 0, TAU); c.stroke(); c.restore();
+      c.fillStyle = '#fff'; for (const [x, y] of [[-8, -40], [6, -44], [10, -30], [-12, -26]]) { c.beginPath(); c.arc(x, y, 1.3, 0, TAU); c.fill(); }
+      piece(c, ell(-8, -40, 5, 2.4, -0.6), '#ffffff', { mul: 0.1 });
+      break;
     }
     case 'egypt': {          // a little golden pyramid on a blue base
       P(rectP(-20, -6, 40, 6), '#3f6fb0'); piece(c, rectP(-20, -6, 40, 2), '#7ab6e8', { mul: 0.3 });

@@ -85,7 +85,7 @@ function keepCard() {
   const m = S.mail.shift(); if (!m) return;
   if (m.fest) addFestCard(m.fest, m.year);
   else if (m.meet) metFriend(m.meet, m.at).card = true;
-  else { S.album[m.dest] = (S.album[m.dest] || 0) + 1; if (m.friend) S.albumFriend[m.dest] = m.friend; }
+  else { S.album[m.dest] = (S.album[m.dest] || 0) + 1; if (m.friend) S.albumFriend[m.dest] = m.friend; else S.albumSolo[m.dest] = true; }   // both versions are kept
   writeSave(S);
 }
 // ---- festivals ----

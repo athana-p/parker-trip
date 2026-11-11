@@ -193,7 +193,7 @@ function renderAlbum(body) {
     body.append(el('p', 'note', T('ui.album.note', LANG, { n: DESTS.filter(d => S.album[d.id]).length, t: DESTS.length })));
     for (const d of DESTS) {
       const cell = el('button', 'album-cell' + (S.album[d.id] ? '' : ' empty'));
-      if (S.album[d.id]) { thumb(cell, d.id, undefined, S.albumFriend[d.id]); cell.onclick = () => { UI.view = d.id; UI.side = 'front'; renderPanel(); }; cell.append(el('span', 'album-name', T('pc.' + d.id + '.name'))); }
+      if (S.album[d.id]) { thumb(cell, d.id, undefined, S.albumFriend[d.id]); if (S.albumFriend[d.id]) cell.append(el('span', 'album-heart', '♥')); cell.onclick = () => { UI.view = d.id; UI.side = 'front'; UI.solo = false; renderPanel(); }; cell.append(el('span', 'album-name', T('pc.' + d.id + '.name'))); }
       else { cell.append(el('span', 'album-q', d.rare ? '★' : '?')); cell.title = T('ui.album.locked'); }
       grid.append(cell);
     }
@@ -227,8 +227,10 @@ function renderFriends(body) {
 }
 function renderAlbumView(body) {
   const id = UI.view, fest = id.startsWith('fest-'), fid = fest ? id.slice(5) : null, year = fest ? UI.viewYear : undefined, meet = id.startsWith('meet-');
-  const friend = !fest && !meet ? S.albumFriend[id] : undefined;
+  // a place he sent both ways (on his own, and with a friend in it): you can switch between the two
+  const fr = !fest && !meet ? S.albumFriend[id] : undefined, both = !!(fr && S.albumSolo[id]), friend = fr && !(both && UI.solo) ? fr : undefined;
   body.append(flipCard(id, renderPanel, year, friend));
+  if (both) { const vr = el('div', 'tabs center'); for (const solo of [true, false]) { const b = el('button', 'tab' + (!!UI.solo === solo ? ' on' : ''), solo ? T('ui.ver.solo') : T('ui.ver.friend', LANG, { name: T('fr.' + fr) })); b.onclick = () => { UI.solo = solo; UI.side = 'front'; renderPanel(); }; vr.append(b); } body.append(vr); }
   if (fest) {
     const years = (S.festAlbum[fid] || []).slice().sort();
     body.append(el('p', 'note center', `${T('fest.' + fid)} ${year} · ${T('pc.' + id + '.country')}`));
@@ -240,7 +242,7 @@ function renderAlbumView(body) {
   const opt = el('div', 'tabs center');
   for (const both of [false, true]) { const b = el('button', 'tab' + (!!UI.shareBoth === both ? ' on' : ''), T(both ? 'ui.both' : 'ui.frontOnly')); b.onclick = () => { UI.shareBoth = both; renderPanel(); }; opt.append(b); }
   const row = el('div', 'share-row'), save = el('button', 'pill btn', T('ui.save.img')), share = el('button', 'pill btn', T('ui.share'));
-  const name = `parker-${id}${year ? '-' + year : ''}${UI.shareBoth ? '-both' : ''}.png`;
+  const name = `parker-${id}${year ? '-' + year : ''}${friend ? '-' + friend : ''}${UI.shareBoth ? '-both' : ''}.png`;
   const prep = { file: null }; setTimeout(() => cardBlob(id, year, !!UI.shareBoth, friend).then(b => prep.file = new File([b], name, { type: 'image/png' })), 60);   // ready before the tap, so sharing stays inside the tap
   save.onclick = async () => saveImage(prep.file || new File([await cardBlob(id, year, !!UI.shareBoth, friend)], name, { type: 'image/png' }));
   share.onclick = async () => shareImage(prep.file || new File([await cardBlob(id, year, !!UI.shareBoth, friend)], name, { type: 'image/png' }));

@@ -1389,6 +1389,358 @@ function pcBdayMomFront(c, W, H, res) {
   vignette(c, W, H, '170,120,100', 0.45, 1.05);
 }
 
+// ================= MORE PLACES (round 4): Hoi An, Bali, Venice, Santorini, the Netherlands, Paris, ★ Kenya, ★ Antarctica =================
+// ---- Hoi An, Vietnam: the old town at night, strings of silk lanterns, little boats on the Thu Bon river ----
+function silkLantern(c, x, y, s, col, lit = true) {
+  c.save(); c.translate(x, y); c.scale(s, s);
+  if (lit) glow(c, 0, 2, 26, '255,190,110', 0.55);
+  pp(c, rectP(-1, -20, 2, 6), '#4a3a32', 0.05);
+  const body = ell(0, 2, 11, 14); pp(c, body, col, 0.15);
+  clipped(c, body, () => { for (const dx of [-6, 0, 6]) piece(c, ell(dx, 2, 1.2, 15), shade(col, 0.8), { mul: 0.3 }); piece(c, ell(-3, -3, 4, 7), 'rgba(255,240,200,0.35)', { mul: 0 }); });
+  pp(c, rectP(-6, -14, 12, 3), '#3a2a26', 0.05); pp(c, rectP(-6, 15, 12, 3), '#3a2a26', 0.05);
+  pp(c, limb([0, 18], [0, 28], 1.4, 2.4), '#e8b84a', 0.05);
+  c.restore();
+}
+function lanternRow(c, x0, x1, y, sag, n, cols, s = 0.8) {
+  c.save(); c.strokeStyle = 'rgba(40,30,30,0.7)'; c.lineWidth = 1.2; c.beginPath();
+  for (let i = 0; i <= 30; i++) { const u = i / 30, px = lerp(x0, x1, u), py = y + sag * 4 * u * (1 - u); i ? c.lineTo(px, py) : c.moveTo(px, py); } c.stroke(); c.restore();
+  for (let i = 0; i < n; i++) { const u = (i + 0.5) / n; silkLantern(c, lerp(x0, x1, u), y + sag * 4 * u * (1 - u) + 20 * s, s, cols[i % cols.length]); }
+}
+function hoianHouse(c, x, by, w, h, wall, seed) {
+  const r = rng(seed), shut = ['#3f7a6a', '#4a6a9a', '#7a4a3a'][Math.floor(r() * 3)];
+  pp(c, rectP(x, by - h, w, h), wall, 0.22);
+  clipped(c, rectP(x, by - h, w, h), () => { piece(c, rectP(x, by - h, w, 10), shade(wall, 0.85), { mul: 0.3 }); for (let k = 0; k < 5; k++) piece(c, ell(x + r() * w, by - r() * h, 10 + r() * 14, 5 + r() * 6), shade(wall, 0.9), { mul: 0.2 }); });   // old weathered plaster
+  // upstairs: a window with wooden shutters and a little balcony
+  const uy = by - h + 26, n = w > 110 ? 2 : 1;
+  for (let k = 0; k < n; k++) { const wx = x + w * (n === 1 ? 0.5 : 0.28 + k * 0.44) - 10; glow(c, wx + 10, uy + 12, 22, '255,200,120', 0.55); pp(c, rectP(wx, uy, 20, 24), '#ffd27a', 0.05); pp(c, rectP(wx - 9, uy - 1, 8, 26), shut, 0.08); pp(c, rectP(wx + 21, uy - 1, 8, 26), shut, 0.08); }
+  pp(c, rectP(x + 6, uy + 28, w - 12, 4), '#6a3a2a', 0.1); for (let k = 0; k < (w - 12) / 9; k++) piece(c, rectP(x + 8 + k * 9, uy + 32, 2, 10), '#6a3a2a', { mul: 0.3 });
+  // downstairs: open wooden doors, warm light inside
+  const dw = Math.min(56, w - 24), dx = x + (w - dw) / 2;
+  glow(c, dx + dw / 2, by - 24, 40, '255,190,110', 0.6); pp(c, rectP(dx, by - 44, dw, 44), '#f6b85a', 0.05);
+  for (const sx of [dx - 2, dx + dw - 10]) pp(c, rectP(sx, by - 46, 12, 46), '#7a4a2a', 0.1);
+  // the tiled roof with upturned eaves, lanterns hung beneath
+  const roof = poly([[x - 12, by - h + 6], [x + w + 12, by - h + 6], [x + w - 2, by - h - 20], [x + 2, by - h - 20]]); pp(c, roof, '#5a3a32', 0.2);
+  clipped(c, roof, () => { for (let k = 0; k < w + 24; k += 7) piece(c, rectP(x - 12 + k, by - h - 22, 2.4, 30), '#3f2824', { mul: 0.4 }); });
+  for (const ex of [x - 12, x + w + 12]) pp(c, poly([[ex, by - h + 6], [ex + (ex < x ? -6 : 6), by - h - 2], [ex, by - h + 1]]), '#5a3a32', 0.05);
+  const lc = ['#e2574a', '#f5c04a', '#e98a8a', '#4fa07a'];
+  for (let k = 0; k < 2; k++) silkLantern(c, x + w * (0.18 + k * 0.64), by - h + 22, 0.55, lc[(Math.floor(r() * 4) + k) % 4]);
+}
+function lampBoat(c, x, y, s, col, flip) {
+  c.save(); c.translate(x, y); c.scale(flip ? -s : s, s);
+  pp(c, poly([[-60, -8], [56, -8], [70, -18], [52, 6], [-46, 6], [-66, -16]]), col, 0.2); piece(c, rectP(-56, -8, 108, 3), '#e8c47a', { mul: 0.3 });
+  pp(c, poly([[-16, -8], [-16, -30], [18, -30], [22, -8]]), '#3a2a26', 0.1);
+  for (const dx of [-40, 34]) silkLantern(c, dx, -32, 0.6, dx < 0 ? '#e2574a' : '#f5c04a');
+  c.restore();
+}
+function pcHoiAn(c, W, H) {
+  skyBands(c, W, ['#1b2350', '#26306a', '#353f80', '#4a4a8e', '#6a5a96'], 40, 220, 2400);
+  const rs = rng(2401); for (let k = 0; k < 40; k++) { c.fillStyle = `rgba(255,246,214,${0.3 + rs() * 0.5})`; c.beginPath(); c.arc(rs() * W, rs() * 160, 0.6 + rs(), 0, TAU); c.fill(); }
+  glow(c, 760, 90, 80, '255,240,200', 0.5); tornPiece(c, ellipsePts(760, 90, 22, 22, 30), '#fff2c4', { amp: 1, seed: 2402, shadow: 0, rimCol: '#fffbe8' });
+  const cols = ['#f2c14a', '#e9b04a', '#f0cc66', '#e6a84a', '#f4d27a'], r = rng(2403);
+  let x = -20; while (x < W) { const w = 100 + r() * 50, h = 120 + r() * 40; hoianHouse(c, x, 340, w, h, cols[Math.floor(r() * cols.length)], 2410 + x | 0); x += w + 14; }
+  lanternRow(c, -20, 480, 70, 46, 8, ['#e2574a', '#f5c04a', '#4fa07a', '#e98a8a', '#5b8ed1'], 1.05);
+  lanternRow(c, 420, 920, 56, 56, 8, ['#f5c04a', '#e2574a', '#c86ad0', '#4fa07a', '#f08a3c'], 1.05);
+  strip(c, -20, W + 20, x => 346 + 2 * fbm1(x / 90, 3), H, '#9a8a70', { seed: 2404, rimCol: '#c8b894', shadow: 0.15 });
+  strip(c, -20, W + 20, x => 362 + 1.5 * fbm1(x / 80, 4), H, '#2a3870', { seed: 2405, rimCol: '#4a5aa0', amp: 1.5, shadow: 0.12 });
+  for (const gx of [120, 260, 420, 600, 780]) wavyGlints(c, gx, 380, 4, 30, 2406 + gx, '#ffd98a', '#f6b06a');
+  lampBoat(c, 640, 430, 0.9, '#4a6a9a', false); lampBoat(c, 200, 470, 1.0, '#6a4a3a', true);
+  const rf = rng(2407); for (let k = 0; k < 10; k++) { const fx = rf() * W, fy = 400 + rf() * 120; glow(c, fx, fy, 16, '255,200,120', 0.7); pp(c, poly([[fx - 7, fy], [fx, fy - 8], [fx + 7, fy], [fx, fy + 3]]), ['#e2574a', '#f5c04a', '#f2a0c0'][k % 3], 0.05); }   // little floating candle lanterns
+  strip(c, -20, W + 20, x => 520 + 3 * fbm1(x / 120, 5), H, '#8a7a6a', { seed: 2408, rimCol: '#b8a890', shadow: 0.22 });
+  for (let k = 0; k < 9; k++) piece(c, rectP(-20, 536 + k * 9, W + 40, 1.3), '#6e6052', { mul: 0.4 });
+}
+function pcHoiAnFront(c, W, H, res) {
+  pcHoiAn(c, W, H);
+  pcParker(c, res, BOX_SIT, 0.86, p => drawSitB(p, 'happy', 0.15, { pack: true, mouth: 'lantern' }), 460, 590);
+  vignette(c, W, H, '60,50,100', 0.42, 1.0);
+}
+
+// ---- Bali, Indonesia: rice terraces in the morning, coconut palms, a swing hung from a palm ----
+function pcBali(c, W, H) {
+  skyBands(c, W, ['#9fd0ee', '#b4daee', '#cfe6ea', '#e6efe0', '#f4eed6'], 40, 200, 2500);
+  // the volcano in the haze
+  tornPiece(c, [[380, 210], [560, 80], [600, 76], [790, 210]], '#a8b8b8', { amp: 2, seed: 2501, rim: 0, shadow: 0.06 });
+  c.save(); c.globalAlpha = 0.5; strip(c, -20, W + 20, x => 196 + 4 * Math.sin(x / 70), H, '#f4f6f0', { seed: 2502, rim: 0, shadow: 0, amp: 3 }); c.restore();
+  // terraces: many narrow steps that all follow the same contour of the hill, each with a bright lip and a dark riser
+  const greens = ['#a8d67a', '#94cc6a', '#b4dc86', '#86c45e', '#9ed072', '#7cbc56', '#a2d276', '#72b450', '#94ca66', '#68aa48', '#8cc462', '#5fa244', '#84be5c', '#58983e'];
+  const hill = x => 46 * Math.sin(x / 210 + 0.5) + 18 * Math.sin(x / 85 + 1.7);
+  for (let i = 0; i < greens.length; i++) {
+    const y0 = 214 + i * 27 + i * i * 0.9, k = 0.55 + i * 0.05, wet = i % 4 === 2;
+    strip(c, -40, W + 40, x => y0 + hill(x) * k + 1.5 * fbm1(x / 50, i), H, wet ? '#9ccab8' : greens[i], { seed: 2510 + i, rimCol: '#e0f4b8', rimA: 0.95, shadow: 0.28, amp: 1.5 });
+    const rr = rng(2520 + i); if (!wet) for (let j = 0; j < 26; j++) { const x = rr() * W, y = y0 + hill(x) * k + 8 + rr() * 12; piece(c, slab([x, y], [x + 1, y - 5 - i * 0.3], 1.3), shade(greens[i], 0.8), { mul: 0.3 }); }   // rows of rice plants
+    else wavyGlints(c, 200 + rr() * 500, y0 + 14, 2, 60, 2540 + i, '#ffffff', '#d6f0ea');                                            // a flooded terrace catching the sky
+  }
+  palm(c, 70, 330, 220, 1.2, 2530); palm(c, 830, 360, 180, 1.0, 2531); palm(c, 760, 300, 140, 0.8, 2532);
+}
+function canangSari(c, x, y, s) {
+  c.save(); c.translate(x, y); c.scale(s, s);
+  pp(c, poly([[-18, -4], [18, -4], [14, 6], [-14, 6]]), '#9ac46a', 0.2);
+  for (const [dx, col] of [[-10, '#fff7ee'], [-3, '#f5c04a'], [4, '#e2574a'], [11, '#c86ad0']]) for (const dy of [-8, -12]) piece(c, circ(dx + (dy === -12 ? 3 : 0), dy, 3.4), col, { mul: 0.3 });
+  pp(c, slab([4, -10], [8, -24], 1.2), '#8a6a4a', 0.05); c.save(); c.globalAlpha = 0.5; for (let k = 0; k < 3; k++) { c.strokeStyle = '#f6f2ea'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(8, -24 - k * 8); c.quadraticCurveTo(14, -30 - k * 8, 8, -34 - k * 8); c.stroke(); } c.restore();   // a stick of incense
+  c.restore();
+}
+function pcBaliFront(c, W, H, res) {
+  pcBali(c, W, H);
+  // the swing hangs from a big coconut palm leaning right over the terraces
+  const bz = u => { const P0 = [880, 640], P1 = [820, 200], P2 = [640, 40], P3 = [420, 70], v = 1 - u; return [v * v * v * P0[0] + 3 * v * v * u * P1[0] + 3 * v * u * u * P2[0] + u * u * u * P3[0], v * v * v * P0[1] + 3 * v * v * u * P1[1] + 3 * v * u * u * P2[1] + u * u * u * P3[1]]; };
+  for (let i = 0; i < 24; i++) { const a = bz(i / 24), b = bz((i + 1) / 24), w = lerp(22, 11, i / 24); pp(c, limb(a, b, w, w * 0.94), i % 3 ? '#8a6a42' : '#7a5a38', 0.12); }
+  const top = bz(1); for (let i = 0; i < 8; i++) leaf(c, top[0], top[1], 70, 11, Math.PI * (0.75 + i * 0.22), i % 2 ? '#4f8a4a' : '#5f9a52');
+  for (let i = 0; i < 3; i++) pp(c, circ(top[0] + 8 + i * 9, top[1] + 10, 7), '#6a8a3a', 0.12);           // coconuts
+  const sx = 520, seat = 470, ropeTop = x => { let best = bz(0); for (let i = 0; i <= 60; i++) { const p = bz(i / 60); if (Math.abs(p[0] - x) < Math.abs(best[0] - x)) best = p; } return best; };
+  for (const dx of [-44, 44]) { const t = ropeTop(sx + dx * 0.8); pp(c, slab([t[0], t[1] + 6], [sx + dx, seat], 3), '#c9a46a', 0.12); }
+  pcParker(c, res, BOX_SIT, 0.78, p => drawSitB(p, 'happy', 0.2, { pack: true }), sx - 4, seat - 4);
+  pp(c, rectP(sx - 56, seat - 6, 112, 12), '#a8743e', 0.25); piece(c, rectP(sx - 56, seat - 6, 112, 3), '#c8945e', { mul: 0.3 });
+  canangSari(c, 230, 584, 2.0); canangSari(c, 140, 592, 1.5);
+  vignette(c, W, H, '150,170,140', 0.45, 1.05);
+}
+
+// ---- Venice, Italy: a canal between pastel palazzi, a little arched bridge, a gondola ----
+function palazzo(c, x, by, w, h, col, seed) {
+  pp(c, rectP(x, by - h, w, h), col, 0.2);
+  const r = rng(seed), rows = Math.floor(h / 46), cols = Math.max(2, Math.floor(w / 30));
+  for (let i = 0; i < rows; i++) for (let j = 0; j < cols; j++) {
+    const wx = x + 10 + j * (w - 20) / cols + 3, wy = by - h + 18 + i * 46, ww = (w - 20) / cols - 6, wh = 26;
+    const win = new Path2D(); win.moveTo(wx, wy + wh); win.lineTo(wx, wy + ww / 2); win.arc(wx + ww / 2, wy + ww / 2, ww / 2, Math.PI, 0); win.lineTo(wx + ww, wy + wh); win.closePath();
+    pp(c, win, '#4a5a6a', 0.05); piece(c, rectP(wx - 2, wy + wh, ww + 4, 3), '#f6efe2', { mul: 0.3 });
+    if (r() < 0.3) for (let f = 0; f < 3; f++) piece(c, circ(wx + 3 + f * (ww - 6) / 2, wy + wh + 3, 2.4), ['#e2574a', '#f2a0c0', '#fff7ee'][f], { mul: 0.3 });   // window-box flowers
+  }
+  pp(c, rectP(x - 3, by - h - 6, w + 6, 7), shade(col, 0.85), 0.1);
+}
+function gondola(c, x, y, s, flip) {
+  c.save(); c.translate(x, y); c.scale(flip ? -s : s, s);
+  const hull = new Path2D(); hull.moveTo(-170, -24); hull.quadraticCurveTo(-120, 10, 0, 10); hull.quadraticCurveTo(130, 10, 176, -38); hull.lineTo(170, -42); hull.quadraticCurveTo(120, -6, 0, -8); hull.quadraticCurveTo(-110, -8, -164, -30); hull.closePath();
+  pp(c, hull, '#22222a', 0.25); piece(c, slab([-150, -14], [150, -16], 2), '#5a4a3a', { mul: 0.3 });
+  pp(c, poly([[176, -38], [190, -60], [186, -44], [196, -50], [186, -34]]), '#d8d0c0', 0.1);                      // the ferro on the prow
+  pp(c, rectP(-40, -24, 70, 14), '#a8322e', 0.12); for (let k = 0; k < 4; k++) piece(c, circ(-30 + k * 17, -18, 2), ARCH.gold, { mul: 0.3 });   // a red cushioned seat
+  c.restore();
+}
+function pcVenice(c, W, H) {
+  skyBands(c, W, ['#8cc4ea', '#a4d0ec', '#c4dcea', '#e6e4d4', '#f6dcb8'], 40, 180, 2600);
+  const cols = ['#e8a87a', '#f2c88a', '#d98a7a', '#f4dcb0', '#e8b0a0', '#d9b88a'], r = rng(2601);
+  let x = -30; while (x < 330) { const w = 70 + r() * 40, h = 190 + r() * 80; palazzo(c, x, 380, w, h, cols[Math.floor(r() * cols.length)], 2610 + x); x += w + 2; }
+  x = 570; while (x < W + 30) { const w = 70 + r() * 40, h = 190 + r() * 80; palazzo(c, x, 380, w, h, cols[Math.floor(r() * cols.length)], 2620 + x); x += w + 2; }
+  // the far end of the canal: a campanile and a dome in the haze
+  pp(c, rectP(430, 150, 26, 210), '#c8a090', 0.1); pp(c, poly([[426, 152], [443, 110], [460, 152]]), '#8a9a8a', 0.1);
+  const dome = new Path2D(); dome.moveTo(470, 300); dome.arc(510, 300, 40, Math.PI, 0); dome.closePath(); pp(c, dome, '#b0c0c4', 0.1); pp(c, rectP(466, 300, 88, 60), '#d8c8b0', 0.1);
+  // the little stone bridge
+  const br = new Path2D(); br.moveTo(320, 380); br.lineTo(320, 330); br.quadraticCurveTo(450, 270, 580, 330); br.lineTo(580, 380); br.lineTo(552, 380); br.quadraticCurveTo(450, 300, 348, 380); br.closePath();
+  pp(c, br, '#f0e6d4', 0.25); for (let k = 0; k < 9; k++) { const u = k / 8, px = lerp(330, 570, u), py = 330 - Math.sin(u * Math.PI) * 30; pp(c, rectP(px - 2, py - 18, 4, 18), '#e6dac4', 0.05); } pp(c, slab([322, 314], [450, 282], 4), '#e6dac4', 0.05); pp(c, slab([450, 282], [578, 314], 4), '#e6dac4', 0.05);
+  // the canal
+  strip(c, -20, W + 20, x => 380 + 1.5 * fbm1(x / 80, 2), H, '#3f9a9a', { seed: 2602, rimCol: '#9ad8d0', amp: 1.5, shadow: 0.1 });
+  wavyGlints(c, 450, 400, 6, 140, 2603, '#ffffff', '#c8ecec');
+  for (const [px, col] of [[150, '#5b8ed1'], [190, '#5b8ed1'], [720, '#e2574a'], [760, '#e2574a']]) { pp(c, rectP(px - 4, 330, 8, 150), '#f6efe2', 0.15); clipped(c, rectP(px - 4, 330, 8, 150), () => { for (let k = 0; k < 8; k++) piece(c, slab([px - 6, 336 + k * 20], [px + 6, 344 + k * 20], 5), col, { mul: 0.3 }); }); }   // striped mooring poles
+}
+function pcVeniceFront(c, W, H, res) {
+  pcVenice(c, W, H);
+  gondola(c, 470, 560, 1.15, false);
+  pcParker(c, res, BOX_SIT, 0.8, p => drawSitB(p, 'happy', 0.15, { pack: true, scarf: true }), 560, 530);
+  vignette(c, W, H, '120,150,160', 0.45, 1.05);
+}
+
+// ---- Santorini, Greece: white houses tumbling down the cliff, blue domes, the Aegean at sunset ----
+function whiteHouse(c, x, by, w, h, seed) {
+  const r = rng(seed); pp(c, rectP(x, by - h, w, h), '#fbf8f2', 0.22); piece(c, rectP(x + w * 0.65, by - h, w * 0.35, h), '#e8e4ec', { mul: 0.3 });
+  if (r() < 0.8) pp(c, rectP(x + w * 0.3, by - h * 0.6, w * 0.22, h * 0.36), r() < 0.5 ? '#3a6ab0' : '#5a8ad0', 0.05);
+  if (r() < 0.5) pp(c, rectP(x + w * 0.66, by - h * 0.7, w * 0.16, h * 0.2), '#3a6ab0', 0.05);
+}
+function blueDome(c, x, by, r) {
+  pp(c, rectP(x - r, by - r * 0.7, r * 2, r * 0.7), '#fbf8f2', 0.2);
+  const d = new Path2D(); d.moveTo(x - r, by - r * 0.7); d.arc(x, by - r * 0.7, r, Math.PI, 0); d.closePath(); pp(c, d, '#2f63b8', 0.2);
+  piece(c, ell(x - r * 0.35, by - r * 1.2, r * 0.25, r * 0.4, -0.5), '#6a96e0', { mul: 0.2 });
+  pp(c, slab([x, by - r * 1.7], [x, by - r * 2.2], 2), '#fbf8f2', 0.05); pp(c, slab([x - 5, by - r * 2], [x + 5, by - r * 2], 2), '#fbf8f2', 0.05);
+}
+function pcSantorini(c, W, H) {
+  skyBands(c, W, ['#6a6aa8', '#a07aae', '#e092a0', '#f4ae86', '#f8d08e'], 40, 300, 2700);
+  glow(c, 650, 290, 280, '255,190,130', 0.6); tornPiece(c, ellipsePts(650, 292, 34, 34, 40), '#ffd98a', { amp: 1.2, seed: 2701, shadow: 0, rimCol: '#fff3cc' });
+  tornPiece(c, [[700, 300], [780, 270], [900, 284], [920, 310], [700, 310]], '#7a6a8a', { amp: 2, seed: 2702, rim: 0, shadow: 0.06 });   // an island far off
+  strip(c, -20, W + 20, x => 304 + 1.5 * fbm1(x / 70, 2), H, '#3a5a9a', { seed: 2703, rimCol: '#f4b080', amp: 1.5, shadow: 0.1 });
+  wavyGlints(c, 650, 320, 6, 120, 2704, '#ffd98a', '#f6b06a');
+  // the cliff and the village tumbling down it
+  const cliff = x => 120 + x * 0.42 + 20 * Math.sin(x / 70);
+  tornPiece(c, [[-20, 120], ...[...Array(13)].map((_, i) => [i * 40, cliff(i * 40)]), [480, 600], [-20, 600]], '#b8826a', { amp: 3, seed: 2705, rimCol: '#d8a080', shadow: 0.2 });
+  // the village: rows of white houses stepping down the cliff, back rows first
+  const r = rng(2706);
+  for (let row = 0; row < 7; row++) for (let x = -30 + (row % 2) * 26; x < 470; x += 46 + r() * 16) {
+    const base = cliff(x + 20) + 6 + row * 34; if (base > 470 || base < 110) continue;
+    whiteHouse(c, x, base, 48 + r() * 16, 36 + r() * 16, 2710 + row * 40 + x | 0);
+    if (r() < 0.25) pp(c, rectP(x - 2, base - 2, 56, 5), '#f2eee8', 0.08);                                   // a terrace ledge
+  }
+  blueDome(c, 120, 250, 32); blueDome(c, 330, 352, 26); blueDome(c, 230, 420, 22);
+  pp(c, rectP(250, 210, 32, 54), '#fbf8f2', 0.2); pp(c, poly([[246, 212], [266, 182], [286, 212]]), '#2f63b8', 0.15); pp(c, rectP(260, 220, 12, 16), '#4a5a6a', 0);   // a little bell tower
+  // the whitewashed terrace and steps in front
+  strip(c, -20, W + 20, x => 470 + 2 * fbm1(x / 120, 3), H, '#f6f2ec', { seed: 2707, rimCol: '#ffffff', shadow: 0.22 });
+  for (let k = 0; k < 4; k++) pp(c, rectP(560 + k * 24, 470 - k * 22, 340 - k * 24, 24), '#f2eee8', 0.15);
+  const bg = rng(2708); for (let k = 0; k < 26; k++) piece(c, circ(20 + bg() * 160, 440 + bg() * 40, 4 + bg() * 4), k % 3 ? '#e8509a' : '#f27ab4', { mul: 0.3 });   // bougainvillea over the wall
+  for (let k = 0; k < 6; k++) leaf(c, 30 + k * 26, 470, 18, 5, -1.2 + k * 0.2, '#4f8a4a');
+}
+function pcSantoriniFront(c, W, H, res) {
+  pcSantorini(c, W, H);
+  pp(c, poly([[196, 540], [236, 540], [232, 580], [200, 580]]), '#3a6ab0', 0.2); for (let k = 0; k < 6; k++) piece(c, circ(200 + k * 7, 532 - (k % 2) * 7, 6), '#e8509a', { mul: 0.3 });   // a blue pot of flowers
+  pcParker(c, res, BOX_WAVE, 0.92, p => drawWaveB(p, 1, { pack: true }), 440, 590);
+  vignette(c, W, H, '150,110,140', 0.45, 1.05);
+}
+
+// ---- the Netherlands: stripes of tulips running to the horizon, windmills by a canal ----
+function windmill(c, x, by, s, rot) {
+  c.save(); c.translate(x, by); c.scale(s, s);
+  pp(c, poly([[-26, 0], [-16, -110], [16, -110], [26, 0]]), '#7a5a4a', 0.25); pp(c, poly([[-18, -110], [0, -134], [18, -110]]), '#4a3a3a', 0.2);
+  pp(c, rectP(-8, -30, 16, 30), '#4a3a32', 0); pp(c, rectP(-26, -48, 52, 5), '#5a4a3a', 0.1);
+  c.save(); c.translate(0, -112); c.rotate(rot);
+  for (let i = 0; i < 4; i++) { c.save(); c.rotate(i * Math.PI / 2); pp(c, rectP(-3, -86, 6, 86), '#e6dccc', 0.12); pp(c, rectP(3, -82, 16, 64), '#f6efe2', 0.1); clipped(c, rectP(3, -82, 16, 64), () => { for (let k = 0; k < 6; k++) piece(c, rectP(3, -80 + k * 11, 16, 1.4), '#b8ab98', { mul: 0.4 }); }); c.restore(); }
+  pp(c, circ(0, 0, 6), '#4a3a32', 0.1); c.restore(); c.restore();
+}
+function pcHolland(c, W, H) {
+  skyBands(c, W, ['#78bce8', '#92c8ec', '#b2d8ee', '#d6eaf0', '#eef4ec'], 40, 250, 2800);
+  for (const [x, y, w] of [[180, 90, 80], [600, 60, 100], [820, 130, 60]]) tornPiece(c, ellipsePts(x, y, w, w * 0.3, 30), '#ffffff', { amp: 2.5, seed: 2801 + x, rimCol: '#ffffff', shadow: 0.08, mul: 0.5 });
+  strip(c, -20, W + 20, x => 262 + 2 * fbm1(x / 70, 2), H, '#8cc86a', { seed: 2802, rimCol: '#c8e8a8', shadow: 0.1 });
+  windmill(c, 700, 268, 0.95, 0.3); windmill(c, 820, 262, 0.6, 0.9); windmill(c, 120, 264, 0.5, 0.6);
+  strip(c, -20, W + 20, x => 272 + 1 * fbm1(x / 60, 3), H, '#5a9ac8', { seed: 2803, rimCol: '#b8e0f0', amp: 1, shadow: 0.08 });   // the canal
+  strip(c, -20, W + 20, x => 282 + 1.5 * fbm1(x / 60, 4), H, '#7cbc58', { seed: 2804, rimCol: '#b8e09a', shadow: 0.12 });
+  // tulip stripes running to a point on the horizon
+  const vx = 450, vy = 270, cols = ['#e2574a', '#f5c04a', '#f2a0c0', '#9a6ad0', '#fff7ee', '#e2574a', '#f08a3c', '#f2a0c0'], n = 16;
+  for (let i = 0; i < n; i++) {
+    const a0 = lerp(-1400, 2300, i / n), a1 = lerp(-1400, 2300, (i + 0.62) / n), col = cols[i % cols.length];
+    pp(c, poly([[vx + (a0 - vx) * 0.01, 290], [vx + (a1 - vx) * 0.01, 290], [a1, 620], [a0, 620]]), col, 0.08, { mul: 0.45 });
+    const g0 = lerp(-1400, 2300, (i + 0.62) / n), g1 = lerp(-1400, 2300, (i + 1) / n);
+    piece(c, poly([[vx + (g0 - vx) * 0.01, 290], [vx + (g1 - vx) * 0.01, 290], [g1, 620], [g0, 620]]), '#5f9a4a', { mul: 0.4 });
+    const rr = rng(2810 + i); for (let k = 0; k < 7; k++) { const u = 0.45 + rr() * 0.55, y = lerp(290, 620, u), ax = lerp(vx + (a0 - vx) * 0.01, a0, u), bx = lerp(vx + (a1 - vx) * 0.01, a1, u), tx = lerp(ax, bx, 0.2 + rr() * 0.6), sz = 3 + u * 7; pp(c, poly([[tx - sz, y], [tx - sz * 0.8, y - sz * 1.5], [tx, y - sz * 1.1], [tx + sz * 0.8, y - sz * 1.5], [tx + sz, y], [tx, y + sz * 0.6]]), shade(col, 1.08), 0.08); }   // a few tulip heads, bigger nearer
+  }
+}
+function pcHollandFront(c, W, H, res) {
+  pcHolland(c, W, H);
+  pcParker(c, res, BOX_LIE, 0.88, p => drawLieB(p, 'happy', { headRot: -0.06 }), 400, 576);
+  for (const [x, y, col] of [[566, 548, '#f2a0c0'], [540, 520, '#e2574a'], [300, 560, '#f5c04a']]) { const s = 9; pp(c, poly([[x - s, y], [x - s * 0.8, y - s * 1.5], [x, y - s * 1.1], [x + s * 0.8, y - s * 1.5], [x + s, y], [x, y + s * 0.6]]), col, 0.15); pp(c, limb([x, y + 4], [x, y + 30], 2, 1.6), '#5f9a4a', 0.08); }
+  piece(c, ell(470, 506, 5, 2.6, 0.4), '#f2a0c0', { mul: 0.3 });                                 // a petal on his nose
+  vignette(c, W, H, '140,160,170', 0.45, 1.05);
+}
+
+// ---- Paris, France: the Eiffel Tower at dusk, the Seine, a café table with a croissant ----
+function eiffel(c, x, by, s) {
+  c.save(); c.translate(x, by); c.scale(s, s);
+  const col = '#6a4a4a', leg = (d) => { const p = new Path2D(); p.moveTo(d * 70, 0); p.quadraticCurveTo(d * 30, -90, d * 12, -190); p.lineTo(d * 4, -190); p.quadraticCurveTo(d * 20, -90, d * 46, 0); p.closePath(); return p; };
+  for (const d of [-1, 1]) pp(c, leg(d), col, 0.15);
+  const arch = new Path2D(); arch.moveTo(-56, -6); arch.quadraticCurveTo(0, -80, 56, -6); arch.lineTo(50, -6); arch.quadraticCurveTo(0, -66, -50, -6); arch.closePath(); pp(c, arch, col, 0.05);
+  pp(c, rectP(-46, -86, 92, 8), col, 0.1); pp(c, rectP(-20, -196, 40, 7), col, 0.1);
+  pp(c, poly([[-12, -196], [-4, -330], [4, -330], [12, -196]]), col, 0.15); pp(c, rectP(-7, -336, 14, 6), col, 0.05); pp(c, slab([0, -336], [0, -360], 2), col, 0);
+  c.strokeStyle = 'rgba(255,220,170,0.35)'; c.lineWidth = 1; for (let y = -20; y > -320; y -= 14) { c.beginPath(); c.moveTo(-60 * (1 + y / 330), y); c.lineTo(60 * (1 + y / 330), y - 10); c.stroke(); }
+  for (let k = 0; k < 20; k++) glow(c, (k % 2 ? 1 : -1) * (6 + (k % 5) * 8) * (1 - k / 24), -20 - k * 15, 6, '255,220,150', 0.6);   // evening sparkle
+  c.restore();
+}
+function pcParis(c, W, H) {
+  skyBands(c, W, ['#5a5aa0', '#8a6aaa', '#c886a6', '#eea898', '#f6c8a0'], 40, 300, 2900);
+  // Haussmann rooftops along the river
+  const r = rng(2901);
+  for (let x = -20; x < W; ) { const w = 60 + r() * 50, h = 60 + r() * 30; pp(c, rectP(x, 320 - h, w, h), '#d8c0a8', 0.12); pp(c, poly([[x - 4, 320 - h], [x + w + 4, 320 - h], [x + w - 8, 300 - h], [x + 8, 300 - h]]), '#7a8aa0', 0.1); for (let k = 0; k < Math.floor(w / 16); k++) { glow(c, x + 10 + k * 16, 340 - h * 0.5, 8, '255,200,120', 0.4); piece(c, rectP(x + 7 + k * 16, 332 - h * 0.6, 6, 10), '#ffd88a', { mul: 0.2 }); } x += w + 4; }
+  eiffel(c, 640, 330, 0.9);
+  strip(c, -20, W + 20, x => 332 + 1.5 * fbm1(x / 80, 2), H, '#4a5a8a', { seed: 2902, rimCol: '#e8a0a0', amp: 1.5, shadow: 0.1 });   // the Seine
+  wavyGlints(c, 640, 350, 5, 100, 2903, '#ffd98a', '#f6b06a');
+  const brg = new Path2D(); brg.moveTo(-20, 360); brg.lineTo(360, 360); brg.lineTo(360, 374); for (let k = 0; k < 4; k++) { const a = 360 - k * 95; brg.lineTo(a, 374); brg.quadraticCurveTo(a - 47, 340, a - 95, 374); } brg.lineTo(-20, 374); brg.closePath(); pp(c, brg, '#c8b8a0', 0.2);
+  for (let k = 0; k < 5; k++) { pp(c, rectP(20 + k * 80, 330, 4, 30), '#3a3a4a', 0.05); glow(c, 22 + k * 80, 328, 14, '255,210,140', 0.8); pp(c, circ(22 + k * 80, 328, 4), '#ffe0a0', 0); }   // lamps on the bridge
+  // the café pavement
+  strip(c, -20, W + 20, x => 430 + 2 * fbm1(x / 120, 3), H, '#b8a898', { seed: 2904, rimCol: '#d8c8b8', shadow: 0.2 });
+  for (let k = 0; k < 8; k++) for (let j = 0; j < 22; j++) piece(c, rectP(j * 44 - (k % 2) * 22, 446 + k * 20, 40, 1.4), '#9a8a7a', { mul: 0.4 });
+  // a red awning in the top corner
+  const aw = poly([[-10, 0], [300, 0], [270, 70], [-10, 70]]); pp(c, aw, '#c8322e', 0.25); clipped(c, aw, () => { for (let k = 0; k < 10; k++) piece(c, rectP(k * 40, 0, 20, 80), '#f6efe2', { mul: 0.3 }); });
+  for (let k = 0; k < 9; k++) { const p = new Path2D(); p.moveTo(k * 32, 70); p.arc(k * 32 + 16, 70, 16, Math.PI, 0, true); p.closePath(); pp(c, p, k % 2 ? '#f6efe2' : '#c8322e', 0.1); }
+}
+function bistroTable(c, x, by, s) {
+  c.save(); c.translate(x, by); c.scale(s, s);
+  pp(c, rectP(-3, -90, 6, 90), '#3a3a40', 0.15); pp(c, ell(0, -2, 26, 5), '#3a3a40', 0.1); pp(c, ell(0, -92, 56, 12), '#e8e0d4', 0.22); piece(c, ell(0, -94, 50, 8), '#f6f2ea', { mul: 0.3 });
+  c.save(); c.translate(-18, -98); drawItem(c, 'croissant', 0.9); c.restore();
+  pp(c, poly([[14, -98], [34, -98], [32, -118], [16, -118]]), '#fbf8f2', 0.15); pp(c, ell(24, -118, 9, 3), '#6a3a2a', 0); pp(c, ell(26, -96, 16, 3.5), '#fbf8f2', 0.05);   // a little cup of coffee
+  c.restore();
+}
+// his red beret, drawn in head space: on the crown between his ears, tipped to one side
+function beretOn(c) {
+  c.save(); c.translate(-4, -62); c.rotate(-0.24);
+  pp(c, ell(0, 4, 40, 9), '#a82a26', 0.25);                                                     // the band, just under the crown
+  pp(c, union(ell(-6, -6, 46, 15), ell(-10, -12, 36, 13)), '#c8322e', 0.2);                    // the soft top, a little floppy to one side
+  piece(c, ell(-18, -15, 18, 5, -0.15), '#e05a50', { mul: 0.3 });
+  pp(c, slab([-2, -22], [1, -31], 3.4), '#9a2420', 0.05);                                       // the little stalk
+  c.restore();
+}
+function pcParisFront(c, W, H, res) {
+  pcParis(c, W, H);
+  bistroTable(c, 650, 590, 1.2);
+  pcParker(c, res, BOX_SIT, 0.86, p => drawSitB(p, 'happy', 0.2, { pack: true, mouth: 'croissant', hat: beretOn }), 420, 594);
+  vignette(c, W, H, '130,100,140', 0.45, 1.05);
+}
+
+// ---- ★ Kenya: the Maasai Mara at sunset, flat-topped acacias, giraffes, Kilimanjaro far away ----
+function acacia(c, x, by, s, col) {
+  c.save(); c.translate(x, by); c.scale(s, s);
+  pp(c, union(limb([0, 0], [-4, -60], 5, 3.5), limb([-4, -50], [-34, -84], 3, 2), limb([-2, -56], [30, -86], 3, 2)), col, 0.1);
+  for (const [dx, dy, w] of [[-30, -90, 46], [24, -94, 40], [0, -98, 34]]) tornPiece(c, ellipsePts(dx, dy, w, 8, 22), col, { amp: 2, seed: 2950 + dx, rim: 0, shadow: 0.08 });
+  c.restore();
+}
+function giraffe(c, x, by, s, col, flip) {
+  c.save(); c.translate(x, by); c.scale(flip ? -s : s, s);
+  const p = new Path2D(); p.moveTo(-22, 0); p.lineTo(-20, -40); p.quadraticCurveTo(-14, -60, 10, -56); p.lineTo(22, -130); p.lineTo(34, -134); p.lineTo(40, -126); p.lineTo(28, -124); p.lineTo(20, -52); p.lineTo(20, 0); p.lineTo(16, 0); p.lineTo(14, -36); p.lineTo(-12, -38); p.lineTo(-16, 0); p.closePath();
+  piece(c, p, col, { mul: 0.4 }); pp(c, slab([26, -134], [24, -142], 1.6), col, 0); pp(c, slab([30, -134], [30, -142], 1.6), col, 0);
+  c.restore();
+}
+function pcKenya(c, W, H) {
+  skyBands(c, W, ['#5a3a6a', '#9a4a6a', '#e0705a', '#f4a24a', '#f8cc6a'], 40, 300, 3000);
+  glow(c, 470, 300, 340, '255,170,90', 0.6); tornPiece(c, ellipsePts(470, 300, 70, 70, 50), '#ffcf6a', { amp: 1.5, seed: 3001, shadow: 0, rimCol: '#fff0b0' });
+  tornPiece(c, [[600, 312], [720, 250], [760, 246], [800, 254], [900, 312]], '#a86a6a', { amp: 2, seed: 3002, rim: 0, shadow: 0.06 }); piece(c, poly([[714, 254], [760, 244], [800, 254], [780, 262], [760, 258], [736, 264]]), '#f6e0d8', { mul: 0.2 });   // Kilimanjaro, snow on top
+  strip(c, -20, W + 20, x => 312 + 2 * fbm1(x / 80, 2), H, '#c8784a', { seed: 3003, rim: 0, shadow: 0.08 });
+  const sil = '#3a2430';
+  acacia(c, 160, 330, 1.2, sil); acacia(c, 800, 340, 0.9, sil); acacia(c, 380, 318, 0.6, sil);
+  giraffe(c, 560, 330, 1.1, sil, false); giraffe(c, 610, 334, 0.7, sil, false); giraffe(c, 260, 326, 0.9, sil, true);
+  for (let i = 0; i < 6; i++) bird(c, 300 + i * 40 + (i % 2) * 14, 170 + Math.sin(i) * 20, 0.9, sil);
+  // the long golden grass, layer on layer
+  for (const [y, col, seed] of [[340, '#d8964a', 3004], [400, '#e6a84e', 3005], [470, '#eab85a', 3006]]) {
+    strip(c, -20, W + 20, x => y + 4 * fbm1(x / 60, seed), H, col, { seed, rimCol: '#f8d890', shadow: 0.18 });
+    const rr = rng(seed + 50); for (let k = 0; k < 60; k++) { const x = rr() * W, h = 14 + rr() * 22; piece(c, poly([[x - 2, y + 6], [x + rr() * 6 - 3, y - h], [x + 2, y + 6]]), shade(col, rr() < 0.5 ? 0.86 : 1.1), { mul: 0.3 }); }
+  }
+}
+function pcKenyaFront(c, W, H, res) {
+  pcKenya(c, W, H);
+  pcParker(c, res, BOX_BACK, 0.84, p => drawBackSitB(p, { pack: true }), 470, 588);
+  const rr = rng(3010); for (let k = 0; k < 30; k++) { const x = 330 + rr() * 280, h = 20 + rr() * 30; piece(c, poly([[x - 2, 600], [x + rr() * 8 - 4, 600 - h], [x + 2, 600]]), rr() < 0.5 ? '#d8a050' : '#f0c870', { mul: 0.3 }); }   // grass in front of him
+  vignette(c, W, H, '150,80,80', 0.42, 1.0);
+}
+
+// ---- ★ Antarctica: icebergs, a line of penguins, a fluffy grey chick ----
+function iceberg(c, pts, seed) {
+  const p = tornPiece(c, pts, '#f4f8fc', { amp: 1.5, seed, rimCol: '#ffffff', shadow: 0.15 });
+  clipped(c, p, () => { const xs = pts.map(q => q[0]), x0 = Math.min(...xs), x1 = Math.max(...xs), ys = pts.map(q => q[1]), y0 = Math.min(...ys); piece(c, poly([[lerp(x0, x1, 0.55), y0], [x1 + 10, y0], [x1 + 10, 700], [lerp(x0, x1, 0.4), 700]]), '#bcd8ec', { mul: 0.2 }); piece(c, rectP(x0 - 10, Math.max(...ys) - 12, x1 - x0 + 20, 20), '#9ac4e0', { mul: 0.2 }); });
+}
+function penguin(c, x, by, s, flip, k = 0) {
+  c.save(); c.translate(x, by); c.scale(flip ? -s : s, s);
+  for (const d of [-1, 1]) pp(c, ell(d * 7, -1, 7, 3), '#f08a3c', 0.05);
+  const body = union(ell(0, -26, 16, 26), circ(2, -54, 11)); pp(c, body, '#2a2a36', 0.18);
+  pp(c, union(ell(4, -24, 11, 21), ell(6, -50, 6, 7)), '#fbfaf6', 0.05); piece(c, ell(7, -44, 4, 3), '#f5c04a', { mul: 0.3 });
+  pp(c, ell(-12, -28 + k * 2, 5, 15, 0.3 + k * 0.3), '#2a2a36', 0.08);
+  pp(c, poly([[11, -56], [20, -54], [11, -51]]), '#f08a3c', 0.05); c.fillStyle = '#111'; c.beginPath(); c.arc(7, -57, 1.4, 0, TAU); c.fill();
+  c.restore();
+}
+function penguinChick(c, x, by, s, flip) {
+  c.save(); c.translate(x, by); c.scale(flip ? -s : s, s);
+  for (const d of [-1, 1]) pp(c, ell(d * 6, -1, 6, 3), '#5a5a62', 0.05);
+  pp(c, union(ell(0, -22, 18, 22), circ(0, -46, 13)), '#a8a8b0', 0.2);
+  piece(c, ell(0, -44, 10, 9), '#fbfaf6', { mul: 0.2 }); piece(c, ell(0, -54, 12, 6), '#3a3a44', { mul: 0.3 });
+  for (const ex of [-4, 4]) { c.fillStyle = '#111'; c.beginPath(); c.arc(ex, -46, 1.6, 0, TAU); c.fill(); }
+  pp(c, poly([[-2, -42], [2, -42], [0, -38]]), '#3a3a44', 0.05); blush(c, [[-8, -41], [8, -41]], 2.4, 0.5);
+  c.restore();
+}
+function pcAntarctica(c, W, H) {
+  skyBands(c, W, ['#9cc6e8', '#b0d2ec', '#c8deee', '#dce8f0', '#eef2f6'], 40, 260, 3100);
+  tornPiece(c, [[-20, 250], [120, 170], [260, 210], [360, 150], [520, 240], [520, 270], [-20, 270]], '#e6eef6', { amp: 2, seed: 3101, rimCol: '#ffffff', shadow: 0.08 });   // far mountains
+  strip(c, -20, W + 20, x => 270 + 1.5 * fbm1(x / 70, 2), H, '#3a6a9a', { seed: 3102, rimCol: '#9ac4e0', amp: 1.5, shadow: 0.1 });
+  iceberg(c, [[540, 300], [580, 220], [640, 200], [700, 230], [740, 300]], 3103); iceberg(c, [[760, 290], [790, 250], [840, 244], [880, 290]], 3104); iceberg(c, [[60, 320], [90, 290], [150, 286], [190, 320]], 3105);
+  const rf = rng(3106); for (let k = 0; k < 8; k++) { const x = rf() * W, y = 330 + rf() * 40, w = 14 + rf() * 20; tornPiece(c, ellipsePts(x, y, w, w * 0.25, 16), '#f4f8fc', { amp: 1, seed: 3110 + k, rim: 0, shadow: 0.1 }); }   // drifting floes
+  strip(c, -20, W + 20, x => 380 + 6 * Math.sin(x / 110) + 3 * fbm1(x / 70, 3), H, '#f4f8fc', { seed: 3107, rimCol: '#ffffff', shadow: 0.2 });
+  strip(c, -20, W + 20, x => 470 + 4 * fbm1(x / 120, 4), H, '#eaf2f8', { seed: 3108, rimCol: '#ffffff', shadow: 0.16 });
+  for (let i = 0; i < 6; i++) penguin(c, 560 + i * 38, 420 + (i % 2) * 6, 0.8, false, i % 2);              // a line of penguins on the snow
+}
+function pcAntarcticaFront(c, W, H, res) {
+  pcAntarctica(c, W, H);
+  for (let i = 0; i < 6; i++) pp(c, ell(140 + i * 30, 600 - i * 4 + (i % 2) * 5, 5, 2.4), '#c8d8e8', 0);   // his paw prints
+  pcParker(c, res, BOX_BOW, 0.86, p => drawPlayBowB(p, 'pant', { pack: true, wag: 0.25 }), 380, 586);
+  penguinChick(c, 620, 584, 1.5, true); penguin(c, 700, 580, 1.3, true, 1);
+  vignette(c, W, H, '140,160,190', 0.45, 1.05);
+}
+
 const POSTCARDS = [
   { id: 'chiangmai', rare: false, front: pcChiangMaiFront, scene: pcChiangMai, stamp: '#c4533f', ink: '#6c4a6e' },
   { id: 'pai', front: pcPaiFront, scene: pcPai, ink: '#7a4a6e' },
@@ -1404,6 +1756,14 @@ const POSTCARDS = [
   { id: 'tekapo', rare: true, front: pcTekapoFront, scene: pcTekapo, ink: '#2a3a6a' },
   { id: 'istanbul', front: pcIstanbulFront, scene: (c, W, H) => pcIstanbul(c, W, H, false), ink: '#2f4a6a' },
   { id: 'egypt', front: pcEgyptFront, scene: pcEgypt, ink: '#8a5a2a' },
+  { id: 'hoian', front: pcHoiAnFront, scene: pcHoiAn, ink: '#3a3a7a' },
+  { id: 'bali', front: pcBaliFront, scene: pcBali, ink: '#3f6a3a' },
+  { id: 'venice', front: pcVeniceFront, scene: pcVenice, ink: '#2f6a7a' },
+  { id: 'santorini', front: pcSantoriniFront, scene: pcSantorini, ink: '#2f4a8a' },
+  { id: 'holland', front: pcHollandFront, scene: pcHolland, ink: '#a8322e' },
+  { id: 'paris', front: pcParisFront, scene: pcParis, ink: '#5a3a6a' },
+  { id: 'kenya', rare: true, front: pcKenyaFront, scene: pcKenya, ink: '#8a4a2a' },
+  { id: 'antarctica', rare: true, front: pcAntarcticaFront, scene: pcAntarctica, ink: '#2a5a8a' },
   { id: 'meet-cat', meet: 'cat', front: pcMeetCatFront, scene: (c, W, H) => pcIstanbul(c, W, H, true), ink: '#6a3a5a' },
   { id: 'meet-peafowl', meet: 'peafowl', front: pcMeetPeafowlFront, scene: pcMeetPeafowl, ink: '#2f6a5a' },
   { id: 'meet-kinako', meet: 'kinako', front: pcMeetKinakoFront, scene: pcFushimi, ink: '#8a3a2e' },

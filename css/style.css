@@ -115,3 +115,4 @@ body { font-family: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsof
 .toy-note-text { margin: 0; font-size: 15px; line-height: 1.7; color: #5b3f37; text-align: center; white-space: pre-line; }
 .toy-note-hint { margin: 0; font-size: 12px; color: #a0807a; }
 @keyframes noteIn { from { opacity: 0; transform: translate(-50%, -40%) rotate(-6deg) scale(0.8); } to { opacity: 1; transform: translate(-50%, -50%) rotate(-2deg); } }
+.album-heart { position: absolute; top: 3px; right: 5px; font-size: 13px; color: #e2574a; text-shadow: 0 0 3px #fff, 0 0 2px #fff; pointer-events: none; }
