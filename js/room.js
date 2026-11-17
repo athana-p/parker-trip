@@ -9,25 +9,18 @@
 
 const ROOMS = [null, null,
   { level: 2, w: 400, wall: 'logs', floor: 'planks', side: 'logs', roof: '#7189bd', roofD: '#556c9f',
-    door: { x: 62, w: 56, h: 118, col: '#9a6242', colD: '#7e4c31' }, windows: [{ x: 170, w: 100, h: 84, top: 96 }], bed: { x: 300 },
-    shelves: [[22, 378, 64], [236, 378, 150], [236, 378, 232], [22, 108, 150]], lamp: 300 },
+    door: { x: 62, w: 56, h: 118, col: '#9a6242', colD: '#7e4c31' }, windows: [{ x: 170, w: 100, h: 84, top: 96 }],
+    lamp: 300 },
   { level: 3, w: 640, wall: 'cream', floor: 'honey', side: 'siding', roof: '#e8604c', roofD: '#c94b3b',
-    door: { x: 72, w: 58, h: 124, col: '#5b8ed1', colD: '#3f6fb0' }, windows: [{ x: 252, w: 100, h: 88, top: 100 }, { x: 444, w: 100, h: 88, top: 100 }], bed: { x: 566 },
-    shelves: [[22, 618, 62], [506, 618, 150]], lamp: 348 },
+    door: { x: 72, w: 58, h: 124, col: '#5b8ed1', colD: '#3f6fb0' }, windows: [{ x: 252, w: 100, h: 88, top: 100 }, { x: 444, w: 100, h: 88, top: 100 }],
+    lamp: 348 },
 ];
 const ROOM_K = 1.05, ROOM_D = 90, SV_K = 0.6, SV_SLOT = 32;      // his size indoors; the souvenirs' size and spacing on the shelves
 const ROOMV = { on: false, cam: 0, trans: null, followAt: null, drag: null, doorOpenUntil: 0, wiggle: null };
 const roomR = () => ROOMS[Math.max(2, houseLevel())];
 function roomGeom() {
-  const F1 = V.H - 118, F0 = F1 - 92, C = F0 - 300;
-  return { F0, F1, C, row: F0 + 46, rows: [F0 + 16, F0 + 46, F0 + 76], ground: F1 + 22 };
-}
-// where each souvenir sits: along the shelves left to right, then on the window sills
-function roomSlots(R, g) {
-  const out = [];
-  for (const [x0, x1, dy] of R.shelves) { const n = Math.floor((x1 - x0) / SV_SLOT), pad = (x1 - x0 - n * SV_SLOT) / 2; for (let i = 0; i < n; i++) out.push([x0 + pad + (i + 0.5) * SV_SLOT, g.C + dy]); }
-  for (const w of R.windows) out.push([w.x, g.C + w.top + w.h + 6]);
-  return out;
+  const lift = ROOMV.lift || 0, F1 = V.H - 118 - lift, F0 = F1 - 92, C = F0 - 300;      // lift: raised while decorating, so the floor clears the tray
+  return { F0, F1, C, lift, row: F0 + 46, rows: [F0 + 16, F0 + 46, F0 + 76], ground: F1 + 22 };
 }
 
 // ---------- the art ----------
@@ -70,8 +63,6 @@ function roomShell(lv, H, res, look) {
     c.save(); c.globalCompositeOperation = 'destination-out'; c.fillRect(x, y, win.w, win.h); c.restore();
     ART.paint('room.window', c, x, y, win.w, win.h);
   }
-  // shelves for the souvenirs
-  for (const [x0, x1, dy] of R.shelves) ART.paint('furn.shelf', c, x0, x1, C + dy);
   ART.paint('furn.ceilingLamp', c, R.lamp, C + 8);
   // door frame (the door itself is drawn live: it opens)
   const d = R.door; pp(c, archDoor(d.x, F0, d.w + 12, d.h + 6), '#fff6e6', 0.15);
@@ -147,16 +138,16 @@ function drawTransition() {
 function showBars() {
   const panel = typeof UI !== 'undefined' && UI.panel;
   document.getElementById('bar').classList.toggle('hidden', !!panel || ROOMV.on);
-  document.getElementById('roomBar').classList.toggle('hidden', !!panel || !ROOMV.on);
+  document.getElementById('roomBar').classList.toggle('hidden', !!panel || !ROOMV.on || DECO.on);
 }
 function enterRoom() {
   if (houseLevel() < 2 || ROOMV.on || ROOMV.trans || HOUSEFX.on) return;
   SFX.door(true);
   roomTransition(() => {
     FX.length = 0;                       // hearts and Zs from outside stay outside
-    ROOMV.on = true; ROOMV.cam = 0; ROOMV.followAt = null; showBars(); hideToast();
+    ROOMV.on = true; ROOMV.cam = 0; ROOMV.followAt = null; showBars(); hideToast(); decorEnsure();      // (after the toast is cleared: it may want to say something went back to the tray)
     if (!P.present || P.pack || P.carrying || /packup|departLook|arrive|gift/.test(P.mode)) return;
-    if (/^(inhouse|goin)$/.test(P.mode)) { const left = Math.max(20, P.until - TT); putInRoom(roomR().bed.x); P.onBed = true; P.face = 1; setMode('nap', left); return; }   // already napping inside: on his bed
+    if (/^(inhouse|goin)$/.test(P.mode)) { const left = Math.max(20, P.until - TT), bed = decorBed(); putInRoom(bed ? bed.x : roomR().door.x + 90); P.onBed = !!bed; P.face = 1; setMode('nap', left); return; }   // already napping inside: on his bed (or on the floor if his bed is put away)
     ROOMV.followAt = TT + 0.9;          // he follows you in
   });
 }
@@ -169,6 +160,8 @@ function stopYardPlay() {               // whatever he was doing in the yard sto
   FETCH.drag = null; press = null;
 }
 function roomTick() {
+  const dt = Math.min(0.05, TT - (ROOMV.lastT || TT)); ROOMV.lastT = TT; decorTick(dt);
+  if (ROOMV.on && !S.decor && houseLevel() > 1) decorEnsure();          // the room is never shown without its things
   if (!ROOMV.on || ROOMV.followAt == null || TT < ROOMV.followAt) return;
   ROOMV.followAt = null;
   if (!P.present || P.inRoom || P.pack || /packup|departLook|arrive|gift/.test(P.mode)) return;
@@ -184,6 +177,7 @@ function leaveRoom() {
 }
 function leaveRoomNow() {
   if (!ROOMV.on) return;
+  if (DECO.on) endDecor();
   ROOMV.on = false; ROOMV.followAt = null; ROOMV.drag = null; FX.length = 0; showBars();
   if (S.shelf.some(s => s.isNew)) { S.shelf.forEach(s => s.isNew = false); writeSave(S); }
   if (!P.inRoom) return;
@@ -196,16 +190,17 @@ function leaveRoomNow() {
 
 // ---------- what he does indoors ----------
 function roomBed(kind) {
-  const R = roomR();
-  goTo(R.bed.x - 10, ROOM_D, () => faceThen(1, () => { P.onBed = true; P.x = R.bed.x; kind === 'sleep' ? setMode('sleep', rand(HABITS.duration.sleep)) : setMode(kind, rand(kind === 'nap' ? HABITS.duration.nap || [20, 40] : HABITS.duration.lie)); }));
+  const bed = decorBed(), dur = () => rand(kind === 'sleep' ? HABITS.duration.sleep : kind === 'nap' ? HABITS.duration.nap : HABITS.duration.lie);
+  if (!bed) return setMode(kind === 'sleep' ? 'sleep' : kind, dur());          // no bed in the room: he curls up where he is
+  goTo(bed.x - 10, ROOM_D, () => faceThen(1, () => { if (!decorItems().includes(bed)) return pickNext(); P.onBed = true; P.x = bed.x; kind === 'sleep' ? setMode('sleep', rand(HABITS.duration.sleep)) : setMode(kind, rand(kind === 'nap' ? HABITS.duration.nap || [20, 40] : HABITS.duration.lie)); }));
 }
 function roomPickNext() {
   const R = roomR(), g = roomGeom(), was = P.onBed; P.onBed = false;
   if (P.wet) { P.wet = false; SFX.shake(); return setMode('shakeoff', HABITS.wxTime.shakeOff); }
   if (sleepTime() && TT >= (P.awakeUntil || 0)) return roomBed('sleep');
   if (was) return setMode('sigh', HABITS.sighTime, { lie: false });            // just hopped off his bed
-  const things = [[R.door.x, 'door'], [R.bed.x, 'bed'], ...R.windows.map(w => [w.x, 'window']), ...roomSlots(R, g).slice(0, Math.max(1, S.shelf.length)).filter(s => s[1] > g.C + 120).map(s => [s[0], 'shelf'])];
-  const k = pickWeighted({ walk: 3, sniff: 2.6, sit: 1.6, bed: 1.6, window: 1, sigh: 0.5 });
+  const things = [[R.door.x, 'door'], ...R.windows.map(w => [w.x, 'window']), ...decorItems().map(r => [decorAnchor(r, g) || [0], r]).filter(([a, r]) => a[0] && (decorDef(r.id).kind !== 'wall' || r.yc > 150)).map(([a]) => [a[0], 'thing'])];
+  const k = pickWeighted({ walk: 3, sniff: 2.6, sit: 1.6, bed: decorBed() ? 1.6 : 0.4, window: 1, sigh: 0.5 });
   const lo = 44, hi = R.w - 44;
   if (k === 'walk') { const x = clamp(P.x + (Math.random() < 0.5 ? -1 : 1) * (60 + Math.random() * 180), lo, hi); return goTo(x, ROOM_D, Math.random() < 0.4 ? () => setMode('sniff', rand(HABITS.duration.sniff)) : null); }
   if (k === 'sniff') { const [tx] = things[Math.floor(Math.random() * things.length)], side = tx > P.x ? 1 : -1; return goTo(clamp(tx - 46 * side, lo, hi), ROOM_D, () => faceThen(side, () => setMode('sniff', rand([2, 3.5])))); }
@@ -222,7 +217,7 @@ function roomLayer() {
   if (ROOMLAY.key !== key) { ROOMLAY.key = key; ROOMLAY.L = ART.layer('room.shell', lv, V.H, V.res, WX.look); ROOMLAY.view = ART.layer('scene.yard', V.H, Math.min(V.res, 2), WX.look, lv, true); }   // the yard as seen from inside: without the house
   return ROOMLAY.L;
 }
-function roomParkerScreen() { const g = roomGeom(); return [P.x - ROOMV.cam, g.row - (P.onBed ? 10 : 0)]; }
+function roomParkerScreen() { const g = roomGeom(), bed = P.onBed && decorBed(), row = bed ? bed.row : 1; return [P.x - ROOMV.cam, g.rows[row] - (bed ? 10 : 0), ROOM_K * ROW_K[row]]; }
 function drawRoom() {
   const L = LAY, R = roomR(), g = roomGeom(), cam = ROOMV.cam;
   ctx.setTransform(cv.width / SCENE_W, 0, 0, cv.width / SCENE_W, 0, 0);
@@ -234,23 +229,14 @@ function drawRoom() {
   ctx.save(); ctx.translate(-cam, 0);
   const shell = roomLayer();
   for (const w of R.windows) ART.draw('live.windowView', ctx, w.x - w.w / 2, g.C + w.top, w.w, w.h, 180 + (w.x / R.w) * 140);
-  drawLayer(ctx, shell);
-  // souvenirs on the shelves
-  const slots = roomSlots(R, g);
-  S.shelf.forEach((s, i) => {
-    const sl = slots[i]; if (!sl) return;
-    const wig = ROOMV.wiggle && ROOMV.wiggle.id === s.id ? Math.sin((TT - ROOMV.wiggle.t0) * 24) * 0.12 * clamp(1 - (TT - ROOMV.wiggle.t0) / 0.6) : 0;
-    if (s.isNew) ART.draw('fx.glow', ctx, sl[0], sl[1] - 16, 30, '255,236,170', 0.5 + 0.15 * Math.sin(TT * 2));
-    drawSprite(sprite(`souvenir.${s.id}|${SV_K}`), sl[0], sl[1], { rot: wig, shA: 0.18 });
-  });
-  // the door, his bed, him
+  drawLayer(ctx, shell, 0, -g.lift);
+  // the door, then what's on the walls and the floor, row by row, with him in his row (js/decor.js)
   drawSprite(sprite(`room.door|${R.level}|${TT < ROOMV.doorOpenUntil ? 1 : 0}`), R.door.x, g.F0, { shA: 0 });
-  drawSprite(sprite('furn.bed'), R.bed.x, g.rows[1] + 4, { shA: 0 });
-  if (P.present && P.inRoom) {
-    const dr = parkerDrawing(), [sx, sy] = roomParkerScreen(), x = sx + cam;
-    ART.draw('live.shadow.parker', ctx, x, sy + 1, (isLying() ? 70 : 52) * ROOM_K * Math.max(0.6, Math.abs(dr.sx)), 6 * ROOM_K, 1 / (1 + dr.lift / 34));
-    drawSprite(sprite(dr.key), x, sy - dr.lift, { sx: dr.sx, scale: ROOM_K });
-  }
+  drawDecorScene(g, R, () => {
+    const dr = parkerDrawing(), [sx, sy, k] = roomParkerScreen(), x = sx + cam;
+    ART.draw('live.shadow.parker', ctx, x, sy + 1, (isLying() ? 70 : 52) * k * Math.max(0.6, Math.abs(dr.sx)), 6 * k, 1 / (1 + dr.lift / 34));
+    drawSprite(sprite(dr.key), x, sy - dr.lift, { sx: dr.sx, scale: k });
+  });
   ctx.restore();
   // indoor light at dusk / night (over the house only)
   const area = new Path2D(); area.rect(-cam - 20, g.C - 140, R.w + 40, V.H);
@@ -262,22 +248,28 @@ function roomParkerCenter() { const [x, y] = roomParkerScreen(), lying = isLying
 
 // ---------- taps and slides ----------
 function roomDown(e, x, y) {
+  if (DECO.on) return decorDown(e, x, y);
   if (P.present && P.inRoom && onParker(x, y)) { press = { id: e.pointerId, t0: TT, x, y, dist: 0, rub: false }; try { cv.setPointerCapture(e.pointerId); } catch (err) { } return; }
   ROOMV.drag = { id: e.pointerId, x0: x, y0: y, cam0: ROOMV.cam, moved: false };          // slides the wide room; if it doesn't move, it's a tap
   try { cv.setPointerCapture(e.pointerId); } catch (err) { }
 }
 function roomTap(x, y) {
   const R = roomR(), g = roomGeom(), rx = x + ROOMV.cam;
-  // a souvenir: it wiggles and says what it is
-  const slots = roomSlots(R, g);
-  for (let i = 0; i < S.shelf.length; i++) { const sl = slots[i]; if (sl && Math.abs(rx - sl[0]) < 16 && y > sl[1] - 40 && y < sl[1] + 4) { const s = S.shelf[i]; ROOMV.wiggle = { id: s.id, t0: TT }; SFX.pop(); toastText(`${T('sv.' + s.id)} · ${T('pc.' + s.id + '.name')}`, 2200); return; } }
   if (Math.abs(rx - R.door.x) < R.door.w / 2 + 4 && y > g.F0 - R.door.h && y < g.F0 + 6) return leaveRoom();       // the door: back out to the yard
-  if (P.present && P.inRoom && Math.abs(rx - R.bed.x) < 70 && y > g.rows[1] - 40 && y < g.rows[1] + 8 && !/sleep|nap|stir/.test(P.mode)) return roomBed('lie');   // his bed: come and lie down
+  const r = decorHit(rx, y, g); if (!r) return;
+  if (isSmall(r.id)) { const id = r.id.slice(3); ROOMV.wiggle = { id: r.id, t0: TT }; SFX.pop(); toastText(`${T('sv.' + id)} · ${T('pc.' + id + '.name')}`, 2200); return; }   // a souvenir: it wiggles and says what it is
+  if (r.id === 'bed' && P.present && P.inRoom && !/sleep|nap|stir/.test(P.mode)) return roomBed('lie');         // his bed: come and lie down
 }
-function roomMove(e, x) {
+function roomMove(e, x, y) {
+  if (DECO.on && decorMove(e, x, y)) return true;
   const D = ROOMV.drag; if (!D || e.pointerId !== D.id) return false;
   if (Math.abs(x - D.x0) > 6) D.moved = true;
   if (D.moved) ROOMV.cam = clamp(D.cam0 - (x - D.x0), 0, roomR().w - SCENE_W);
   return true;
 }
-function roomUp(e) { const D = ROOMV.drag; if (!D || e.pointerId !== D.id) return false; ROOMV.drag = null; if (!D.moved) roomTap(D.x0, D.y0); return true; }
+function roomUp(e, x, y) {
+  if (DECO.on && decorUp(e, x, y)) return true;
+  const D = ROOMV.drag; if (!D || e.pointerId !== D.id) return false; ROOMV.drag = null;
+  if (!D.moved) { if (DECO.on) { DECO.sel = null; placeTools(); } else roomTap(D.x0, D.y0); }
+  return true;
+}

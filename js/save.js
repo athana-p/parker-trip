@@ -7,9 +7,9 @@ const Clock = {
 };
 const CLOCK_KEY = 'parker-trip-debug-clock';
 
-const SAVE_KEY = 'parker-trip-save', LANG_KEY = 'parker-trip-lang', SAVE_VERSION = 7;
+const SAVE_KEY = 'parker-trip-save', LANG_KEY = 'parker-trip-lang', SAVE_VERSION = 8;
 function defaultSave(now) {
-  return addV7(addV6(addV5(addV4(addV3(addV2({ v: SAVE_VERSION, createdAt: now, lastSeen: now, dandelions: 0, field: [], nextSpawnAt: now, seq: 0, seenHint: false }))))));
+  return addV8(addV7(addV6(addV5(addV4(addV3(addV2({ v: SAVE_VERSION, createdAt: now, lastSeen: now, dandelions: 0, field: [], nextSpawnAt: now, seq: 0, seenHint: false })))))));
 }
 // upgrade older saves step by step here when the format changes (v1 → v2 → …)
 function migrateSave(s) {
@@ -20,6 +20,7 @@ function migrateSave(s) {
   if (s.v === 4) { addV5(s); s.v = 5; }
   if (s.v === 5) { addV6(s); s.v = 6; }
   if (s.v === 6) { addV7(s); s.v = 7; }
+  if (s.v === 7) { addV8(s); s.v = 8; }
   return s;
 }
 function loadSave() { try { return migrateSave(JSON.parse(localStorage.getItem(SAVE_KEY))); } catch (e) { return null; } }
@@ -55,4 +56,9 @@ function addV6(s) {
 //     already been round sniffing (a new one he hasn't seen yet gets a look round the first time he's home and awake).
 function addV7(s) {
   return Object.assign(s, { house: 1, houseSeen: 1, ...s });
+}
+// v8: decorating his room — decor: the layout ({ items, seq, seen, custom, level } or null until he first has a room:
+//     it is then laid out the house's own way, every souvenir he has on a shelf); furn: furniture he owns ({ id: count }).
+function addV8(s) {
+  return Object.assign(s, { decor: null, furn: {}, ...s });
 }

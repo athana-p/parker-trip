@@ -102,6 +102,10 @@ const SFX = {
     if (!this.ok()) return; const t = this.ctx.currentTime;
     this.noise(t, { dur: 0.06, v: 0.1, type: 'lowpass', f: 900, a: 0.003 }); this.tone(open ? 300 : 260, t + 0.02, { type: 'triangle', a: 0.01, d: 0.18, v: 0.03, to: open ? 360 : 220 });
   },
+  snap() {                           // something put down in its place: a crisp papery pat and a soft thump
+    if (!this.ok()) return; const t = this.ctx.currentTime;
+    this.noise(t, { dur: 0.05, v: 0.12, type: 'bandpass', f: 2200, q: 1.2, a: 0.002 }); this.tone(180, t, { type: 'sine', a: 0.003, d: 0.12, v: 0.08, to: 120 });
+  },
   paper(i = 0) {                     // a piece of the new house landing: a soft papery tap, a little higher each time
     if (!this.ok()) return; const t = this.ctx.currentTime;
     this.noise(t, { dur: 0.07, v: 0.09, type: 'bandpass', f: 2600, q: 1.4, a: 0.004 }); this.tone(520 + (i % 8) * 45, t, { type: 'triangle', a: 0.004, d: 0.12, v: 0.035 });

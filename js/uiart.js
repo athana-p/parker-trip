@@ -51,3 +51,7 @@ ART.def('ui.icon.house', { kind: 'paint', group: 'ui', box: { w: 34, h: 34, ox: 
   pp(c, rectP(-10, -3, 20, 16), '#f6cf86', 0.2); pp(c, poly([[-14, -2], [0, -14], [14, -2]]), '#e8604c', 0.2); pp(c, slab([0, -15], [-15, -1], 3), '#c94b3b', 0); pp(c, slab([0, -15], [15, -1], 3), '#c94b3b', 0);
   pp(c, archDoor(0, 13, 8, 11), '#5b8ed1', 0.08); pp(c, circ(0, -7, 2.2), '#fff6e6', 0);
 } });
+ART.def('ui.icon.decor', { kind: 'paint', group: 'ui', box: { w: 34, h: 34, ox: 17, oy: 17 }, note: 'decorate: a little paint roller over a strip of wallpaper', draw: c => {
+  pp(c, rectP(-13, -10, 26, 12), '#f3b9b0', 0.15); for (const x of [-8, -1, 6]) piece(c, circ(x, -4, 2), '#fff6e6', { mul: 0.2 });
+  pp(c, slab([8, 2], [8, 9], 3), '#8a5e3c', 0.1); pp(c, slab([8, 9], [-2, 15], 4), '#8a5e3c', 0.1); pp(c, rectP(-15, -14, 26, 6), '#5b8ed1', 0.15);
+} });

@@ -17,6 +17,8 @@ function buildBar() {
   $('btnShop').prepend(shopIco); $('btnPack').prepend(packIco); $('btnAlbum').prepend(albumIco);
   $('btnYard').prepend(iconCanvas(c => ART.paint('ui.icon.yard', c), 34)); $('btnHouse').prepend(iconCanvas(c => ART.paint('ui.icon.house', c), 34));   // indoors
   $('btnYard').onclick = () => leaveRoom(); $('btnHouse').onclick = () => openPanel('shelf');
+  $('btnDecor').prepend(iconCanvas(c => ART.paint('ui.icon.decor', c), 34)); $('btnDecor').onclick = () => startDecor();
+  $('decorDone').onclick = () => endDecor(); $('toolFlip').onclick = () => toolFlip(); $('toolStore').onclick = () => toolStore();
   $('btnAlbum').onclick = () => openPanel('album');
   // top-right: sound on/off and settings, drawn in code like everything else
   const drawMute = () => { const b = $('muteBtn'); b.innerHTML = ''; b.append(iconCanvas(c => ART.paint('ui.icon.sound', c, SFX.muted), 26)); b.setAttribute('aria-label', T(SFX.muted ? 'ui.soundOff' : 'ui.soundOn')); };
@@ -355,6 +357,7 @@ function buildDebug(force) {
   const hr = el('div', 'dbg-row'); hr.append(el('b', '', T('dbg.house')));
   for (const lv of [1, 2, 3]) { const b = el('button', 'dbg-b', String(lv)); b.onclick = () => { finishHouseBuild(); S.house = lv; S.houseSeen = lv; applyHouse(lv); writeSave(S); LAY = null; buildStatic(TOD); if (UI.panel) renderPanel(); }; hr.append(b); }
   const hb = el('button', 'dbg-b', T('dbg.houseFx')); hb.onclick = () => { if (HOUSEFX.on) return; const lv = houseLevel(), from = lv < HOUSE_MAX ? lv : lv - 1; S.house = from + 1; writeSave(S); startHouseBuild(from, from + 1); }; hr.append(hb);
+  const dr = el('button', 'dbg-b', T('dbg.decorReset')); dr.onclick = () => { if (DECO.on) endDecor(); S.decor = null; if (ROOMV.on) decorEnsure(); writeSave(S); }; hr.append(dr);
   const hs = el('button', 'dbg-b', T('dbg.houseSniff')); hs.onclick = () => { if (houseLevel() > 1) { S.houseSeen = houseLevel() - 1; writeSave(S); if (P.present) pickNext(); } }; hr.append(hs);
   const ml = el('button', 'dbg-b', T('dbg.melt')); ml.onclick = () => { const m = S.snowman; if (m && !m.twig) { m.meltFrom = Clock.now() - MELT_MS * 0.6; m.melt = 0.6; } }; acts.append(ml);
   const vr = el('div', 'dbg-row'); vr.append(el('b', '', T('dbg.visit')));

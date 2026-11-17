@@ -650,15 +650,15 @@ cv.addEventListener('pointerdown', e => {
   if (!HOUSEFX.on && x > ht[0] && x < ht[1] && y > hb - ht[2] && y < hb + ht[3]) return houseLevel() > 1 ? enterRoom() : openPanel('shelf');   // the cabin and the big house: go in
 });
 cv.addEventListener('pointermove', e => {
-  if (ROOMV.on && roomMove(e, toScene(e)[0])) return;
+  if (ROOMV.on && roomMove(e, ...toScene(e))) return;
   if (FETCH.drag && e.pointerId === FETCH.drag.id) { const [x, y] = toScene(e); return ballFollow(x, y); }
   if (TUG.on && e.pointerId === TUG.id) { const [x, y] = toScene(e); TUG.ax = x; TUG.ay = y; return; }
   if (KITE.drag && e.pointerId === KITE.drag.id) { const [x, y] = toScene(e); return kiteMove(x, y); }
   if (!press || e.pointerId !== press.id) return;
   const [x, y] = toScene(e); press.dist += Math.hypot(x - press.x, y - press.y); press.x = x; press.y = y;
 });
-cv.addEventListener('pointerup', e => { if (ROOMV.on && roomUp(e)) return; if (FETCH.drag && e.pointerId === FETCH.drag.id) return ballThrow(); if (TUG.on && e.pointerId === TUG.id) return ropeRelease(); if (KITE.drag && e.pointerId === KITE.drag.id) return kiteUp(); if (!press || e.pointerId !== press.id) return; press.rub ? endBelly() : tapParker(); press = null; });
-cv.addEventListener('pointercancel', () => { ROOMV.drag = null; if (FETCH.drag) { FETCH.drag = null; } KITE.drag = null; if (TUG.on) ropeRelease(); if (press && press.rub) endBelly(); press = null; });
+cv.addEventListener('pointerup', e => { if (ROOMV.on && roomUp(e, ...toScene(e))) return; if (FETCH.drag && e.pointerId === FETCH.drag.id) return ballThrow(); if (TUG.on && e.pointerId === TUG.id) return ropeRelease(); if (KITE.drag && e.pointerId === KITE.drag.id) return kiteUp(); if (!press || e.pointerId !== press.id) return; press.rub ? endBelly() : tapParker(); press = null; });
+cv.addEventListener('pointercancel', () => { ROOMV.drag = null; if (DECO.held) { const H = DECO.held; DECO.held = null; H.fromTray ? decorRemove(H.rec) : Object.assign(H.rec, H.from); } DECO.press = null; if (FETCH.drag) { FETCH.drag = null; } KITE.drag = null; if (TUG.on) ropeRelease(); if (press && press.rub) endBelly(); press = null; });
 function checkRub() {
   if (!press || press.rub || /sleep|nap|stir|packup|departLook|arrive|gift|inhouse|goin/.test(P.mode) || P.pack) return;
   if (TT - press.t0 > HABITS.bellyRub.hold || press.dist > HABITS.bellyRub.rubDistance) {
@@ -773,6 +773,7 @@ function worldTick() {
     if (e.type === 'home') {
       if (live) startArrival(); else { P.present = true; P.pack = false; P.x = 236; P.d = 150; P.face = -1; setMode('sit', 5); if (ROOMV.on) putInRoom(roomR().door.x + 90); }
       showToast(e.souvenir ? 'toast.souvenir' : 'toast.home', 4500);
+      if (ROOMV.on) { decorEnsure(); if (DECO.on) renderTray(); }          // indoors: the new souvenir sets itself out
       if (e.souvenir) fx({ type: 'glow', x: HOUSE.x + 60, y: Y(HOUSE.d) - 50, life: 2, r: 90, rgb: '255,236,170' });
     }
   }
@@ -1216,13 +1217,13 @@ function updateVisitor(dt) {
   const dx = VIS.tx - VIS.x, step = VIS_SPEED[VIS.kind] * dt * (VIS.phase === 'out' ? 1.4 : 1);
   if (Math.abs(dx) <= step) {
     VIS.x = VIS.tx;
-    if (VIS.phase === 'in') { VIS.phase = 'stay'; VIS.until = TT + VIS.stay; VIS.face = Math.random() < 0.5 ? 1 : -1; if (P.present) VIS.face = Math.sign(P.x - VIS.x) || 1; if (VIS.kind === 'cat') catHello(); }
+    if (VIS.phase === 'in') { VIS.phase = 'stay'; VIS.until = TT + VIS.stay; VIS.face = Math.random() < 0.5 ? 1 : -1; if (P.present && !P.inRoom) VIS.face = Math.sign(P.x - VIS.x) || 1; if (VIS.kind === 'cat') catHello(); }
     else VIS.on = false;
   } else VIS.x += Math.sign(dx) * step;
 }
 // the cat and Parker say hello (only while he's home, awake and free)
 function catHello() {
-  if (!P.present || !/^(sit|lie|look|sniff|trot|sigh|wag|tilt|hop|eat|expect|shelter)$/.test(P.mode) || P.pack || P.hold || Math.random() > HABITS.catPlayChance) return;
+  if (!P.present || P.inRoom || !/^(sit|lie|look|sniff|trot|sigh|wag|tilt|hop|eat|expect|shelter)$/.test(P.mode) || P.pack || P.hold || Math.random() > HABITS.catPlayChance) return;
   const kind = pickWeighted(HABITS.catPlay), side = Math.sign(VIS.x - P.x) || 1, gap = { boop: 92, bow: 76, side: 70 }[kind];
   VIS.hold = TT + 30; VIS.until = Math.max(VIS.until, TT + 14);
   if (kind === 'boop') VIS.d = clamp(VIS.d, 104, 220) + 4;          // she sits just behind him, so his nose reaches her face

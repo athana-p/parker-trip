@@ -26,6 +26,7 @@ body { font-family: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsof
 .sheet { position: absolute; left: 10px; right: 10px; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); max-height: 80%; overflow-y: auto; overscroll-behavior: contain;
   background: var(--paper); border: 4px solid var(--edge); border-radius: 22px; box-shadow: 0 4px 0 rgba(140, 100, 90, 0.18), 0 14px 40px rgba(60, 30, 40, 0.3); padding: 12px 14px 16px; transition: transform 0.32s cubic-bezier(.2,.9,.3,1.2), opacity 0.25s; }
 .sheet.hidden { transform: translateY(30px); opacity: 0; pointer-events: none; }
+.sheet.hidden *, #decor.hidden * { pointer-events: none !important; }   /* a hidden panel's buttons must not catch taps meant for the bar */
 .sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; }
 .sheet-head h2 { margin: 0; font-size: 20px; }
 .sheet-head .btn { box-shadow: none; background: #f3e7d6; border-color: #f3e7d6; }
@@ -124,3 +125,20 @@ body { font-family: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsof
 .house-buy { margin-top: 4px; display: inline-flex; align-items: center; gap: 4px; }
 .house-buy.sure { background: #f59f6a; color: #fff; }
 .house-short { font-size: 12px; color: #a08a7e; }
+/* decorating his room: the tray along the bottom, and flip / put away above the thing you tapped */
+#decor { position: absolute; left: 0; right: 0; bottom: 0; background: var(--paper); border-radius: 22px 22px 0 0; box-shadow: 0 -6px 20px rgba(70,40,50,.18); padding: 8px 10px calc(env(safe-area-inset-bottom, 0px) + 10px); transition: transform 0.3s; }
+#decor.hidden { transform: translateY(110%); pointer-events: none; }
+.decor-head { display: flex; align-items: center; gap: 8px; padding: 0 2px 6px; }
+.decor-head b { font-size: 16px; }
+.decor-hint { flex: 1; font-size: 11.5px; color: #8a6a5c; line-height: 1.3; }
+#decorDone { background: #f6c96a; font-size: 14px; padding: 5px 14px; }
+.decor-tray { display: flex; gap: 8px; overflow-x: auto; overscroll-behavior: contain; padding: 2px 2px 4px; scrollbar-width: none; min-height: 84px; }
+.decor-tray::-webkit-scrollbar { display: none; }
+.decor-item { position: relative; flex: 0 0 auto; width: 70px; display: flex; flex-direction: column; align-items: center; gap: 2px; background: #fff; border: 0; border-radius: 14px; padding: 6px 2px 5px; font: inherit; color: var(--ink); touch-action: pan-x; cursor: grab; user-select: none; -webkit-user-select: none; }
+.decor-item canvas { pointer-events: none; }
+.decor-name { font-size: 11px; line-height: 1.2; text-align: center; max-width: 66px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.decor-n { position: absolute; top: 3px; right: 5px; font-size: 11px; font-weight: 600; color: #a07a52; }
+.decor-empty { font-size: 13px; color: #8a6a5c; margin: 14px 4px; }
+#decorTools { position: absolute; display: flex; gap: 6px; z-index: 5; }
+#decorTools.hidden { display: none; }
+#decorTools .btn { font-size: 13px; padding: 5px 12px; }
