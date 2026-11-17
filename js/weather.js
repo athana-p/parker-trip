@@ -277,3 +277,7 @@ function drawBit(ctx, season, i, x, y, rot, s = 1.3) {
   const bits = wxSprites(WXP.res || 2).bit[season], im = bits[i % bits.length], w = 20 * s, h = 14 * s;
   ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.drawImage(im, -w / 2, -h / 2, w, h); ctx.restore();
 }
+
+// ---- art list: weather (drawn fresh every frame)
+ART.def('live.weather', { kind: 'live', group: 'live', draw: (ctx, wx, H, t, res) => drawWeather(ctx, wx, H, t, res), note: 'rain, snow, wind-blown bits, fog: (ctx, weather, H, t, res)' });
+ART.def('live.leafBit', { kind: 'live', group: 'live', box: { w: 12, h: 12, ox: 6, oy: 6 }, draw: (ctx, season, i, x, y, rot, s) => drawBit(ctx, season, i, x, y, rot, s), note: 'one petal or leaf of the season (the one he chases)' });

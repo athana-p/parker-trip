@@ -143,3 +143,6 @@ function drawFennec(c, pose = 'sit') {
 
 const FRIEND_DRAW = { cat: drawCat, peafowl: drawPeafowl, kinako: drawKinako, fennec: drawFennec };
 const BOX_FRIEND = { cat: { w: 140, h: 190, ox: 60, oy: 170 }, peafowl: { w: 300, h: 230, ox: 170, oy: 210 }, kinako: { w: 200, h: 190, ox: 90, oy: 170 }, fennec: { w: 150, h: 180, ox: 70, oy: 160 } };
+
+// ================= ART LIST: friends =================
+for (const id in FRIEND_DRAW) ART.def('friend.' + id, { group: 'friend', box: BOX_FRIEND[id], draw: (c, a) => FRIEND_DRAW[id](c, a[0]), note: 'pose' });

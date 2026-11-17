@@ -8,33 +8,19 @@ function iconCanvas(draw, size = 48) {
   c.width = size * dpr; c.height = size * dpr; c.style.width = c.style.height = size + 'px';
   const x = c.getContext('2d'); x.scale(dpr, dpr); x.translate(size / 2, size / 2); draw(x, size); return c;
 }
-const itemIcon = (id, size = 52) => iconCanvas(c => drawItem(c, id, size / 60), size);
-function coinMini() { return iconCanvas(c => { c.translate(-1, 36 * 0.62); c.scale(0.62, 0.62); const ring = (n, r, rx, ry, col) => { const p = new Path2D(); for (let i = 0; i < n; i++) { const a = i / n * TAU; p.addPath(ell(1 + Math.cos(a) * r, -36 + Math.sin(a) * r, rx, ry, a)); } piece(c, p, col, { mul: 0.4 }); }; ring(14, 6.4, 4.4, 1.9, '#f6c22c'); ring(10, 3.6, 3.2, 1.6, '#fbd648'); piece(c, circ(1, -36, 2.4), '#eaa21c', { mul: 0.4 }); }, 18); }
+const itemIcon = (id, size = 52) => iconCanvas(c => ART.paint('item.' + id, c, size / 60), size);
+function coinMini() { return iconCanvas(c => { c.translate(-1, 36 * 0.62); c.scale(0.62, 0.62); ART.paint('ui.coin', c); }, 18); }
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 
 function buildBar() {
-  const shopIco = iconCanvas(c => {          // a little paper shopping bag
-    pp(c, poly([[-13, -8], [13, -8], [15, 15], [-15, 15]]), '#f2c46a', 0.2);
-    c.save(); c.strokeStyle = '#a8742f'; c.lineWidth = 2; c.beginPath(); c.arc(0, -8, 7, Math.PI, 0); c.stroke(); c.restore();
-    pawPrint(c, 0, 4, 0.5, '#c98b3e');
-  }, 34);
-  const packIco = iconCanvas(c => { c.scale(0.62, 0.62); backpack(c, 0, 4, 0); }, 34);
-  const albumIco = iconCanvas(c => {          // a little album with a postcard tucked in
-    pp(c, rectP(-14, -11, 28, 24), '#5b8ed1', 0.2); pp(c, rectP(-14, -11, 5, 24), '#3f6fb0', 0);
-    c.save(); c.rotate(-0.15); pp(c, rectP(-6, -14, 20, 14), '#fff6e6', 0.15); piece(c, rectP(-4, -12, 16, 8), '#f2b07a', { mul: 0.4 }); c.restore();
-  }, 34);
+  const shopIco = iconCanvas(c => ART.paint('ui.icon.shop', c), 34), packIco = iconCanvas(c => ART.paint('ui.icon.pack', c), 34), albumIco = iconCanvas(c => ART.paint('ui.icon.album', c), 34);
   $('btnShop').prepend(shopIco); $('btnPack').prepend(packIco); $('btnAlbum').prepend(albumIco);
   $('btnAlbum').onclick = () => openPanel('album');
   // top-right: sound on/off and settings, drawn in code like everything else
-  const drawMute = () => { const b = $('muteBtn'); b.innerHTML = ''; b.append(iconCanvas(c => {
-    pp(c, poly([[-9, -4], [-4, -4], [3, -10], [3, 10], [-4, 4], [-9, 4]]), '#5b3f37', 0.1);
-    c.save(); c.strokeStyle = '#5b3f37'; c.lineWidth = 2; c.lineCap = 'round';
-    if (SFX.muted) { c.beginPath(); c.moveTo(7, -5); c.lineTo(15, 5); c.moveTo(15, -5); c.lineTo(7, 5); c.stroke(); }
-    else for (const r of [6, 11]) { c.beginPath(); c.arc(3, 0, r, -0.8, 0.8); c.stroke(); }
-    c.restore(); }, 26)); b.setAttribute('aria-label', T(SFX.muted ? 'ui.soundOff' : 'ui.soundOn')); };
+  const drawMute = () => { const b = $('muteBtn'); b.innerHTML = ''; b.append(iconCanvas(c => ART.paint('ui.icon.sound', c, SFX.muted), 26)); b.setAttribute('aria-label', T(SFX.muted ? 'ui.soundOff' : 'ui.soundOn')); };
   drawMute(); $('muteBtn').onclick = () => { SFX.unlock(); SFX.setMuted(!SFX.muted); drawMute(); if (UI.panel === 'settings') renderPanel(); };
   UI.drawMute = drawMute;
-  $('setBtn').append(iconCanvas(c => { const g = new Path2D(); for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; g.addPath(poly([[Math.cos(a - 0.2) * 7, Math.sin(a - 0.2) * 7], [Math.cos(a - 0.15) * 11, Math.sin(a - 0.15) * 11], [Math.cos(a + 0.15) * 11, Math.sin(a + 0.15) * 11], [Math.cos(a + 0.2) * 7, Math.sin(a + 0.2) * 7]])); } g.addPath(circ(0, 0, 8)); pp(c, g, '#5b3f37', 0.1); pp(c, circ(0, 0, 3.4), '#fffaf0', 0); }, 26));
+  $('setBtn').append(iconCanvas(c => ART.paint('ui.icon.settings', c), 26));
   $('setBtn').onclick = () => openPanel('settings');
   $('btnShop').onclick = () => openPanel('shop');
   $('btnPack').onclick = () => openPanel('pack');
@@ -124,16 +110,15 @@ function renderShelf(body) {
   body.append(el('p', 'note', T('ui.shelf.note')));
   const rows = Math.ceil(DESTS.length / 4), dpr = Math.min(2, window.devicePixelRatio || 1), W = 340, H = 26 + rows * 108, c = document.createElement('canvas');
   c.width = W * dpr; c.height = H * dpr; c.className = 'shelf'; const x = c.getContext('2d'); x.scale(dpr, dpr);
-  piece(x, rectP(0, 0, W, H), '#f3d9a8', { scr: 0.25 });
-  for (let k = 0; k < H / 38; k++) piece(x, rectP(0, k * 38, W, 2), '#e6c48d', { mul: 0.4 });
+  ART.paint('ui.shelf.back', x, W, H);
   const have = Object.fromEntries(S.shelf.map(s => [s.id, s]));
   for (let r = 0; r < rows; r++) {
     const by = 92 + r * 108;
-    pp(x, rectP(8, by, W - 16, 12), '#b57a4a', 0.3); piece(x, rectP(8, by, W - 16, 3), '#d39b66', { mul: 0.4 });
+    ART.paint('ui.shelf.board', x, W, by);
     for (let k = 0; k < 4; k++) {
       const d = DESTS[r * 4 + k]; if (!d) continue; const cx = 48 + k * 81, s = have[d.id];
-      if (s) { if (s.isNew) glow(x, cx, by - 26, 44, '255,236,170', 0.7); x.save(); x.translate(cx, by); drawSouvenir(x, d.id, 1); x.restore(); }
-      else { x.save(); x.setLineDash([3, 4]); x.strokeStyle = 'rgba(150,110,80,0.4)'; x.lineWidth = 1.5; x.strokeRect(cx - 22, by - 52, 44, 50); x.restore(); }
+      if (s) { if (s.isNew) ART.draw('fx.glow', x, cx, by - 26, 44, '255,236,170', 0.7); x.save(); x.translate(cx, by); ART.paint('souvenir.' + d.id, x, 1); x.restore(); }
+      else ART.paint('ui.shelf.empty', x, cx, by);
       x.fillStyle = s ? '#6b4a3f' : 'rgba(107,74,63,0.4)'; x.font = `600 11px ${FONT}`; x.textAlign = 'center';
       x.fillText(s ? T('sv.' + d.id) : (d.rare ? '★' : '?'), cx, by + 26);
     }
@@ -151,14 +136,15 @@ function renderGifts(body) {
   const grid = el('div', 'gifts');
   for (const g of GIFTS) {
     const n = S.giftBox[g] || 0, cell = el('div', 'gift-cell' + (n ? '' : ' none'));
-    const ic = paperIcon(64, x => { if (!n) { x.globalAlpha = 0.18; x.filter = 'grayscale(1)'; } drawGift(x, g); }, BOX_GIFT, 1.7);
+    const ic = paperIcon(64, x => { if (!n) { x.globalAlpha = 0.18; x.filter = 'grayscale(1)'; } ART.paint('gift.' + g, x); }, ART.get('gift.' + g).box, 1.7);
     cell.append(ic, el('div', 'gift-name', n ? T('gift.' + g) : (g === 'clover' ? '★ ?' : '?')), el('div', 'gift-count', n ? '× ' + n : ''));
     grid.append(cell);
   }
   body.append(grid);
   body.append(el('h3', 'sub', T('ui.gifts.who')));
   const who = el('div', 'gifts visitors');
-  for (const [v, draw, box, k] of [['sparrow', x => drawBird(x, 0), { w: 60, h: 60, ox: 30, oy: 48 }, 1.5], ['cat', x => drawNeighborCat(x, 'sit'), BOX_NCAT, 0.5], ['squirrel', x => drawSquirrel(x, 'nibble'), BOX_SQ, 0.8]]) {
+  for (const [v, id, pose, k] of [['sparrow', 'visitor.sparrow', 0, 1.5], ['cat', 'visitor.cat', 'sit', 0.5], ['squirrel', 'visitor.squirrel', 'nibble', 0.8]]) {
+    const draw = x => ART.paint(id, x, pose), box = ART.get(id).box;
     const n = S.visits[v] || 0, cell = el('div', 'gift-cell' + (n ? '' : ' none'));
     cell.append(paperIcon(72, x => { if (!n) x.globalAlpha = 0.25; draw(x); }, box, k), el('div', 'gift-name', T('vis.' + v)), el('div', 'gift-count', n ? T('ui.gifts.times').replace('{n}', n) : T('ui.gifts.notYet')));
     who.append(cell);
@@ -168,7 +154,7 @@ function renderGifts(body) {
 // a postcard that turns over when tapped (mailbox + album)
 function flipCard(id, onFlip, year, friend) {
   const dpr = Math.min(2, window.devicePixelRatio || 1), wrap = el('button', 'card'), cvs = document.createElement('canvas');
-  const src = postcardCanvas(id, UI.side, dpr, year, friend); cvs.width = src.width; cvs.height = src.height; cvs.getContext('2d').drawImage(src, 0, 0);
+  const src = ART.card(id, UI.side, dpr, year, friend); cvs.width = src.width; cvs.height = src.height; cvs.getContext('2d').drawImage(src, 0, 0);
   wrap.append(cvs); wrap.onclick = () => { UI.side = UI.side === 'front' ? 'back' : 'front'; wrap.classList.add('flip'); setTimeout(onFlip, 160); };
   return wrap;
 }
@@ -178,7 +164,7 @@ function renderAlbum(body) {
   for (const t of ['places', 'fests', 'friends']) { const b = el('button', 'tab' + ((UI.tab || 'places') === t ? ' on' : ''), T('ui.album.' + t)); b.onclick = () => { UI.tab = t; renderPanel(); }; tabs.append(b); }
   body.append(tabs);
   const grid = el('div', 'album'), jobs = [];
-  const thumb = (cell, id, year, friend) => { const c = document.createElement('canvas'); c.width = 180; c.height = 120; cell.prepend(c); jobs.push(() => c.getContext('2d').drawImage(postcardCanvas(id, 'front', 0.4, year, friend), 0, 0, 180, 120)); };
+  const thumb = (cell, id, year, friend) => { const c = document.createElement('canvas'); c.width = 180; c.height = 120; cell.prepend(c); jobs.push(() => c.getContext('2d').drawImage(ART.card(id, 'front', 0.4, year, friend), 0, 0, 180, 120)); };
   if (UI.tab === 'friends') return renderFriends(body);
   if (UI.tab === 'fests') {
     body.append(el('p', 'note', T('ui.album.festNote')));
@@ -203,9 +189,8 @@ function renderAlbum(body) {
 }
 // the friends page: a card for each friend; the ones not met yet are blank paper silhouettes
 function friendPortrait(id, met) {
-  const dpr = Math.min(2, window.devicePixelRatio || 1), box = BOX_FRIEND[id], k = id === 'peafowl' ? 0.5 : 0.7;
-  const bx = { w: box.w * k, h: box.h * k, ox: box.ox * k, oy: box.oy * k };
-  const src = puppetCanvas(bx, dpr, p => { p.scale(k, k); FRIEND_DRAW[id](p, id === 'peafowl' ? 'stand' : 'sit'); });
+  const dpr = Math.min(2, window.devicePixelRatio || 1), k = id === 'peafowl' ? 0.5 : 0.7;
+  const { cv: src, box: bx } = ART.puppet('friend.' + id, dpr, k, id === 'peafowl' ? 'stand' : 'sit');
   const cv = mk(150 * dpr, 120 * dpr), x = cv.getContext('2d'); x.scale(dpr, dpr);
   if (met) sticker(x, src, 75 - bx.ox, 112 - bx.oy, { res: dpr });
   else { const sil = mk(src.width, src.height), sc = sil.getContext('2d'); sc.drawImage(src, 0, 0); sc.globalCompositeOperation = 'source-in'; sc.fillStyle = '#e6d8c2'; sc.fillRect(0, 0, sil.width, sil.height); x.globalAlpha = 0.9; x.drawImage(sil, 75 - bx.ox, 112 - bx.oy, bx.w, bx.h); }
@@ -250,11 +235,10 @@ function renderAlbumView(body) {
   const back = el('button', 'pill btn wide', T('ui.album.back')); back.onclick = () => { UI.view = null; UI.side = 'front'; renderPanel(); }; body.append(back);
 }
 function cardBlob(id, year, both, friend) {
-  const f = postcardCanvas(id, 'front', 2, year, friend); let cv = f;
+  const f = ART.card(id, 'front', 2, year, friend); let cv = f;
   if (both) {
-    const b = postcardCanvas(id, 'back', 2, year, friend), m = 60; cv = mk(f.width * 2 + m * 3, f.height + m * 2); const x = cv.getContext('2d');
-    piece(x, rectP(0, 0, cv.width, cv.height), '#e8dcc8', { scr: 0.2 });
-    for (const [img, dx] of [[f, m], [b, m * 2 + f.width]]) { castShadow(x, k => k.drawImage(img, dx, m), 16, 4, 10, 0.3); x.drawImage(img, dx, m); }
+    const b = ART.card(id, 'back', 2, year, friend), m = 60; cv = mk(f.width * 2 + m * 3, f.height + m * 2); const x = cv.getContext('2d');
+    ART.paint('ui.shareSheet', x, cv.width, cv.height, [[f, m], [b, m * 2 + f.width]], m);
   }
   return new Promise(r => cv.toBlob(r, 'image/png'));
 }

@@ -119,3 +119,9 @@ function drawGiftBox(c) {
   pawPrint(c, -7, -6, 0.32, '#b5835a');
 }
 const BOX_GIFTBOX = { w: 40, h: 40, ox: 20, oy: 34 };
+
+// ================= ART LIST: visitors and what they leave =================
+ART.def('visitor.cat', { group: 'visitor', box: BOX_NCAT, k: 0.62, draw: (c, a) => drawNeighborCat(c, a[0]), note: 'the neighbour\'s cat: sit | blink | walk0 | walk1 | swat' });
+ART.def('visitor.squirrel', { group: 'visitor', box: BOX_SQ, k: 0.66, draw: (c, a) => drawSquirrel(c, a[0]), note: 'sit | nibble | hop0 | hop1' });
+for (const kind of ['feather', 'pinecone', 'pebble', 'flower', 'clover']) ART.def('gift.' + kind, { group: 'gift', box: BOX_GIFT, k: 1.25, stick: false, draw: c => drawGift(c, kind) });
+ART.def('prop.giftbox', { group: 'prop', box: BOX_GIFTBOX, k: 1.2, stick: false, draw: c => drawGiftBox(c), note: 'the box by the door where gifts are kept' });

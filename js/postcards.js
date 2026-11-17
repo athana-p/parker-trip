@@ -1848,3 +1848,8 @@ function postcardCanvas(id, side, res, year, friend) {
   if (side === 'front' && friend && FRIEND_SPOT[id]) { const f = FRIEND_SPOT[id]; fr(c, res, friend, f.pose, f.x, f.y, f.k, f.flip); }
   _pcCache.set(key, cv); return cv;
 }
+
+// ================= ART LIST: postcards =================
+// one entry per card, 900 × 600; ART.card(id, side, res, year, friend) gives the finished picture (kept once made)
+for (const pc of POSTCARDS) ART.def('card.' + pc.id, { kind: 'card', group: 'card', box: { w: PC_W, h: PC_H, ox: 0, oy: 0 }, draw: (c, W, H, res) => pc.front.call(pc, c, W, H, res), note: 'front; the back is drawn from the texts' });
+ART.card = (id, side, res, year, friend) => postcardCanvas(id, side, res, year, friend);

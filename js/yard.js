@@ -190,3 +190,14 @@ function drawDandelion(c, kind) {
   }
 }
 const DANDELION_BOX = { w: 60, h: 66, ox: 28, oy: 56 };
+
+// ================= ART LIST: the yard =================
+// backdrops, built once per time of day / season and kept by the game (w = the scene's 400 units; h follows the screen)
+ART.def('scene.sky', { kind: 'layer', group: 'scene', box: { w: SCENE_W, h: 'screen', ox: 0, oy: 0 }, draw: (p, H, res) => buildSky(p, H, res), note: 'sky, sun or moon, hills, trees behind the fence: (palette, H, res)' });
+ART.def('scene.clouds', { kind: 'layer', group: 'scene', box: { w: 164, h: 78, ox: 82, oy: 60 }, draw: (p, res) => cloudSprites(p, res), note: 'three clouds (the largest box is given): (palette, res)' });
+ART.def('scene.yard', { kind: 'layer', group: 'scene', box: { w: SCENE_W, h: 440, ox: 0, oy: 440 }, draw: (H, res, look) => buildYard(H, res, look), note: 'lawn, fence, bushes, doghouse, mailbox, lamp, bowl, stones: (H, res, season look)' });
+ART.def('scene.fore', { kind: 'layer', group: 'scene', box: { w: SCENE_W, h: 90, ox: 0, oy: 90 }, draw: (H, res, look) => buildFore(H, res, look), note: 'grass in front of everything: (H, res, season look)' });
+ART.def('scene.light.mul', { kind: 'layer', group: 'scene', box: { w: SCENE_W, h: 'screen', ox: 0, oy: 0 }, draw: (p, H) => buildMulOverlay(p, H), note: 'time-of-day tint over the yard (multiplied)' });
+ART.def('scene.light.scr', { kind: 'layer', group: 'scene', box: { w: SCENE_W, h: 'screen', ox: 0, oy: 0 }, draw: (p, H) => buildScrOverlay(p, H), note: 'time-of-day glow (screened)' });
+ART.def('prop.dandelion', { group: 'prop', box: DANDELION_BOX, stick: false, draw: (c, a) => drawDandelion(c, a[0]), note: 'yellow | puff' });
+ART.def('live.mailFlag', { kind: 'live', group: 'live', box: { w: 34, h: 34, ox: 30, oy: 30 }, draw: (ctx, x, by, up) => mailboxFlag(ctx, x, by, up), note: 'the mailbox flag, up when there is post: (ctx, x, baseY, up)' });

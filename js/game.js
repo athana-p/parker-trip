@@ -1,6 +1,5 @@
 // ================= GAME: home (stage 1) =================
 const SPAWN_INTERVAL = 4 * 60 * 1000, FIELD_CAP = 12, PUFF_CHANCE = 0.15, START_DANDELIONS = 5;
-const K_DOG = 0.55;                                   // puppet scale in the yard
 const DEV = new URLSearchParams(location.search);     // dev: ?tod=night  ?pose=sleep  ?debug=1 (debug panel)
 
 const cv = document.getElementById('scene'), ctx = cv.getContext('2d');
@@ -8,67 +7,9 @@ const V = { H: 700, res: 2, cssW: 1, cssH: 1, k: 1 };
 const Y = d => V.H - d;
 let S = null, TT = 0, LAY = null, TOD = null, WX = null, shown = 0;
 
-// ---------- sprites: puppet drawings rendered once (sticker edge + soft shadow baked), then reused ----------
-function makeSprite(fn, box, k, stick = true) {
-  const res = V.res, PAD = 22, bx = { w: box.w * k, h: box.h * k, ox: box.ox * k, oy: box.oy * k };
-  const src = puppetCanvas(bx, res, c => { c.scale(k, k); fn(c); });
-  const w = bx.w + PAD * 2, h = bx.h + PAD * 2;
-  const img = mk(w * res, h * res), ic = img.getContext('2d'); ic.scale(res, res);
-  if (stick) sticker(ic, src, PAD, PAD, { res, shadowA: 0 }); else ic.drawImage(src, PAD, PAD, bx.w, bx.h);
-  const sh = mk(w * res, h * res), sc = sh.getContext('2d'); sc.scale(res, res);
-  castShadow(sc, c => c.drawImage(img, 0, 0, w, h), stick ? 6 : 2.5, 0, 0, 1);
-  return { img, sh, ox: bx.ox + PAD, oy: bx.oy + PAD, w, h, stick };
-}
-const SPRITES = {
-  sit: a => [c => drawSitB(c, a[0], +a[1], { headRot: +a[2], headDy: +(a[3] || 0), pack: a[4] === 'pack', mouth: ['duck', 'card', 'simit', 'ball', 'rope', 'twig'].includes(a[4]) ? a[4] : null }), BOX_SIT, K_DOG],
-  item: a => [c => drawItem(c, a[0], +a[1]), { w: 44, h: 44, ox: 22, oy: 22 }, 1, false],
-  bow: a => [c => drawPlayBowB(c, a[0], { wag: +(a[1] || 0) }), BOX_BOW, K_DOG],
-  dust: a => [c => tornPiece(c, ellipsePts(0, 0, 3 + (+a[1]), 2 + (+a[1]) * 0.6, 10), a[0], { amp: 0.5, seed: 30 + (+a[1]), rim: 0, shadow: 0.15, mul: 0.3 }), { w: 14, h: 12, ox: 7, oy: 6 }, 1, false],
-  kite: () => [c => drawKite(c, false), { w: 50, h: 70, ox: 25, oy: 35 }, 1, false],
-  kitebow: a => [c => kiteBow(c, 0, 0, a[0]), { w: 16, h: 12, ox: 8, oy: 6 }, 1, false],
-  snowman: a => [c => drawSnowman(c, +a[0], +a[1] / 10), { w: 90, h: 100, ox: 45, oy: 84 }, 1.4, false],
-  confetti: a => [c => tornPiece(c, [[-3, -1.6], [3, -2], [2.6, 1.8], [-2.8, 1.4]], a[0], { amp: 0.4, seed: 3, rim: 0, shadow: 0.12, mul: 0.3 }), { w: 10, h: 8, ox: 5, oy: 4 }, 1, false],
-  bird: a => [c => drawBird(c, +a[0]), { w: 60, h: 60, ox: 30, oy: 48 }, 1, false],
-  ncat: a => [c => drawNeighborCat(c, a[0]), BOX_NCAT, 0.62],
-  sq: a => [c => drawSquirrel(c, a[0]), BOX_SQ, 0.66],
-  gift: a => [c => drawGift(c, a[0]), BOX_GIFT, 1.25, false],
-  giftbox: () => [c => drawGiftBox(c), BOX_GIFTBOX, 1.2, false],
-  belly: a => [c => drawBellyB(c, +a[0]), BOX_BELLY, K_DOG],
-  puff: () => [c => drawPuff(c), { w: 30, h: 22, ox: 15, oy: 11 }, 1, false],
-  trot: a => [c => drawStandB(c, { ...trotPose(+a[0]), pack: a[1] === 'pack' }), BOX_STAND, K_DOG],
-  stand: a => [c => drawStandB(c, { ...STAND0, expr: a[0], pack: a[1] === 'pack' }), BOX_STAND, K_DOG],
-  door: a => [c => drawDoorNap(c, a[0], +a[1]), BOX_DOOR, 1, false],
-  bat: a => [c => drawStandB(c, { ...STAND0, wag: 0.15, legs: { ...STAND0.legs, fn: +a[0] ? { a: 0.95, lift: 16 } : { a: 0.2, lift: 4 } }, head: { view: 'side', dx: 4, dy: 18, rot: 0.25 }, expr: 'happy' }), BOX_STAND, K_DOG],
-  tug: a => [c => drawStandB(c, { ...STAND0, tilt: -0.1 - (+a[0]) * 0.03, bob: 3, wag: 0.2 * (+a[0] ? 1 : -1), legs: { fn: { a: 0.55, lift: 0 }, ff: { a: 0.45, lift: 0 }, hn: { a: -0.45, lift: 0 }, hf: { a: -0.38, lift: 0 } }, head: { view: 'side', dx: 6, dy: 14, rot: 0.18 + (+a[0]) * 0.06 }, expr: 'happy' }), BOX_STAND, K_DOG],
-  nosepush: a => [c => drawStandB(c, { ...trotPose(+a[0]), head: { view: 'side', dx: 8, dy: 30, rot: 0.38 }, expr: 'happy' }), BOX_STAND, K_DOG],
-  sniff: a => [c => drawStandB(c, sniffPose(+a[0])), BOX_STAND, K_DOG],
-  look: a => [c => drawStandB(c, { ...lookBackPose(+a[0]), pack: a[1] === 'pack' }), BOX_STAND, K_DOG],
-  lie: a => [c => drawLieB(c, a[0], { breath: +a[1], bone: a[2] === 'bone', headRot: a[3] != null ? +a[3] : undefined }), BOX_LIE, K_DOG],
-  dand: a => [c => drawDandelion(c, a[0]), DANDELION_BOX, 1, false],
-  heart: () => [c => drawHeart(c, 1), { w: 30, h: 30, ox: 15, oy: 15 }, 1, false],
-  z: () => [c => drawZ(c, 1.1), { w: 24, h: 24, ox: 12, oy: 12 }, 1, false],
-  petal: () => [c => piece(c, ell(0, 0, 4, 1.8), '#f6c22c', { mul: 0.5 }), { w: 12, h: 8, ox: 6, oy: 4 }, 1, false],
-  shake: a => [c => drawShakeB(c, +a[0]), BOX_SHAKE, K_DOG],
-  flat: a => [c => drawFlatB(c, +a[0]), BOX_FLAT, K_DOG],
-  drop: () => [c => { const p = new Path2D(); p.moveTo(0, -4.5); p.quadraticCurveTo(3.4, 1, 0, 4); p.quadraticCurveTo(-3.4, 1, 0, -4.5); piece(c, p, '#8fcdef', { mul: 0.35 }); }, { w: 12, h: 14, ox: 6, oy: 7 }, 1, false],
-  flake: () => [c => tornPiece(c, ellipsePts(0, 0, 3.4, 3, 14), '#ffffff', { amp: 0.6, seed: 905, rimCol: '#ffffff', shadow: 0.2, mul: 0.2 }), { w: 14, h: 14, ox: 7, oy: 7 }, 1, false],
-  seed: () => [c => { c.strokeStyle = '#fff'; c.lineWidth = 0.8; c.beginPath(); c.moveTo(0, 4); c.lineTo(0, -3); c.stroke(); for (let i = -2; i <= 2; i++) { c.beginPath(); c.moveTo(0, -3); c.lineTo(i * 1.8, -6); c.stroke(); } }, { w: 12, h: 14, ox: 6, oy: 7 }, 1, false],
-};
-const SPR = new Map();
-function sprite(key) {
-  let s = SPR.get(key);
-  if (!s) {
-    const sn = key.endsWith('|sn'), a = (sn ? key.slice(0, -3) : key).split('|'), [fn, box, k, stick] = SPRITES[a[0]](a.slice(1));
-    HEAD_SNOW = sn; try { s = makeSprite(fn, box, k, stick); } finally { HEAD_SNOW = false; }      // |sn = a dab of snow on his nose
-    SPR.set(key, s); if (SPR.size > 72) SPR.delete(SPR.keys().next().value);
-  }
-  return s;
-}
-function drawSprite(s, x, y, o = {}) {
-  const { sx = 1, scale = 1, alpha = 1, rot = 0, shA = s.stick ? 0.3 : 0.22 } = o, off = s.stick ? [4, 7] : [1, 2.5];
-  ctx.save(); ctx.globalAlpha = alpha * shA; ctx.translate(x + off[0] * scale, y + off[1] * scale); ctx.rotate(rot); ctx.scale(sx * scale, scale); ctx.drawImage(s.sh, -s.ox, -s.oy, s.w, s.h); ctx.restore();
-  ctx.save(); ctx.globalAlpha = alpha; ctx.translate(x, y); ctx.rotate(rot); ctx.scale(sx * scale, scale); ctx.drawImage(s.img, -s.ox, -s.oy, s.w, s.h); ctx.restore();
-}
+// ---------- art: the game never draws anything itself; it asks the art list (js/art.js) by id ----------
+function sprite(key) { return ART.sprite(key); }
+function drawSprite(s, x, y, o) { ART.put(ctx, s, x, y, o); }
 
 // ---------- layout + static layers ----------
 function layout() {
@@ -76,14 +17,14 @@ function layout() {
   V.cssW = r.width; V.cssH = r.height; V.H = SCENE_W * r.height / r.width;
   V.k = r.width * dpr / SCENE_W; V.res = Math.min(3, V.k);
   cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
-  SPR.clear(); LAY = null; buildStatic(TOD);
+  ART.res = V.res; ART.clear(); LAY = null; buildStatic(TOD);
 }
 function buildStatic(tod) {
   const p = wxPalette(PALETTES[tod], WX), old = LAY, look = WX.look;
-  const L = { tod, look, sky: buildSky(p, V.H, V.res), clouds: cloudSprites(p, V.res), mul: buildMulOverlay(p, V.H), scr: buildScrOverlay(p, V.H), p };
+  const L = { tod, look, sky: ART.layer('scene.sky', p, V.H, V.res), clouds: ART.layer('scene.clouds', p, V.res), mul: ART.layer('scene.light.mul', p, V.H), scr: ART.layer('scene.light.scr', p, V.H), p };
   const same = old && old.look === look;            // the yard only changes with the season (and snow on the ground)
-  L.yard = same ? old.yard : buildYard(V.H, V.res, look);
-  L.fore = same ? old.fore : buildFore(V.H, V.res, look);
+  L.yard = same ? old.yard : ART.layer('scene.yard', V.H, V.res, look);
+  L.fore = same ? old.fore : ART.layer('scene.fore', V.H, V.res, look);
   if (old) { L.old = old; L.fadeT0 = TT; old.old = null; }
   LAY = L;
 }
@@ -121,8 +62,8 @@ function collect(f) {
   const value = f.kind === 'puff' ? 3 : 1, x = f.x, y = Y(f.d) - 36 * depthScale(f.d);
   S.dandelions += value; S.seenHint = true; hideToast(); writeSave(S); SFX.collect(f.kind === 'puff');
   fx({ type: 'glow', x, y, life: 0.5, r: 34, rgb: '255,236,170' });
-  if (f.kind === 'puff') for (let i = 0; i < 12; i++) fx({ type: 'spr', key: 'seed', x: x + (Math.random() - 0.5) * 16, y: y + (Math.random() - 0.5) * 16, vx: (Math.random() - 0.3) * 30, vy: -20 - Math.random() * 30, sway: Math.random() * TAU, life: 1.8 + Math.random(), rot: (Math.random() - 0.5) * 0.6 });
-  else for (let i = 0; i < 9; i++) { const a = i / 9 * TAU; fx({ type: 'spr', key: 'petal', x, y, vx: Math.cos(a) * 60, vy: Math.sin(a) * 60 - 30, g: 120, life: 0.7, rot: a, vr: 6 }); }
+  if (f.kind === 'puff') for (let i = 0; i < 12; i++) fx({ type: 'spr', key: 'fx.seed', x: x + (Math.random() - 0.5) * 16, y: y + (Math.random() - 0.5) * 16, vx: (Math.random() - 0.3) * 30, vy: -20 - Math.random() * 30, sway: Math.random() * TAU, life: 1.8 + Math.random(), rot: (Math.random() - 0.5) * 0.6 });
+  else for (let i = 0; i < 9; i++) { const a = i / 9 * TAU; fx({ type: 'spr', key: 'fx.petal', x, y, vx: Math.cos(a) * 60, vy: Math.sin(a) * 60 - 30, g: 120, life: 0.7, rot: a, vr: 6 }); }
   if (f.kind === 'puff' && /^(sit|look|sniff|lie|trot)$/.test(P.mode) && Math.random() < HABITS.fluffChase) {
     const side = Math.sign(x - P.x) || 1, tx = clamp(x - 44 * side, 40, 360), td = clamp(f.d, 100, 220);
     goTo(tx, td, () => faceThen(side, () => setMode('sniff', 2.2)));
@@ -223,7 +164,7 @@ function comeOut(then) {                 // out through the door, a stretchy bli
 // a little puff of paper dust where he lands
 function dustPuff(x, y, n = 6) {
   const col = WX.look === 'snow' ? '#f4f7fb' : WX.look === 'autumn' ? '#d9c08a' : '#d8c9a4';
-  for (let i = 0; i < n; i++) { const a = (i / (n - 1) - 0.5) * 2.6; fx({ type: 'spr', key: `dust|${col}|${i % 2}`, x: x + Math.sin(a) * 10, y: y - 2, vx: Math.sin(a) * 46, vy: -18 - Math.random() * 16, g: 70, life: 0.5 + Math.random() * 0.2, rot: a }); }
+  for (let i = 0; i < n; i++) { const a = (i / (n - 1) - 0.5) * 2.6; fx({ type: 'spr', key: `fx.dust|${col}|${i % 2}`, x: x + Math.sin(a) * 10, y: y - 2, vx: Math.sin(a) * 46, vy: -18 - Math.random() * 16, g: 70, life: 0.5 + Math.random() * 0.2, rot: a }); }
 }
 // ---- weather behaviours (stage 3) ----
 const SHELTER = [118, 244], SHADE = [100, 238];
@@ -244,13 +185,13 @@ const WX_ACTS = {
     step(3);
   },
 };
-function shakeOff() { goTo(SHELTER[0], SHELTER[1], () => faceThen(1, () => { setMode('shakeoff', HABITS.wxTime.shakeOff); SFX.shake(); const [hx, hy] = parkerCenter(); for (let i = 0; i < 10; i++) { const a = -Math.PI * (0.1 + 0.8 * i / 9); fx({ type: 'spr', key: 'drop', x: hx, y: hy - 10, vx: Math.cos(a) * 90, vy: Math.sin(a) * 70, g: 220, life: 0.7, rot: a + Math.PI / 2 }); } })); }
+function shakeOff() { goTo(SHELTER[0], SHELTER[1], () => faceThen(1, () => { setMode('shakeoff', HABITS.wxTime.shakeOff); SFX.shake(); const [hx, hy] = parkerCenter(); for (let i = 0; i < 10; i++) { const a = -Math.PI * (0.1 + 0.8 * i / 9); fx({ type: 'spr', key: 'fx.drop', x: hx, y: hy - 10, vx: Math.cos(a) * 90, vy: Math.sin(a) * 70, g: 220, life: 0.7, rot: a + Math.PI / 2 }); } })); }
 // snapping at snowflakes: three little hops, a flake caught at the top of each
 function snapTick() {
   const u = (TT - P.t0) / (HABITS.wxTime.snap / 3), n = Math.floor(u);
   if (n > P.data.hops - 1 && u - n > 0.45 && n < 3) {
     P.data.hops = n + 1; const s = depthScale(P.d), mx = P.x + 34 * P.face * s, my = Y(P.d) - 118 * s;
-    fx({ type: 'spr', key: 'flake', x: mx + 6 * P.face, y: my - 22, vy: 30, life: 0.35, grow: false }); fx({ type: 'glow', x: mx, y: my, life: 0.35, r: 18, rgb: '255,255,255' });
+    fx({ type: 'spr', key: 'fx.flake', x: mx + 6 * P.face, y: my - 22, vy: 30, life: 0.35, grow: false }); fx({ type: 'glow', x: mx, y: my, life: 0.35, r: 18, rgb: '255,255,255' });
   }
 }
 const CHASE = { on: false };
@@ -270,13 +211,9 @@ function leavePrint() {
 }
 function drawPrints() {
   if (!PRINTS.length) return;
-  ctx.save(); ctx.fillStyle = 'rgb(136,154,186)';
-  for (const p of PRINTS) {
-    const a = 0.7 * clamp(1 - (TT - p.t) / 70); if (a <= 0) continue;
-    const x = p.x, y = Y(p.d) - 1, s = p.s * 0.75; ctx.globalAlpha = a;
-    ctx.beginPath(); ctx.ellipse(x, y, 6 * s, 3 * s, 0, 0, TAU); for (const dx of [-6, -2, 2, 6]) ctx.ellipse(x + dx * s, y - 4.6 * s + Math.abs(dx) * 0.4 * s, 2 * s, 1.4 * s, 0, 0, TAU); ctx.fill();
-  }
-  ctx.restore();
+  const list = [];
+  for (const p of PRINTS) { const a = 0.7 * clamp(1 - (TT - p.t) / 70); if (a > 0) list.push([p.x, Y(p.d) - 1, p.s * 0.75, a]); }
+  ART.draw('live.prints', ctx, list);
 }
 function updateParker(dt) {
   if (!P.present) return;
@@ -303,7 +240,7 @@ function updateParker(dt) {
     if (WX.look === 'snow' && (P.walked = (P.walked || 0) + step) > HABITS.printEvery) leavePrint();
     if (P.x < 40 || P.x > 360) P.until = Math.min(P.until, TT);
   }
-  if (P.mode === 'wet' && TT > (P.dripAt || 0)) { P.dripAt = TT + 0.25; const [hx, hy] = parkerCenter(); fx({ type: 'spr', key: 'drop', x: hx + (Math.random() - 0.5) * 50, y: hy + 10, vy: 30, g: 200, life: 0.5, rot: 0 }); }
+  if (P.mode === 'wet' && TT > (P.dripAt || 0)) { P.dripAt = TT + 0.25; const [hx, hy] = parkerCenter(); fx({ type: 'spr', key: 'fx.drop', x: hx + (Math.random() - 0.5) * 50, y: hy + 10, vy: 30, g: 200, life: 0.5, rot: 0 }); }
   if (P.mode === 'snap') snapTick();
   if (TT < P.until) return;
   if (P.mode === 'turn') { P.face = P.data.to; P.data.then(); }
@@ -464,7 +401,7 @@ function tapParker() {
   P.lastReact = r; setMode(r, HABITS.reactionTime[r]); SFX.pop();
   const [hx, hy] = parkerCenter();
   fx({ type: 'glow', x: hx, y: hy - 20, life: 0.6, r: 60, rgb: '255,240,200' });
-  if (r !== 'tilt') for (let i = 0; i < 3; i++) fx({ type: 'spr', key: 'heart', x: hx + (i - 1) * 22, y: hy - 40, vx: (i - 1) * 8, vy: -34, delay: i * 0.18, sway: i, life: 1.4, rot: (i - 1) * 0.2 });
+  if (r !== 'tilt') for (let i = 0; i < 3; i++) fx({ type: 'spr', key: 'fx.heart', x: hx + (i - 1) * 22, y: hy - 40, vx: (i - 1) * 8, vy: -34, delay: i * 0.18, sway: i, life: 1.4, rot: (i - 1) * 0.2 });
 }
 // which drawing to show (held on twos: the index changes 12 times per second)
 function parkerDrawing() {
@@ -473,58 +410,58 @@ function parkerDrawing() {
   const open = blink ? 'blink' : 'calm', pk = P.pack ? '|pack' : '';
   let key, sx = P.face, lift = 0;
   switch (P.mode) {
-    case 'trot': key = `trot|${(P.data.slow ? Math.floor(f / 2) : f) % 6}${pk}`; break;
-    case 'chase': case 'fetch': case 'bubblego': case 'yarnchase': key = `trot|${f % 6}`; break;
-    case 'goin': key = `trot|${f % 6}`; break;
-    case 'inhouse': key = `door|${TT < (P.data.peekUntil || 0) ? (TT - P.data.peekUntil > -0.25 ? 'blink' : 'calm') : 'sleepy'}|${[0, 0.8, 1.6, 0.8][Math.floor(TT / 0.75) % 4]}`; sx = 1; break;
-    case 'kitechase': { const h = P.data.hopT0 != null ? clamp((TT - P.data.hopT0) / 0.6) : 1; if (h < 1) { lift = 28 * Math.sin(Math.PI * h); key = 'sit|happy|0|-0.36'; } else key = P.data.run ? `trot|${f % 6}` : `sit|happy|${f % 4 < 2 ? 0.22 : -0.16}|-0.3`; break; }
-    case 'twigput': key = (TT - P.t0) < 0.5 ? 'sit|happy|0|0.1|0|twig' : 'sit|happy|0.2|0.05'; break;
-    case 'sprinkplay': { const h = P.data.hopT0 != null ? clamp((TT - P.data.hopT0) / 0.55) : 1; if (h < 1) { lift = 24 * Math.sin(Math.PI * h); key = 'sit|happy|0|-0.3'; } else key = `trot|${f % 6}`; break; }
-    case 'tug': key = `tug|${f % 4 < 2 ? 0 : 1}`; break;
-    case 'ropewin': key = `sit|happy|0|${f % 4 < 2 ? -0.24 : 0.24}|0|rope`; break;      // shaking the rope he won
-    case 'yarnbat': key = `bat|${(TT - P.t0) > 0.12 && (TT - P.t0) < 0.4 ? 1 : 0}`; break;
-    case 'temari': key = `nosepush|${Math.floor(f / 2) % 6}`; break;
-    case 'bubblewait': key = `sit|happy|${f % 6 < 3 ? 0.2 : -0.15}|-0.32`; break;      // wagging, nose up at the bubble
-    case 'bubblehop': { const u = clamp((TT - P.t0) / 0.62); lift = 30 * Math.sin(Math.PI * u); key = lift > 6 ? 'sit|happy|0|-0.36' : 'sit|calm|0|-0.24'; break; }
-    case 'pickup': key = 'sniff|1'; break;
-    case 'present': key = (TT - P.t0) < 0.35 ? 'sit|happy|0|0.1|0|ball' : 'sit|happy|0|0.05'; break;
-    case 'waitthrow': key = `sit|${f % 12 < 6 ? 'happy' : open}|${f % 4 < 2 ? 0.26 : -0.2}|-0.08`; break;   // wagging, looking up at you
-    case 'pant': key = `lie|pant|${Math.floor(TT * 4) % 2 ? 1.6 : 0}`; break;
-    case 'catboop': { const u = TT - P.t0; key = u > 0.7 && u < 2.1 ? 'sniff|1' : `stand|calm`; break; }   // nose to nose
-    case 'catbow': key = `bow|pant|${f % 4 < 2 ? 0.25 : -0.2}`; break;
-    case 'catside': key = (TT - P.t0) > 3 && (TT - P.t0) < 5 ? 'sit|content|0|0.07' : `sit|${open}|0|0`; break;
-    case 'shelter': { const ph = Math.floor((TT - P.t0) / 3) % 3; key = `sit|${open}|0|${ph === 1 ? -0.16 : ph === 2 ? 0.1 : 0}`; break; }   // watching the rain, now and then looking up
-    case 'wet': key = `look|${Math.floor(f / 6) % 2}`; break;
-    case 'shakeoff': key = `shake|${f % 4 < 2 ? 0 : 1}`; sx = 1; break;
-    case 'sunnap': { const b = [0, 1.2, 2.4, 1.2][Math.floor(TT / 0.9) % 4]; key = `lie|sleepy|${b}`; break; }
-    case 'sunbelly': key = `belly|${Math.floor(f / 6) % 2}`; break;
-    case 'flat': key = `flat|${Math.floor(TT * 4) % 2}`; break;
-    case 'snap': { const u = ((TT - P.t0) / (HABITS.wxTime.snap / 3)) % 1; lift = 18 * Math.max(0, Math.sin(Math.PI * clamp((u - 0.15) / 0.6))); key = lift > 4 ? 'sit|happy|0|-0.34' : 'sit|calm|0|-0.24'; break; }
-    case 'turn': key = `stand|calm${pk}`; sx = (f < 1 ? 0.55 : -0.55) * P.face; lift = 8 * Math.sin(Math.PI * clamp((TT - P.t0) / (2 / 12))); break;
-    case 'sniff': key = `sniff|${Math.floor(f / 3) % 2}`; break;
-    case 'look': key = `look|${Math.floor(f / 6) % 2}`; break;
-    case 'lie': key = `lie|${open}|0`; break;
-    case 'nap': case 'sleep': { const b = [0, 1.2, 2.4, 1.2][Math.floor(TT / 0.75) % 4]; key = `lie|sleepy|${b}`; break; }
-    case 'stir': key = (TT - P.t0) < 0.6 ? 'lie|blink|0' : 'lie|sleepy|1.2'; break;
-    case 'wag': key = `sit|happy|${f % 2 ? 0.3 : -0.25}|0`; break;
-    case 'tilt': key = f < 2 ? `sit|calm|0|0` : `sit|calm|0|-0.3`; break;
-    case 'sigh': { const inhale = (TT - P.t0) < HABITS.sighTime * 0.45; key = P.data.lie ? `lie|content|${inhale ? 2.4 : 0}` : (inhale ? 'sit|content|0|-0.05|-2.5' : 'sit|content|0|0.07|2'); break; }
-    case 'belly': key = P.data.ending ? 'belly|0' : `belly|${Math.floor(f / 3) % 2}`; break;
-    case 'drowsy': key = (TT - P.t0) < 0.9 ? 'sit|sleepy|0|0.08' : 'sit|blink|0|-0.05'; break;
-    case 'gift': key = `sit|happy|${f % 6 < 3 ? 0.2 : -0.12}|0|0|card`; break;
-    case 'packup': key = `sit|calm|0|0|0|pack`; break;
-    case 'departLook': key = `look|${Math.floor(f / 6) % 2}|pack`; break;
-    case 'arrive': key = `sit|happy|${f % 2 ? 0.3 : -0.25}|0|0|pack`; break;
-    case 'nudge': key = 'sniff|1'; break;
-    case 'watch': key = `stand|calm`; break;
-    case 'shake': key = `sit|happy|0|${f % 4 < 2 ? -0.24 : 0.24}|0|duck`; break;
-    case 'chew': key = `lie|calm|0|bone|${f % 6 < 3 ? 0.02 : 0.12}`; break;
-    case 'eat': key = `sniff|${Math.floor(f / 2) % 2}`; break;
-    case 'expect': key = `sit|${open}|${f % 6 < 3 ? 0.18 : -0.12}|0`; break;
-    case 'hop': { const u = clamp((TT - P.t0) / 0.6); lift = 16 * Math.sin(Math.PI * u); key = 'sit|happy|0.1|0'; break; }
-    default: key = `sit|${open}|0|0`;
+    case 'trot': key = `parker.trot|${(P.data.slow ? Math.floor(f / 2) : f) % 6}${pk}`; break;
+    case 'chase': case 'fetch': case 'bubblego': case 'yarnchase': key = `parker.trot|${f % 6}`; break;
+    case 'goin': key = `parker.trot|${f % 6}`; break;
+    case 'inhouse': key = `parker.door|${TT < (P.data.peekUntil || 0) ? (TT - P.data.peekUntil > -0.25 ? 'blink' : 'calm') : 'sleepy'}|${[0, 0.8, 1.6, 0.8][Math.floor(TT / 0.75) % 4]}`; sx = 1; break;
+    case 'kitechase': { const h = P.data.hopT0 != null ? clamp((TT - P.data.hopT0) / 0.6) : 1; if (h < 1) { lift = 28 * Math.sin(Math.PI * h); key = 'parker.sit|happy|0|-0.36'; } else key = P.data.run ? `parker.trot|${f % 6}` : `parker.sit|happy|${f % 4 < 2 ? 0.22 : -0.16}|-0.3`; break; }
+    case 'twigput': key = (TT - P.t0) < 0.5 ? 'parker.sit|happy|0|0.1|0|twig' : 'parker.sit|happy|0.2|0.05'; break;
+    case 'sprinkplay': { const h = P.data.hopT0 != null ? clamp((TT - P.data.hopT0) / 0.55) : 1; if (h < 1) { lift = 24 * Math.sin(Math.PI * h); key = 'parker.sit|happy|0|-0.3'; } else key = `parker.trot|${f % 6}`; break; }
+    case 'tug': key = `parker.tug|${f % 4 < 2 ? 0 : 1}`; break;
+    case 'ropewin': key = `parker.sit|happy|0|${f % 4 < 2 ? -0.24 : 0.24}|0|rope`; break;      // shaking the rope he won
+    case 'yarnbat': key = `parker.bat|${(TT - P.t0) > 0.12 && (TT - P.t0) < 0.4 ? 1 : 0}`; break;
+    case 'temari': key = `parker.nosepush|${Math.floor(f / 2) % 6}`; break;
+    case 'bubblewait': key = `parker.sit|happy|${f % 6 < 3 ? 0.2 : -0.15}|-0.32`; break;      // wagging, nose up at the bubble
+    case 'bubblehop': { const u = clamp((TT - P.t0) / 0.62); lift = 30 * Math.sin(Math.PI * u); key = lift > 6 ? 'parker.sit|happy|0|-0.36' : 'parker.sit|calm|0|-0.24'; break; }
+    case 'pickup': key = 'parker.sniff|1'; break;
+    case 'present': key = (TT - P.t0) < 0.35 ? 'parker.sit|happy|0|0.1|0|ball' : 'parker.sit|happy|0|0.05'; break;
+    case 'waitthrow': key = `parker.sit|${f % 12 < 6 ? 'happy' : open}|${f % 4 < 2 ? 0.26 : -0.2}|-0.08`; break;   // wagging, looking up at you
+    case 'pant': key = `parker.lie|pant|${Math.floor(TT * 4) % 2 ? 1.6 : 0}`; break;
+    case 'catboop': { const u = TT - P.t0; key = u > 0.7 && u < 2.1 ? 'parker.sniff|1' : `parker.stand|calm`; break; }   // nose to nose
+    case 'catbow': key = `parker.bow|pant|${f % 4 < 2 ? 0.25 : -0.2}`; break;
+    case 'catside': key = (TT - P.t0) > 3 && (TT - P.t0) < 5 ? 'parker.sit|content|0|0.07' : `parker.sit|${open}|0|0`; break;
+    case 'shelter': { const ph = Math.floor((TT - P.t0) / 3) % 3; key = `parker.sit|${open}|0|${ph === 1 ? -0.16 : ph === 2 ? 0.1 : 0}`; break; }   // watching the rain, now and then looking up
+    case 'wet': key = `parker.look|${Math.floor(f / 6) % 2}`; break;
+    case 'shakeoff': key = `parker.shake|${f % 4 < 2 ? 0 : 1}`; sx = 1; break;
+    case 'sunnap': { const b = [0, 1.2, 2.4, 1.2][Math.floor(TT / 0.9) % 4]; key = `parker.lie|sleepy|${b}`; break; }
+    case 'sunbelly': key = `parker.belly|${Math.floor(f / 6) % 2}`; break;
+    case 'flat': key = `parker.flat|${Math.floor(TT * 4) % 2}`; break;
+    case 'snap': { const u = ((TT - P.t0) / (HABITS.wxTime.snap / 3)) % 1; lift = 18 * Math.max(0, Math.sin(Math.PI * clamp((u - 0.15) / 0.6))); key = lift > 4 ? 'parker.sit|happy|0|-0.34' : 'parker.sit|calm|0|-0.24'; break; }
+    case 'turn': key = `parker.stand|calm${pk}`; sx = (f < 1 ? 0.55 : -0.55) * P.face; lift = 8 * Math.sin(Math.PI * clamp((TT - P.t0) / (2 / 12))); break;
+    case 'sniff': key = `parker.sniff|${Math.floor(f / 3) % 2}`; break;
+    case 'look': key = `parker.look|${Math.floor(f / 6) % 2}`; break;
+    case 'lie': key = `parker.lie|${open}|0`; break;
+    case 'nap': case 'sleep': { const b = [0, 1.2, 2.4, 1.2][Math.floor(TT / 0.75) % 4]; key = `parker.lie|sleepy|${b}`; break; }
+    case 'stir': key = (TT - P.t0) < 0.6 ? 'parker.lie|blink|0' : 'parker.lie|sleepy|1.2'; break;
+    case 'wag': key = `parker.sit|happy|${f % 2 ? 0.3 : -0.25}|0`; break;
+    case 'tilt': key = f < 2 ? `parker.sit|calm|0|0` : `parker.sit|calm|0|-0.3`; break;
+    case 'sigh': { const inhale = (TT - P.t0) < HABITS.sighTime * 0.45; key = P.data.lie ? `parker.lie|content|${inhale ? 2.4 : 0}` : (inhale ? 'parker.sit|content|0|-0.05|-2.5' : 'parker.sit|content|0|0.07|2'); break; }
+    case 'belly': key = P.data.ending ? 'parker.belly|0' : `parker.belly|${Math.floor(f / 3) % 2}`; break;
+    case 'drowsy': key = (TT - P.t0) < 0.9 ? 'parker.sit|sleepy|0|0.08' : 'parker.sit|blink|0|-0.05'; break;
+    case 'gift': key = `parker.sit|happy|${f % 6 < 3 ? 0.2 : -0.12}|0|0|card`; break;
+    case 'packup': key = `parker.sit|calm|0|0|0|pack`; break;
+    case 'departLook': key = `parker.look|${Math.floor(f / 6) % 2}|pack`; break;
+    case 'arrive': key = `parker.sit|happy|${f % 2 ? 0.3 : -0.25}|0|0|pack`; break;
+    case 'nudge': key = 'parker.sniff|1'; break;
+    case 'watch': key = `parker.stand|calm`; break;
+    case 'shake': key = `parker.sit|happy|0|${f % 4 < 2 ? -0.24 : 0.24}|0|duck`; break;
+    case 'chew': key = `parker.lie|calm|0|bone|${f % 6 < 3 ? 0.02 : 0.12}`; break;
+    case 'eat': key = `parker.sniff|${Math.floor(f / 2) % 2}`; break;
+    case 'expect': key = `parker.sit|${open}|${f % 6 < 3 ? 0.18 : -0.12}|0`; break;
+    case 'hop': { const u = clamp((TT - P.t0) / 0.6); lift = 16 * Math.sin(Math.PI * u); key = 'parker.sit|happy|0.1|0'; break; }
+    default: key = `parker.sit|${open}|0|0`;
   }
-  if (P.noseSnowUntil > TT && !/^(shake|belly)/.test(key)) key += '|sn';
+  if (P.noseSnowUntil > TT && !/^parker\.(shake|belly)/.test(key)) key += '|sn';
   return { key, sx, lift };
 }
 function parkerCenter() { if (P.mode === 'inhouse') return [DOOR.x, Y(DOOR.d) - 18]; const s = depthScale(P.d), lying = isLying(); return [P.x + (lying ? 20 : 4) * P.face * s, Y(P.d) - (lying ? 34 : 64) * s]; }
@@ -545,32 +482,21 @@ function drawFX() {
     if (p.delay > 0) continue;
     const u = p.age / p.life;
     if (p.type === 'spr') drawSprite(sprite(p.key), p.x, p.y, { alpha: Math.min(1, (1 - u) * 2.2), rot: p.rot, shA: 0.15, scale: (p.scale || 1) * (p.grow ? lerp(0.6, 1.5, u) : 1) });
-    else if (p.type === 'glow') glow(ctx, p.x, p.y, p.r * (0.6 + u * 0.6), p.rgb, 0.8 * (1 - u));
+    else if (p.type === 'glow') ART.draw('fx.glow', ctx, p.x, p.y, p.r * (0.6 + u * 0.6), p.rgb, 0.8 * (1 - u));
     else if (p.type === 'fly') {
       const e = smooth(u), cx = (p.x0 + p.x1) / 2, cy = Math.min(p.y0, p.y1) - 60;
       const x = (1 - e) * (1 - e) * p.x0 + 2 * (1 - e) * e * cx + e * e * p.x1, y = (1 - e) * (1 - e) * p.y0 + 2 * (1 - e) * e * cy + e * e * p.y1;
-      glow(ctx, x, y, 16, '255,226,140', 0.9); ctx.fillStyle = '#ffe9a6'; ctx.beginPath(); ctx.arc(x, y, 3.2, 0, TAU); ctx.fill();
+      ART.draw('live.spark', ctx, x, y);
     }
   }
 }
 function sleepZ() {
   if (!P.present || !/sleep|nap|inhouse/.test(P.mode) || (P.mode === 'inhouse' && TT < (P.data.peekUntil || 0))) return;
   const k = Math.floor(TT / 2.2);
-  if (k !== P.lastZ) { P.lastZ = k; const [x, y] = parkerCenter(); fx({ type: 'spr', key: 'z', x: x + 30 * P.face, y: y - 26, vx: 6 * P.face, vy: -14, sway: k, life: 2.6, rot: -0.15 }); }
+  if (k !== P.lastZ) { P.lastZ = k; const [x, y] = parkerCenter(); fx({ type: 'spr', key: 'fx.z', x: x + 30 * P.face, y: y - 26, vx: 6 * P.face, vy: -14, sway: k, life: 2.6, rot: -0.15 }); }
 }
 
 // ---------- render ----------
-function fireflies(t) {
-  const r = rng(17);
-  ctx.save(); ctx.globalCompositeOperation = 'screen';
-  for (let i = 0; i < 9; i++) {
-    const bx = r() * SCENE_W, bd = 90 + r() * 220, ph = r() * TAU, sp = 0.3 + r() * 0.3;
-    const x = bx + Math.sin(t * sp + ph) * 26, y = Y(bd) + Math.sin(t * sp * 1.3 + ph * 2) * 14, a = 0.5 + 0.5 * Math.sin(t * 1.7 + ph);
-    const g = ctx.createRadialGradient(x, y, 0, x, y, 9); g.addColorStop(0, `rgba(230,255,160,${a})`); g.addColorStop(1, 'rgba(230,255,160,0)');
-    ctx.fillStyle = g; ctx.fillRect(x - 9, y - 9, 18, 18);
-  }
-  ctx.restore();
-}
 function drawScene() {
   const L = LAY, p = L.p, H = V.H;
   ctx.setTransform(cv.width / SCENE_W, 0, 0, cv.width / SCENE_W, 0, 0);
@@ -584,18 +510,14 @@ function drawScene() {
   ctx.restore();
   if (L.old && L.old.yard !== L.yard) { drawLayer(ctx, L.old.yard); ctx.save(); ctx.globalAlpha = fade; drawLayer(ctx, L.yard); ctx.restore(); }   // the season / snow changes softly
   else drawLayer(ctx, L.yard);
-  if (WX.hot) {           // cool shade in front of the house on a hot afternoon
-    ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.translate(SHADE[0] - 6, Y(SHADE[1] - 2)); ctx.scale(1, 0.2);
-    const g = ctx.createRadialGradient(0, 0, 10, 0, 0, 110); g.addColorStop(0, 'rgba(150,170,205,0.6)'); g.addColorStop(0.6, 'rgba(170,186,214,0.35)'); g.addColorStop(1, 'rgba(190,200,220,0)');
-    ctx.fillStyle = g; ctx.fillRect(-110, -110, 220, 220); ctx.restore();
-  }
+  if (WX.hot) ART.draw('live.shade.hot', ctx, SHADE[0] - 6, Y(SHADE[1] - 2));           // cool shade in front of the house on a hot afternoon
   drawPrints();
   drawYarnThread();
   drawRainbowArc();
   drawKiteShadow();
   const mail = S.mail.length > 0;
-  if (mail) glow(ctx, MAILBOX.x, Y(MAILBOX.d) - 106, 46, '255,236,170', 0.35 + 0.1 * Math.sin(TT * 2));
-  mailboxFlag(ctx, MAILBOX.x, Y(MAILBOX.d), mail);
+  if (mail) ART.draw('fx.glow', ctx, MAILBOX.x, Y(MAILBOX.d) - 106, 46, '255,236,170', 0.35 + 0.1 * Math.sin(TT * 2));
+  ART.draw('live.mailFlag', ctx, MAILBOX.x, Y(MAILBOX.d), mail);
   // ground things, back to front
   const items = S.field.map(f => ({ d: f.d, f }));
   for (const t of S.toys) if (P.hold !== t && !(t === 'rope' && TUG.on) && !(t === 'kite' && KITE.on)) items.push({ d: S.toyPos[t].d, toy: t });
@@ -609,51 +531,50 @@ function drawScene() {
   for (const it of items) {
     if (it.g) {
       const g = it.g, s = depthScale(g.d), tw = 0.5 + 0.5 * Math.sin(TT * 1.6 + g.id);
-      drawSprite(sprite(`gift|${g.kind}`), g.x, Y(g.d), { scale: s });
-      if (tw > 0.85) glow(ctx, g.x + 5, Y(g.d) - 18 * s, 20, '255,250,225', (tw - 0.85) * 4);    // a little glint now and then
+      drawSprite(sprite(`gift.${g.kind}`), g.x, Y(g.d), { scale: s });
+      if (tw > 0.85) ART.draw('fx.glow', ctx, g.x + 5, Y(g.d) - 18 * s, 20, '255,250,225', (tw - 0.85) * 4);    // a little glint now and then
     } else if (it.vis) {
       const s = depthScale(VIS.d), dr = visitorDrawing();
       drawSprite(sprite(dr.key), VIS.x, Y(VIS.d) - dr.lift, { sx: VIS.face, scale: s });
     } else if (it.snowman) { drawSnowmanItem();
     } else if (it.box) {
-      if (S.giftNew) glow(ctx, GIFTBOX.x, Y(GIFTBOX.d) - 14, 34, '255,236,170', 0.35 + 0.1 * Math.sin(TT * 2));
-      drawSprite(sprite('giftbox'), GIFTBOX.x, Y(GIFTBOX.d), { scale: depthScale(GIFTBOX.d) });
+      if (S.giftNew) ART.draw('fx.glow', ctx, GIFTBOX.x, Y(GIFTBOX.d) - 14, 34, '255,236,170', 0.35 + 0.1 * Math.sin(TT * 2));
+      drawSprite(sprite('prop.giftbox'), GIFTBOX.x, Y(GIFTBOX.d), { scale: depthScale(GIFTBOX.d) });
     } else if (it.toy) {
       const t = S.toyPos[it.toy], s = depthScale(t.d), k = TOY_K[it.toy] || 0.6;
       if (it.toy === 'ball') {                     // a paper shadow on the grass that shrinks as the ball flies higher
         const hk = 1 / (1 + BALL.z / 40);
-        ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = `rgba(110,100,115,${0.32 * hk})`; ctx.beginPath(); ctx.ellipse(t.x + 2, Y(t.d) + 1, 13 * s * (0.5 + 0.5 * hk), 4 * s * (0.5 + 0.5 * hk), 0, 0, TAU); ctx.fill(); ctx.restore();
-        drawSprite(sprite(`item|ball|${k}`), t.x, Y(t.d) - 11 * s - BALL.z, { scale: s, rot: BALL.rot, shA: BALL.z > 2 ? 0 : 0.22 });
-      } else drawSprite(sprite(`item|${it.toy}|${k}`), t.x, Y(t.d) - 11 * s, { scale: s, rot: it.toy === 'yarn' ? YARN.rot : it.toy === 'temari' ? TEMARI.rot : 0 });
+        ART.draw('live.shadow.ball', ctx, t.x + 2, Y(t.d) + 1, 13 * s * (0.5 + 0.5 * hk), 4 * s * (0.5 + 0.5 * hk), hk);
+        drawSprite(sprite(`item.ball|${k}`), t.x, Y(t.d) - 11 * s - BALL.z, { scale: s, rot: BALL.rot, shA: BALL.z > 2 ? 0 : 0.22 });
+      } else drawSprite(sprite(`item.${it.toy}|${k}`), t.x, Y(t.d) - 11 * s, { scale: s, rot: it.toy === 'yarn' ? YARN.rot : it.toy === 'temari' ? TEMARI.rot : 0 });
     } else if (it.f) {
       const f = it.f, s = depthScale(f.d), grow = smooth(clamp((now - f.born) / 1200)), sw = 0.035 * Math.sin(TT * 1.1 + f.id * 1.7);
-      if (grow > 0) drawSprite(sprite(`dand|${f.kind}`), f.x, Y(f.d), { scale: s * lerp(0.2, 1, grow), alpha: Math.min(1, grow * 3), rot: sw });
+      if (grow > 0) drawSprite(sprite(`prop.dandelion|${f.kind}`), f.x, Y(f.d), { scale: s * lerp(0.2, 1, grow), alpha: Math.min(1, grow * 3), rot: sw });
     } else {
       const s = depthScale(P.d), dr = parkerDrawing(), lying = isLying();
       if (P.mode === 'inhouse') { drawSprite(sprite(dr.key), DOOR.x, Y(DOOR.d), { shA: 0 }); continue; }        // only his face in the doorway
       const hk = 1 / (1 + dr.lift / 34);                               // the higher he jumps, the smaller and paler his shadow
-      ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = `rgba(120,110,120,${0.35 * hk})`;
-      ctx.beginPath(); ctx.ellipse(P.x + (lying ? 14 * P.face : 0) * s, Y(P.d) + 1, (lying ? 70 : 52) * s * Math.max(0.6, Math.abs(dr.sx)) * (0.5 + 0.5 * hk), 6 * s * (0.5 + 0.5 * hk), 0, 0, TAU); ctx.fill(); ctx.restore();
+      ART.draw('live.shadow.parker', ctx, P.x + (lying ? 14 * P.face : 0) * s, Y(P.d) + 1, (lying ? 70 : 52) * s * Math.max(0.6, Math.abs(dr.sx)) * (0.5 + 0.5 * hk), 6 * s * (0.5 + 0.5 * hk), hk);
       if ((P.prevLift || 0) > 5 && dr.lift < 1) dustPuff(P.x, Y(P.d));
       P.prevLift = dr.lift;
       drawSprite(sprite(dr.key), P.x, Y(P.d) - dr.lift, { sx: dr.sx, scale: s * (P.mode === 'goin' ? 1 - 0.3 * clamp((TT - P.t0) / 0.5) : 1), alpha: P.mode === 'goin' ? 1 - clamp((TT - P.t0) / 0.5) : 1 });
-      if (P.mode === 'turn') glow(ctx, P.x, Y(P.d) - 50 * s, 46, '255,240,200', 0.5);
-      if (P.hold === 'twig' && !/^(twigput)$/.test(P.mode)) drawSprite(sprite('item|twig|0.55'), P.x + (P.mode === 'sniff' ? 66 : 70) * P.face * s * Math.abs(dr.sx), Y(P.d) - (P.mode === 'sniff' ? 26 : 56) * s - dr.lift, { scale: s, sx: P.face, rot: 0.1 });
-      if (P.hold === 'ball' && !/^(sit|present|wag|tilt|sigh)$/.test(P.mode)) drawSprite(sprite('item|ball|0.42'), P.x + (P.mode === 'pickup' ? 66 : 70) * P.face * s * Math.abs(dr.sx), Y(P.d) - (P.mode === 'pickup' ? 26 : 56) * s - dr.lift, { scale: s, rot: BALL.rot });   // the ball in his mouth
-      if (P.carrying && P.mode !== 'gift') drawSprite(sprite('item|card|0.5'), P.x + 64 * P.face * s * Math.abs(dr.sx), Y(P.d) - 72 * s - dr.lift, { scale: s, rot: 0.15 * P.face });   // the card in his mouth on the way
-      if (P.mode === 'gift') glow(ctx, P.x, Y(P.d) - 70 * s, 70, '255,236,170', 0.25 + 0.08 * Math.sin(TT * 2.5));
-      if (/^sun/.test(P.mode)) glow(ctx, P.x + 14 * P.face * s, Y(P.d) - 30 * s, 84, '255,232,170', 0.3 + 0.05 * Math.sin(TT * 1.3));   // warm in the sun
+      if (P.mode === 'turn') ART.draw('fx.glow', ctx, P.x, Y(P.d) - 50 * s, 46, '255,240,200', 0.5);
+      if (P.hold === 'twig' && !/^(twigput)$/.test(P.mode)) drawSprite(sprite('item.twig|0.55'), P.x + (P.mode === 'sniff' ? 66 : 70) * P.face * s * Math.abs(dr.sx), Y(P.d) - (P.mode === 'sniff' ? 26 : 56) * s - dr.lift, { scale: s, sx: P.face, rot: 0.1 });
+      if (P.hold === 'ball' && !/^(sit|present|wag|tilt|sigh)$/.test(P.mode)) drawSprite(sprite('item.ball|0.42'), P.x + (P.mode === 'pickup' ? 66 : 70) * P.face * s * Math.abs(dr.sx), Y(P.d) - (P.mode === 'pickup' ? 26 : 56) * s - dr.lift, { scale: s, rot: BALL.rot });   // the ball in his mouth
+      if (P.carrying && P.mode !== 'gift') drawSprite(sprite('item.card|0.5'), P.x + 64 * P.face * s * Math.abs(dr.sx), Y(P.d) - 72 * s - dr.lift, { scale: s, rot: 0.15 * P.face });   // the card in his mouth on the way
+      if (P.mode === 'gift') ART.draw('fx.glow', ctx, P.x, Y(P.d) - 70 * s, 70, '255,236,170', 0.25 + 0.08 * Math.sin(TT * 2.5));
+      if (/^sun/.test(P.mode)) ART.draw('fx.glow', ctx, P.x + 14 * P.face * s, Y(P.d) - 30 * s, 84, '255,232,170', 0.3 + 0.05 * Math.sin(TT * 1.3));   // warm in the sun
     }
   }
   drawSprinklerArm();
   drawSprinklerWater();
   drawTugRope();
   drawBubbles();
-  if (CHASE.on) drawBit(ctx, CHASE.season, CHASE.i, CHASE.x, CHASE.y, CHASE.rot, 1.9);
+  if (CHASE.on) ART.draw('live.leafBit', ctx, CHASE.season, CHASE.i, CHASE.x, CHASE.y, CHASE.rot, 1.9);
   drawVisitor();
   if (L.old && L.old.fore !== L.fore) { drawLayer(ctx, L.old.fore); ctx.save(); ctx.globalAlpha = fade; drawLayer(ctx, L.fore); ctx.restore(); }
   else drawLayer(ctx, L.fore);
-  drawWeather(ctx, WX, H, TT, V.res);
+  ART.draw('live.weather', ctx, WX, H, TT, V.res);
   drawFlyingKite();
   // light: multiply tint + vignette, then screen glow, lamp, motes
   ctx.save(); ctx.globalCompositeOperation = 'multiply';
@@ -661,8 +582,8 @@ function drawScene() {
   ctx.globalAlpha = fade; drawLayer(ctx, L.mul);
   ctx.globalCompositeOperation = 'screen'; drawLayer(ctx, L.scr);
   ctx.restore();
-  if (p.lamp) glow(ctx, LAMP.x + 14, Y(LAMP.d) - 62, 70, '255,206,130', 0.55 * p.lamp * (1 + 0.04 * Math.sin(TT * 2.3)));
-  if (p.fireflies) fireflies(TT); else if (p.motes) motes(ctx, TT, SCENE_W, H * 0.8, 8, 91, p.motes);
+  if (p.lamp) ART.draw('fx.glow', ctx, LAMP.x + 14, Y(LAMP.d) - 62, 70, '255,206,130', 0.55 * p.lamp * (1 + 0.04 * Math.sin(TT * 2.3)));
+  if (p.fireflies) ART.draw('live.fireflies', ctx, TT, H); else if (p.motes) ART.draw('live.motes', ctx, TT, SCENE_W, H * 0.8, 8, 91, p.motes);
   drawFX();
   drawSay();
 }
@@ -711,11 +632,11 @@ function endBelly() { if (P.mode === 'belly') setMode('belly', HABITS.bellyRub.e
 function parkerExtras() {
   if (P.mode === 'belly' && !P.data.ending && TT > P.data.nextHeart) {
     P.data.nextHeart = TT + 0.7; const [hx, hy] = parkerCenter();
-    fx({ type: 'spr', key: 'heart', x: hx + (Math.random() - 0.5) * 50, y: hy - 30, vy: -30, sway: Math.random() * TAU, life: 1.3 });
+    fx({ type: 'spr', key: 'fx.heart', x: hx + (Math.random() - 0.5) * 50, y: hy - 30, vy: -30, sway: Math.random() * TAU, life: 1.3 });
   }
   if (P.mode === 'sigh' && !P.data.puffed && TT - P.t0 > HABITS.sighTime * 0.48) {
     P.data.puffed = true; SFX.sigh(); const s = depthScale(P.d), lie = P.data.lie;
-    fx({ type: 'spr', key: 'puff', x: P.x + (lie ? 62 : 44) * P.face * s, y: Y(P.d) - (lie ? 28 : 70) * s, vx: 16 * P.face, vy: -6, grow: true, life: 1.6 });
+    fx({ type: 'spr', key: 'fx.puff', x: P.x + (lie ? 62 : 44) * P.face * s, y: Y(P.d) - (lie ? 28 : 70) * s, vx: 16 * P.face, vy: -6, grow: true, life: 1.6 });
   }
 }
 
@@ -728,8 +649,7 @@ function updateHUD(bump) {
 function drawCoinIcon() {
   const c = document.getElementById('coinIcon'), dpr = window.devicePixelRatio || 1, s = 26;
   c.width = s * dpr; c.height = s * dpr; const x = c.getContext('2d'); x.scale(dpr, dpr); x.translate(s / 2 - 1, s / 2 + 36 * 0.95); x.scale(0.95, 0.95);
-  const ring = (n, r, rx, ry, col) => { const p = new Path2D(); for (let i = 0; i < n; i++) { const a = i / n * TAU; p.addPath(ell(1 + Math.cos(a) * r, -36 + Math.sin(a) * r, rx, ry, a)); } piece(x, p, col, { mul: 0.4 }); };
-  ring(14, 6.4, 4.4, 1.9, '#f6c22c'); ring(10, 3.6, 3.2, 1.6, '#fbd648'); piece(x, circ(1, -36, 2.4), '#eaa21c', { mul: 0.4 });
+  ART.paint('ui.coin', x);
 }
 function applyLang() {
   document.documentElement.lang = LANG === 'zh' ? 'zh-CN' : 'en'; document.title = T_('title');
@@ -787,7 +707,7 @@ function boot() {
   };
   requestAnimationFrame(loop);
   // warm up the common drawings while idle so the first walk doesn't hitch
-  const warm = ['trot|0', 'trot|1', 'trot|2', 'trot|3', 'trot|4', 'trot|5', 'stand|calm', 'sit|calm|0|0', 'sit|blink|0|0', 'sniff|0', 'sniff|1', 'dand|yellow', 'dand|puff'];
+  const warm = ['parker.trot|0', 'parker.trot|1', 'parker.trot|2', 'parker.trot|3', 'parker.trot|4', 'parker.trot|5', 'parker.stand|calm', 'parker.sit|calm|0|0', 'parker.sit|blink|0|0', 'parker.sniff|0', 'parker.sniff|1', 'prop.dandelion|yellow', 'prop.dandelion|puff'];
   const idle = window.requestIdleCallback || (f => setTimeout(f, 60));
   const step = () => { const k = warm.shift(); if (k) { sprite(k); idle(step); } };
   idle(step);
@@ -834,7 +754,7 @@ function receiveGift() {
   const f = S.festPending; if (!f) return;
   addFestCard(f.id, f.year); S.festPending = null; P.carrying = false; P.giftHinted = false; writeSave(S);
   SFX.mail(); const [hx, hy] = parkerCenter(); fx({ type: 'glow', x: hx, y: hy - 20, life: 0.8, r: 80, rgb: '255,236,170' });
-  for (let i = 0; i < 3; i++) fx({ type: 'spr', key: 'heart', x: hx + (i - 1) * 22, y: hy - 40, vx: (i - 1) * 8, vy: -34, delay: i * 0.18, sway: i, life: 1.4 });
+  for (let i = 0; i < 3; i++) fx({ type: 'spr', key: 'fx.heart', x: hx + (i - 1) * 22, y: hy - 40, vx: (i - 1) * 8, vy: -34, delay: i * 0.18, sway: i, life: 1.4 });
   setMode('sigh', HABITS.sighTime, { lie: false }); showToast('toast.giftGot', 3000);
   UI.tab = 'fests'; openPanel('album'); UI.view = festCard(f.id); UI.viewYear = f.year; renderPanel();
 }
@@ -852,7 +772,7 @@ function popBubble(b, byHim) {
   const i = BUBBLES.indexOf(b); if (i < 0) return; BUBBLES.splice(i, 1);
   const [x, y] = bubblePos(b); SFX.bubblePop();
   const cols = ['#bfe3f7', '#f7cfe0', '#fff1b8', '#cdeccd'];
-  for (let k = 0; k < 8; k++) { const a = k / 8 * TAU; fx({ type: 'spr', key: `confetti|${cols[k % 4]}`, x: x + Math.cos(a) * b.r * 0.6, y: y + Math.sin(a) * b.r * 0.6, vx: Math.cos(a) * 46, vy: Math.sin(a) * 46 - 10, g: 60, life: 0.6, rot: a, vr: 5 }); }
+  for (let k = 0; k < 8; k++) { const a = k / 8 * TAU; fx({ type: 'spr', key: `fx.confetti|${cols[k % 4]}`, x: x + Math.cos(a) * b.r * 0.6, y: y + Math.sin(a) * b.r * 0.6, vx: Math.cos(a) * 46, vy: Math.sin(a) * 46 - 10, g: 60, life: 0.6, rot: a, vr: 5 }); }
   if (byHim) fx({ type: 'glow', x, y, life: 0.4, r: 22, rgb: '230,245,255' });
 }
 function updateBubbles(dt) {
@@ -898,24 +818,11 @@ function bubbleHopTick() {
   }
 }
 function drawBubbles() {
-  if (!BUBBLES.length) return;
-  const im = bubbleImg();
   for (const b of BUBBLES) {
     if (TT < b.born) continue;
     const [x, y] = bubblePos(b), w = 1 + 0.06 * Math.sin((TT - b.born) * 5 + b.ph), age = (TT - b.born) / b.life, a = age > 0.85 ? (1 - age) / 0.15 : Math.min(1, (TT - b.born) * 4);
-    ctx.save(); ctx.globalAlpha = a; ctx.drawImage(im, x - b.r * w, y - b.r / w, b.r * 2 * w, b.r * 2 / w); ctx.restore();
+    ART.draw('live.bubble', ctx, x, y, b.r, w, a);
   }
-}
-let _bub = null;
-function bubbleImg() {                   // a disc of tracing paper with a little highlight
-  if (_bub && _bub.res === V.res) return _bub.cv;
-  const R = 16, res = V.res, cv = mk(R * 2 * res, R * 2 * res), c = cv.getContext('2d'); c.scale(res, res); c.translate(R, R);
-  c.globalAlpha = 0.5; piece(c, circ(0, 0, R - 1.5), '#dceefa', { mul: 0.15, scr: 0.2 }); c.globalAlpha = 1;
-  c.strokeStyle = 'rgba(110,150,190,0.55)'; c.lineWidth = 1.1; c.beginPath(); c.arc(0, 0, R - 1, 0, TAU); c.stroke();      // a thin blue-grey edge so it reads on white fur
-  c.strokeStyle = 'rgba(255,255,255,0.95)'; c.lineWidth = 1.5; c.beginPath(); c.arc(0, 0, R - 2.3, 0, TAU); c.stroke();
-  c.lineWidth = 1.6; for (const [a0, a1, col] of [[0.2, 1.1, 'rgba(246,170,200,0.7)'], [1.1, 1.9, 'rgba(250,220,130,0.7)'], [1.9, 2.6, 'rgba(150,210,170,0.7)']]) { c.strokeStyle = col; c.beginPath(); c.arc(0, 0, R - 4, a0, a1); c.stroke(); }   // a hint of rainbow
-  piece(c, ell(-5, -6, 4.5, 2.2, -0.7), '#ffffff', { mul: 0.1 }); piece(c, circ(5, 6, 1.4), '#ffffff', { mul: 0.1 });
-  _bub = { res, cv }; return cv;
 }
 function tapBubble(x, y) { for (const b of BUBBLES) { if (TT < b.born) continue; const [bx, by] = bubblePos(b); if (Math.hypot(x - bx, y - by) < b.r + 10) { popBubble(b, false); return true; } } return false; }
 // ---------- 3. toys from friends: Simit's ball of yarn, Kinako's temari ball ----------
@@ -957,9 +864,7 @@ function updateYarn(dt) {
 }
 function drawYarnThread() {
   const T = YARN.trail, t = S.toyPos.yarn; if (T.length < 1 || !t) return;
-  ctx.save(); ctx.strokeStyle = '#c94a40'; ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath();
-  T.forEach(([x, d], i) => { const y = Y(d) - 1 + Math.sin(i * 1.3) * 1.2; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
-  ctx.lineTo(t.x, Y(t.d) - 2); ctx.stroke(); ctx.restore();
+  ART.draw('live.yarnThread', ctx, [...T.map(([x, d], i) => [x, Y(d) - 1 + Math.sin(i * 1.3) * 1.2]), [t.x, Y(t.d) - 2]]);
 }
 // temari: he nudges it along with his nose, round the yard
 function temariGo() {
@@ -1008,19 +913,14 @@ function tugUpdate(dt) {                 // braced and pulling back; a strong pu
 }
 function ropeRelease() {
   TUG.on = false;
-  if (P.mode === 'tug') { P.hold = 'rope'; SFX.pop(); setMode('ropewin', HABITS.ropeShake); const [mx, my] = ropeMouth(); fx({ type: 'glow', x: mx, y: my, life: 0.6, r: 40, rgb: '255,236,170' }); for (let i = 0; i < 2; i++) fx({ type: 'spr', key: 'heart', x: mx + (i - 0.5) * 20, y: my - 40, vy: -30, delay: i * 0.2, sway: i, life: 1.3 }); }
+  if (P.mode === 'tug') { P.hold = 'rope'; SFX.pop(); setMode('ropewin', HABITS.ropeShake); const [mx, my] = ropeMouth(); fx({ type: 'glow', x: mx, y: my, life: 0.6, r: 40, rgb: '255,236,170' }); for (let i = 0; i < 2; i++) fx({ type: 'spr', key: 'fx.heart', x: mx + (i - 0.5) * 20, y: my - 40, vy: -30, delay: i * 0.2, sway: i, life: 1.3 }); }
 }
 function ropePickUp() { P.hold = 'rope'; setMode('ropewin', HABITS.ropeShake); }
 function ropeDrop() { S.toyPos.rope = { x: clamp(P.x + 40 * P.face, 30, 370), d: clamp(P.d - 4, 96, 226) }; P.hold = null; writeSave(S); setMode('sigh', HABITS.sighTime, { lie: false }); }
 function drawTugRope() {
   if (!TUG.on) return;
-  const tugging = P.mode === 'tug', [bx, by] = tugging ? ropeMouth() : [TUG.bx, TUG.by], ax = TUG.ax, ay = TUG.ay;
-  const dist = Math.hypot(ax - bx, ay - by), tension = clamp((dist - TUG_LEN) / 70), N = 12, nx = -(ay - by) / (dist || 1), ny = (ax - bx) / (dist || 1);
-  const sag = Math.max(0, TUG_LEN - dist) * 0.55, w = lerp(6, 3.6, tension), pts = [];
-  for (let i = 0; i <= N; i++) { const u = i / N, wob = Math.sin(TT * (tugging ? 26 : 6) + u * 9) * (tugging ? 0.6 + 1.6 * tension : 0.4) * Math.sin(Math.PI * u); pts.push([lerp(bx, ax, u) + nx * wob, lerp(by, ay, u) + sag * Math.sin(Math.PI * u) + ny * wob]); }
-  ctx.save(); castShadow(ctx, c => { c.beginPath(); c.moveTo(...pts[0]); pts.forEach(p => c.lineTo(...p)); c.lineWidth = w; c.strokeStyle = '#000'; c.stroke(); }, 3, 1, 3, 0.25); ctx.restore();
-  for (let i = 0; i < N; i++) piece(ctx, slab(pts[i], pts[i + 1], w), i % 2 ? '#f6efe2' : '#5b8ed1', { mul: 0.3 });
-  for (const [x, y] of [[ax, ay], [bx, by]]) piece(ctx, circ(x, y, w * 0.95), '#5b8ed1', { mul: 0.3 });
+  const tugging = P.mode === 'tug', [bx, by] = tugging ? ropeMouth() : [TUG.bx, TUG.by];
+  ART.draw('live.tugRope', ctx, TUG.ax, TUG.ay, bx, by, TUG_LEN, tugging, TT);
 }
 // ---------- 5. the kite (windy days only): tap it to fly it, drag it around the sky; he chases its shadow below ----------
 const KITE = { on: false, tail: [] };
@@ -1072,16 +972,14 @@ function kiteChase(dt) {
 function drawKiteShadow() {
   if (!KITE.on || KITE.landing) return;
   const [x, d, a] = kiteShadow(), s = depthScale(d);
-  ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = `rgba(100,90,115,${0.42 * a})`; ctx.translate(x, Y(d)); ctx.rotate(KITE.rot); ctx.scale(1.5, 0.45);
-  ctx.beginPath(); ctx.moveTo(0, -24 * s); ctx.lineTo(16 * s, -4 * s); ctx.lineTo(0, 24 * s); ctx.lineTo(-16 * s, -4 * s); ctx.closePath(); ctx.fill(); ctx.restore();
+  ART.draw('live.shadow.kite', ctx, x, Y(d), s, KITE.rot, a);
 }
 function drawFlyingKite() {
   if (!KITE.on) return;
-  const sx = SCENE_W / 2 + 30, sy = V.H + 10, mx = (sx + KITE.x) / 2, my = (sy + KITE.y) / 2 + 40;     // the string, held by you below the screen
-  ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.quadraticCurveTo(mx, my, KITE.x, KITE.y + 6); ctx.stroke(); ctx.restore();
-  const cols = ['#f5c04a', '#5b8ed1', '#e2574a'];
-  KITE.tail.forEach((p, i) => { const s = sprite(`kitebow|${cols[i % 3]}`); drawSprite(s, p[0], p[1], { rot: Math.sin(TT * 5 + i) * 0.5, shA: 0.12, scale: 1.3 }); });
-  drawSprite(sprite('kite'), KITE.x, KITE.y, { rot: KITE.rot, scale: 1.45 });
+  ART.draw('live.kiteString', ctx, SCENE_W / 2 + 30, V.H + 10, KITE.x, KITE.y);     // the string, held by you below the screen
+  const cols = ART.KITE_BOWS;
+  KITE.tail.forEach((p, i) => { const s = sprite(`prop.kitebow|${cols[i % 3]}`); drawSprite(s, p[0], p[1], { rot: Math.sin(TT * 5 + i) * 0.5, shA: 0.12, scale: 1.3 }); });
+  drawSprite(sprite('prop.kite'), KITE.x, KITE.y, { rot: KITE.rot, scale: 1.45 });
 }
 // ---------- 6. the snowman (free): a snow pile appears when there's snow on the ground. Three taps: base, head, his twig arms ----------
 const SNOWMAN_SPOT = { x: 300, d: 176 }, MELT_MS = 2 * 3600000, SNOWPOP = { t0: -9 };
@@ -1112,14 +1010,14 @@ function snowmanTap(x, y) {
 function twigPut() {
   const m = S.snowman; P.hold = null; if (m && !m.twig) { m.stage = 3; writeSave(S); SNOWPOP.t0 = TT; SFX.crunch(); }
   const [hx, hy] = parkerCenter(); fx({ type: 'glow', x: m ? m.x : hx, y: m ? Y(m.d) - 50 : hy, life: 0.8, r: 50, rgb: '255,250,235' });
-  for (let i = 0; i < 2; i++) fx({ type: 'spr', key: 'heart', x: hx + (i - 0.5) * 24, y: hy - 40, vy: -30, delay: i * 0.2, sway: i, life: 1.3 });
+  for (let i = 0; i < 2; i++) fx({ type: 'spr', key: 'fx.heart', x: hx + (i - 0.5) * 24, y: hy - 40, vy: -30, delay: i * 0.2, sway: i, life: 1.3 });
   setMode('wag', HABITS.reactionTime.wag);
 }
 function drawSnowmanItem() {
   const m = S.snowman, s = depthScale(m.d);
-  if (m.twig) return drawSprite(sprite('item|twig|0.8'), m.x + 6, Y(m.d) - 3, { scale: s, rot: 0.12 });
+  if (m.twig) return drawSprite(sprite('item.twig|0.8'), m.x + 6, Y(m.d) - 3, { scale: s, rot: 0.12 });
   const u = clamp((TT - SNOWPOP.t0) / 0.5), pop = u < 1 ? [0.5, 0.8, 1.08, 0.97, 1, 1][Math.floor(u * 6)] : 1;   // rolls in on twos
-  drawSprite(sprite(`snowman|${m.stage}|${Math.round((m.melt || 0) * 10)}`), m.x, Y(m.d), { scale: s * pop });
+  drawSprite(sprite(`prop.snowman|${m.stage}|${Math.round((m.melt || 0) * 10)}`), m.x, Y(m.d), { scale: s * pop });
 }
 // ---------- 7. the sprinkler (sunny days, not in winter): tap it on; paper-strip water arcs, he jumps about in it ----------
 const SPRINK = { on: false, drops: [], rainbow: null };
@@ -1137,7 +1035,7 @@ function sprinkOut() {                   // out of the water, a good shake, and 
   goTo(clamp(t.x + side * 110, 40, 360), clamp(P.d + (Math.random() - 0.5) * 30, 100, 224), () => {
     setMode('shakeoff', HABITS.wxTime.shakeOff, { then: () => { P.rounds = (P.rounds || 0) + 1; if (SPRINK.on && P.rounds < 3) sprinkPlay(); else { P.rounds = 0; setMode('sigh', HABITS.sighTime, { lie: false }); } } });
     SFX.shake(); const [hx, hy] = parkerCenter();
-    for (let i = 0; i < 10; i++) { const a = -Math.PI * (0.1 + 0.8 * i / 9); fx({ type: 'spr', key: 'drop', x: hx, y: hy - 10, vx: Math.cos(a) * 90, vy: Math.sin(a) * 70, g: 220, life: 0.7, rot: a + Math.PI / 2 }); }
+    for (let i = 0; i < 10; i++) { const a = -Math.PI * (0.1 + 0.8 * i / 9); fx({ type: 'spr', key: 'fx.drop', x: hx, y: hy - 10, vx: Math.cos(a) * 90, vy: Math.sin(a) * 70, g: 220, life: 0.7, rot: a + Math.PI / 2 }); }
   }, { speed: 100 });
 }
 function sprinkUpdate(dt) {              // dashing in and out of the spray, jumping when he's in it
@@ -1148,7 +1046,7 @@ function sprinkUpdate(dt) {              // dashing in and out of the spray, jum
   if (Math.abs(dx) > 6) P.face = Math.sign(dx);
   if (L > 0.01) { P.x += dx / L * step; P.d += dd / L * step; }
   const inside = Math.hypot((P.x - t.x) / 1.4, (P.d - t.d) / 0.6) < 70;
-  if (inside) { P.wet = true; if (TT > P.data.hopAt) { P.data.hopAt = TT + rand([0.9, 1.6]); P.data.hopT0 = TT; } if (TT > (P.dripAt || 0)) { P.dripAt = TT + 0.2; const [hx, hy] = parkerCenter(); fx({ type: 'spr', key: 'drop', x: hx + (Math.random() - 0.5) * 50, y: hy + 6, vy: 30, g: 200, life: 0.45 }); } }
+  if (inside) { P.wet = true; if (TT > P.data.hopAt) { P.data.hopAt = TT + rand([0.9, 1.6]); P.data.hopT0 = TT; } if (TT > (P.dripAt || 0)) { P.dripAt = TT + 0.2; const [hx, hy] = parkerCenter(); fx({ type: 'spr', key: 'fx.drop', x: hx + (Math.random() - 0.5) * 50, y: hy + 6, vy: 30, g: 200, life: 0.45 }); } }
   if (TT > P.until) sprinkOut();
 }
 function updateSprinkler(dt) {
@@ -1165,26 +1063,16 @@ function updateSprinkler(dt) {
 }
 function drawSprinklerWater() {
   const D = SPRINK.drops; if (!D.length) return;
-  ctx.save(); ctx.lineCap = 'round';
-  for (const p of D) {                   // each drop is a short paper strip pointing the way it flies
-    const x = p.x, y = Y(p.d) - p.z, vy = -p.vz + p.vd * -0.4, L = Math.hypot(p.vx, vy) || 1, l = 7;
-    ctx.strokeStyle = p.age < 0.35 ? 'rgba(240,248,255,0.95)' : 'rgba(170,214,244,0.92)'; ctx.lineWidth = 2.2;
-    ctx.beginPath(); ctx.moveTo(x - p.vx / L * l, y - vy / L * l); ctx.lineTo(x, y); ctx.stroke();
-  }
-  ctx.restore();
+  ART.draw('live.sprinklerWater', ctx, D.map(p => { const vy = -p.vz + p.vd * -0.4, L = Math.hypot(p.vx, vy) || 1, l = 7; return [p.x, Y(p.d) - p.z, p.vx / L * l, vy / L * l, p.age < 0.35]; }));
 }
 function drawSprinklerArm() {            // the yellow arm turns while it's on
-  if (!SPRINK.on) return; const t = S.toyPos.sprinkler, s = depthScale(t.d) * TOY_K.sprinkler, a = (TT - SPRINK.t0) * 2.4, cx = t.x, cy = Y(t.d) - 11 * s - 12 * s;
-  const ex = Math.cos(a) * 16 * s, ey = Math.sin(a) * 4 * s;
-  ctx.save(); ctx.strokeStyle = '#f5c04a'; ctx.lineWidth = 4 * s; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(cx - ex, cy - ey); ctx.lineTo(cx + ex, cy + ey); ctx.stroke();
-  ctx.fillStyle = '#e2a93d'; ctx.beginPath(); ctx.arc(cx, cy, 4 * s, 0, TAU); ctx.fill(); ctx.restore();
+  if (!SPRINK.on) return; const t = S.toyPos.sprinkler, s = depthScale(t.d) * TOY_K.sprinkler;
+  ART.draw('live.sprinklerArm', ctx, t.x, Y(t.d) - 11 * s - 12 * s, s, (TT - SPRINK.t0) * 2.4);
 }
 function drawRainbowArc() {
   const R = SPRINK.rainbow; if (!R) return; const u = (TT - R.t0) / 3.5, a = u < 0.2 ? u / 0.2 : u > 0.75 ? (1 - u) / 0.25 : 1;
-  if (!_rb || _rb.res !== V.res) { const res = V.res, cv = mk(90 * res, 50 * res), c = cv.getContext('2d'); c.scale(res, res); c.translate(45, 46); drawRainbow(c, 40); _rb = { res, cv }; }
-  ctx.save(); ctx.globalAlpha = 0.8 * a; ctx.drawImage(_rb.cv, R.x - 70, Y(R.d) - 118, 140, 78); ctx.restore();
+  ART.draw('live.rainbow', ctx, R.x, Y(R.d), a);
 }
-let _rb = null;
 // ---------- home from a trip: one short line in a little paper speech bubble above his head ----------
 const SAY = { on: false };
 function sayKey(h) {
@@ -1198,39 +1086,17 @@ function sayTick() {
   const key = sayKey(h); S.homeSay = null; writeSave(S);
   if (key) Object.assign(SAY, { on: true, key, t0: TT, until: TT + 4 + T_(key).length * (LANG === 'zh' ? 0.12 : 0.04), img: null, lang: null });
 }
-function bubblePts(w, h, r) {
-  const pts = [], arc = (cx, cy, a0) => { for (let i = 0; i <= 4; i++) { const a = a0 + i / 4 * Math.PI / 2; pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]); } };
-  arc(w - r, h - r, 0); arc(r, h - r, Math.PI / 2); arc(r, r, Math.PI); arc(w - r, r, Math.PI * 1.5); return pts;
-}
-function sayBubble(text) {
-  const res = V.res, M = 8, maxW = 170, fs = 13, lh = 18, m = mk(1, 1).getContext('2d'); m.font = `600 ${fs}px ${FONT}`;
-  // even-length lines (no lone last character), and a line never starts with punctuation
-  const toks = LANG === 'zh' ? [...text] : text.split(/(?<= )/), lines = []; let line = '';
-  const total = m.measureText(text).width, n = Math.ceil(total / maxW), lineW = n > 1 ? Math.min(maxW, total / n + fs * 0.6) : maxW;
-  for (const t of toks) { if (line && !/^[，。！？、…,.!?]/.test(t) && m.measureText(line + t).width > lineW) { lines.push(line.trim()); line = t.trimStart(); } else line += t; }
-  if (line.trim()) lines.push(line.trim());
-  const w = Math.ceil(Math.max(...lines.map(l => m.measureText(l).width))) + 22, h = lines.length * lh + 14;
-  const cv = mk((w + M * 2) * res, (h + M * 2) * res), c = cv.getContext('2d'); c.scale(res, res); c.translate(M, M);
-  tornPiece(c, bubblePts(w, h, 9), '#fffaf0', { amp: 0.7, seed: 77, rimCol: '#ffffff', shadow: 0.22, mul: 0.3 });
-  c.fillStyle = '#5b3f37'; c.font = `600 ${fs}px ${FONT}`; c.textAlign = 'center'; c.textBaseline = 'middle';
-  lines.forEach((l, i) => c.fillText(l, w / 2, 7 + lh * (i + 0.5) + 0.5));
-  return { cv, w, h, M };
-}
 function drawSay() {
   if (!SAY.on) return;
   if (TT > SAY.until + 0.35 || !P.present) { SAY.on = false; return; }
-  if (!SAY.img || SAY.lang !== LANG) { SAY.img = sayBubble(T_(SAY.key)); SAY.lang = LANG; }
+  if (!SAY.img || SAY.lang !== LANG) { SAY.img = ART.paint('ui.sayBubble', T_(SAY.key), LANG, V.res); SAY.lang = LANG; }
   const B = SAY.img, s = depthScale(P.d), lying = isLying(), dr = parkerDrawing();
   const [ox, oy] = lying ? [46, 74] : /^(trot|look|sniff|stand|watch|turn|chase|wet)$/.test(P.mode) ? [40, 124] : [20, 132];
   const tx = P.x + ox * P.face * s, ty = Y(P.d) - oy * s - dr.lift + 1.5 * Math.sin(TT * 2);
   const bx = clamp(tx - B.w / 2, 6, SCENE_W - B.w - 6), by = ty - 10 - B.h;
   const u = TT - SAY.t0, pop = [0.55, 0.85, 1.06, 1][Math.min(3, Math.floor(u * 12))];   // pops in on twos
   const a = TT > SAY.until ? clamp(1 - (TT - SAY.until) / 0.35) : 1;
-  ctx.save(); ctx.globalAlpha = a; ctx.translate(tx, ty); ctx.scale(pop, pop); ctx.translate(-tx, -ty);
-  const tail = poly([[clamp(tx - 7, bx + 10, bx + B.w - 18), by + B.h - 2], [clamp(tx + 5, bx + 20, bx + B.w - 8), by + B.h - 2], [tx + 2 * P.face, ty]]);
-  castShadow(ctx, tail, 2, 1, 2, 0.18); piece(ctx, tail, '#fffaf0', { mul: 0.3 });
-  ctx.drawImage(B.cv, bx - B.M, by - B.M, B.w + B.M * 2, B.h + B.M * 2);
-  ctx.restore();
+  ART.draw('live.say', ctx, B, tx, ty, bx, by, P.face, pop, a);
 }
 // ---------- small visitors: the sparrow, the neighbour's cat, the squirrel (stage 4) ----------
 // One at a time. Mostly while he's away; nobody at night or in heavy rain. Some leave a gift where they were.
@@ -1326,9 +1192,9 @@ function catPlayTick() {
   if (!/^cat(boop|bow|side)$/.test(P.mode)) return;
   if (!VIS.on || VIS.kind !== 'cat') return setMode('sit', 2);
   const u = TT - P.t0, [mx, my] = [(P.x + VIS.x) / 2, Y(P.d) - 70 * depthScale(P.d)];
-  if (P.mode === 'catboop') { VIS.pose = u > 0.8 && u < 2.2 ? 'blink' : 'sit'; if (u > 1.1 && !P.data.heart) { P.data.heart = true; SFX.pop(); fx({ type: 'spr', key: 'heart', x: mx, y: my - 6, vy: -28, sway: 1, life: 1.4 }); fx({ type: 'glow', x: mx, y: my + 10, life: 0.6, r: 30, rgb: '255,236,200' }); } }
+  if (P.mode === 'catboop') { VIS.pose = u > 0.8 && u < 2.2 ? 'blink' : 'sit'; if (u > 1.1 && !P.data.heart) { P.data.heart = true; SFX.pop(); fx({ type: 'spr', key: 'fx.heart', x: mx, y: my - 6, vy: -28, sway: 1, life: 1.4 }); fx({ type: 'glow', x: mx, y: my + 10, life: 0.6, r: 30, rgb: '255,236,200' }); } }
   if (P.mode === 'catbow') { VIS.pose = u > 0.9 && u < 1.5 ? 'swat' : 'sit'; if (u > 1.0 && !P.data.swat) { P.data.swat = true; SFX.mew(); } }
-  if (P.mode === 'catside') { VIS.pose = Math.floor(u / 2.5) % 2 ? 'blink' : 'sit'; if (u > 3 && !P.data.sighed) { P.data.sighed = true; SFX.sigh(); fx({ type: 'spr', key: 'puff', x: P.x + 44 * P.face, y: Y(P.d) - 66, vx: 14 * P.face, vy: -6, grow: true, life: 1.6 }); fx({ type: 'spr', key: 'heart', x: mx, y: my - 30, vy: -20, sway: 2, life: 1.6, scale: 0.8 }); } }
+  if (P.mode === 'catside') { VIS.pose = Math.floor(u / 2.5) % 2 ? 'blink' : 'sit'; if (u > 3 && !P.data.sighed) { P.data.sighed = true; SFX.sigh(); fx({ type: 'spr', key: 'fx.puff', x: P.x + 44 * P.face, y: Y(P.d) - 66, vx: 14 * P.face, vy: -6, grow: true, life: 1.6 }); fx({ type: 'spr', key: 'fx.heart', x: mx, y: my - 30, vy: -20, sway: 2, life: 1.6, scale: 0.8 }); } }
 }
 function catPlayEnd() {                  // after saying hello: he hops back (bow), or just sits there content
   const was = P.mode; VIS.hold = 0; VIS.pose = 'sit'; VIS.until = Math.max(VIS.until, TT + 4);
@@ -1340,20 +1206,20 @@ function tapVisitor(x, y) {
   if (Math.hypot(x - VIS.x, y - cy) > (VIS.kind === 'cat' ? 42 : 32)) return false;
   if (VIS.kind === 'cat') {               // the cat doesn't mind: a slow blink back at you
     VIS.pose = 'blink'; VIS.poseAt = TT + 1.4; SFX.mew();
-    fx({ type: 'spr', key: 'heart', x: VIS.x, y: cy - 30, vy: -26, sway: 1, life: 1.3, scale: 0.7 });
+    fx({ type: 'spr', key: 'fx.heart', x: VIS.x, y: cy - 30, vy: -26, sway: 1, life: 1.3, scale: 0.7 });
     return true;
   }
   VIS.face = x < VIS.x ? 1 : -1; visitorLeave(); return true;
 }
 function visitorDrawing() {
-  if (VIS.kind === 'cat') return { key: VIS.phase === 'stay' ? `ncat|${VIS.pose}` : `ncat|walk${Math.floor(TT * 6) % 2}`, lift: 0 };
-  if (VIS.phase === 'stay') return { key: `sq|${VIS.pose}`, lift: 0 };
-  const u = (TT * 2.6) % 1; return { key: `sq|${u < 0.35 ? 'hop0' : 'hop1'}`, lift: u < 0.35 ? 0 : 12 * Math.sin(Math.PI * (u - 0.35) / 0.65) };
+  if (VIS.kind === 'cat') return { key: VIS.phase === 'stay' ? `visitor.cat|${VIS.pose}` : `visitor.cat|walk${Math.floor(TT * 6) % 2}`, lift: 0 };
+  if (VIS.phase === 'stay') return { key: `visitor.squirrel|${VIS.pose}`, lift: 0 };
+  const u = (TT * 2.6) % 1; return { key: `visitor.squirrel|${u < 0.35 ? 'hop0' : 'hop1'}`, lift: u < 0.35 ? 0 : 12 * Math.sin(Math.PI * (u - 0.35) / 0.65) };
 }
 function drawVisitor() {                 // the sparrow (it perches up high, so it's drawn over the ground things)
   if (!VIS.on || VIS.kind !== 'sparrow') return;
   const k = VIS.phase !== 'stay' ? 2 + Math.floor(TT * 12) % 2 : VIS.pose;
-  drawSprite(sprite(`bird|${k}`), VIS.x, VIS.y, { sx: VIS.face, scale: 1 });
+  drawSprite(sprite(`visitor.sparrow|${k}`), VIS.x, VIS.y, { sx: VIS.face, scale: 1 });
 }
 // ---------- gifts on the ground ----------
 function giftAt(x, y) { let best = null, bd = 30; for (const g of S.gifts) { const dd = Math.hypot(x - g.x, y - (Y(g.d) - 12)); if (dd < bd) { bd = dd; best = g; } } return best; }
@@ -1362,7 +1228,7 @@ function pickGift(g) {
   S.giftBox[g.kind] = (S.giftBox[g.kind] || 0) + 1; S.dandelions += g.dand; S.giftNew = true; writeSave(S);
   const y = Y(g.d) - 10; SFX.gift(g.kind === 'clover');
   fx({ type: 'glow', x: g.x, y, life: 0.7, r: g.kind === 'clover' ? 60 : 40, rgb: g.kind === 'clover' ? '220,255,190' : '255,236,170' });
-  fx({ type: 'spr', key: `gift|${g.kind}`, x: g.x, y: y + 4, vy: -50, life: 0.8, scale: 1 });
+  fx({ type: 'spr', key: `gift.${g.kind}`, x: g.x, y: y + 4, vy: -50, life: 0.8, scale: 1 });
   if (g.dand) { const t = hudTarget(); fx({ type: 'fly', x0: g.x, y0: y, x1: t[0], y1: t[1], life: 0.8, value: g.dand }); }
   toastText(T_('toast.giftPick').replace('{what}', T_('gift.' + g.kind + '.a')).replace('{who}', T_('vis.' + g.from + '.the')) + (g.dand ? T_('toast.giftDand').replace('{n}', g.dand) : ''), 3800);
 }

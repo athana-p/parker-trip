@@ -647,3 +647,57 @@ function drawShakeB(c, k = 0, o = {}) {
   c.save(); c.translate(d * 14, -118); c.rotate(d * 0.34); c.scale(0.78, 0.78); head3q(c, DESIGNS.B.q.G, o.expr || 'happy'); c.restore();
 }
 const BOX_SHAKE = { w: 260, h: 260, ox: 130, oy: 236 };
+
+// ================= ART LIST: Parker =================
+const K_DOG = 0.55;                                   // puppet scale in the yard
+
+// ---- his parts. The pose drawings above call these through the list, so repainting one part changes it in every pose
+// (and on every postcard). The two heads have a fixed size; the rest stretch with the pose (flex), so they have no box.
+head3q = ART.part('parker.part.head3q', { group: 'parker.part', box: { w: 142, h: 138, ox: 71, oy: 72 }, note: 'three-quarter head, origin at its centre; (c, G, expr)' }, head3q);
+headSide = ART.part('parker.part.headSide', { group: 'parker.part', box: { w: 134, h: 128, ox: 61, oy: 69 }, note: 'side head, origin at its centre; (c, G, expr)' }, headSide);
+ear = ART.part('parker.part.ear', { group: 'parker.part', flex: true, note: '(c, E, o)' }, ear);
+eyes = ART.part('parker.part.eyes', { group: 'parker.part', flex: true, note: '(c, pts, R, expr)' }, eyes);
+nose = ART.part('parker.part.nose', { group: 'parker.part', flex: true, note: '(c, x, y, rx, ry)' }, nose);
+blush = ART.part('parker.part.blush', { group: 'parker.part', flex: true, note: '(c, pts, R, a)' }, blush);
+tongue = ART.part('parker.part.tongue', { group: 'parker.part', flex: true, note: '(c, x, y, w, h, tilt)' }, tongue);
+mouthFront = ART.part('parker.part.mouth', { group: 'parker.part', flex: true, note: '(c, mx, my, s, expr)' }, mouthFront);
+tail = ART.part('parker.part.tail', { group: 'parker.part', flex: true, note: 'curled tail puff; (c, x, y, R, o)' }, tail);
+tailBase = ART.part('parker.part.tailBase', { group: 'parker.part', flex: true, note: '(c, x, y, R, base)' }, tailBase);
+legs = ART.part('parker.part.legs', { group: 'parker.part', flex: true, note: 'legs between joints; (c, list, col)' }, legs);
+legB = ART.part('parker.part.leg', { group: 'parker.part', flex: true, note: 'one swinging leg; (c, pivot, a, len, lift, w0, w1, col)' }, legB);
+bodyBlob = ART.part('parker.part.body', { group: 'parker.part', flex: true, note: 'body from the design\'s blobs; (c, D)' }, bodyBlob);
+girth = ART.part('parker.part.harness.girth', { group: 'parker.part', flex: true, note: 'red + khaki girth with buckle; (c, top, bot, w, red)' }, girth);
+band = ART.part('parker.part.harness.band', { group: 'parker.part', flex: true, note: 'one strap; (c, a, b, w, col, o)' }, band);
+twoTone = ART.part('parker.part.harness.neck', { group: 'parker.part', flex: true, note: 'yellow/green neck loop; (c, path, mx, colL, colR)' }, twoTone);
+ring = ART.part('parker.part.harness.ring', { group: 'parker.part', flex: true, note: '(c, x, y, r)' }, ring);
+scarfSide = ART.part('parker.part.scarfSide', { group: 'parker.part', flex: true, note: 'winter scarf, sitting pose; (c)' }, scarfSide);
+scarfFront = ART.part('parker.part.scarfFront', { group: 'parker.part', flex: true, note: 'winter scarf, front poses; (c, y)' }, scarfFront);
+
+// ---- his poses: what the game asks for. Arguments follow the id in the key, e.g. 'parker.sit|calm|0|0'
+{
+  const pose = (id, box, draw, note) => ART.def('parker.' + id, { group: 'parker', box, k: K_DOG, draw, note });
+  const HELD = ['duck', 'card', 'simit', 'ball', 'rope', 'twig'];
+  pose('sit', BOX_SIT, (c, a) => drawSitB(c, a[0], +a[1], { headRot: +a[2], headDy: +(a[3] || 0), pack: a[4] === 'pack', mouth: HELD.includes(a[4]) ? a[4] : null }), 'expr | wag | headRot | headDy | pack or thing in his mouth');
+  pose('stand', BOX_STAND, (c, a) => drawStandB(c, { ...STAND0, expr: a[0], pack: a[1] === 'pack' }), 'expr | pack');
+  pose('trot', BOX_STAND, (c, a) => drawStandB(c, { ...trotPose(+a[0]), pack: a[1] === 'pack' }), 'frame 0–5 | pack');
+  pose('look', BOX_STAND, (c, a) => drawStandB(c, { ...lookBackPose(+a[0]), pack: a[1] === 'pack' }), 'frame | pack');
+  pose('sniff', BOX_STAND, (c, a) => drawStandB(c, sniffPose(+a[0])), 'frame 0–1');
+  pose('bat', BOX_STAND, (c, a) => drawStandB(c, { ...STAND0, wag: 0.15, legs: { ...STAND0.legs, fn: +a[0] ? { a: 0.95, lift: 16 } : { a: 0.2, lift: 4 } }, head: { view: 'side', dx: 4, dy: 18, rot: 0.25 }, expr: 'happy' }), 'paw up 0/1');
+  pose('tug', BOX_STAND, (c, a) => drawStandB(c, { ...STAND0, tilt: -0.1 - (+a[0]) * 0.03, bob: 3, wag: 0.2 * (+a[0] ? 1 : -1), legs: { fn: { a: 0.55, lift: 0 }, ff: { a: 0.45, lift: 0 }, hn: { a: -0.45, lift: 0 }, hf: { a: -0.38, lift: 0 } }, head: { view: 'side', dx: 6, dy: 14, rot: 0.18 + (+a[0]) * 0.06 }, expr: 'happy' }), 'frame 0–1');
+  pose('nosepush', BOX_STAND, (c, a) => drawStandB(c, { ...trotPose(+a[0]), head: { view: 'side', dx: 8, dy: 30, rot: 0.38 }, expr: 'happy' }), 'frame 0–5');
+  pose('lie', BOX_LIE, (c, a) => drawLieB(c, a[0], { breath: +a[1], bone: a[2] === 'bone', headRot: a[3] != null ? +a[3] : undefined }), 'expr | breath | bone | headRot');
+  pose('flat', BOX_FLAT, (c, a) => drawFlatB(c, +a[0]), 'frame 0–1');
+  pose('belly', BOX_BELLY, (c, a) => drawBellyB(c, +a[0]), 'frame 0–1');
+  pose('bow', BOX_BOW, (c, a) => drawPlayBowB(c, a[0], { wag: +(a[1] || 0) }), 'expr | wag');
+  pose('shake', BOX_SHAKE, (c, a) => drawShakeB(c, +a[0]), 'frame 0–1');
+  ART.def('parker.door', { group: 'parker', box: BOX_DOOR, k: 1, stick: false, draw: (c, a) => drawDoorNap(c, a[0], +a[1]), note: 'his face in the doghouse door: expr | breath' });
+  // poses that so far only the postcards use (they call the drawing directly; entered so the list is complete)
+  pose('back', BOX_BACK, (c, a) => drawBackSitB(c, {}), 'postcards');
+  pose('dig', BOX_DIG, (c, a) => drawDigB(c, +(a[0] || 0)), 'postcards: frame');
+  pose('run', BOX_RUN, (c, a) => drawRunFrontB(c, +(a[0] || 0)), 'postcards: frame');
+  pose('wave', BOX_WAVE, (c, a) => drawWaveB(c, +(a[0] || 0)), 'postcards: frame');
+}
+// little things that float up from him
+ART.def('fx.heart', { group: 'fx', box: { w: 30, h: 30, ox: 15, oy: 15 }, stick: false, draw: c => drawHeart(c, 1) });
+ART.def('fx.z', { group: 'fx', box: { w: 24, h: 24, ox: 12, oy: 12 }, stick: false, draw: c => drawZ(c, 1.1) });
+ART.def('fx.puff', { group: 'fx', box: { w: 30, h: 22, ox: 15, oy: 11 }, stick: false, draw: c => drawPuff(c), note: 'the little cloud of a sigh' });

@@ -312,3 +312,42 @@ function drawBird(c, k = 0) {
   if (k < 2) { piece(c, slab([-9, -13], [2, -16], 1.4), '#f6efe4', { mul: 0.3 }); piece(c, slab([-8, -17], [-1, -19], 1.6), '#4e3424', { mul: 0.4 }); }
   c.restore();
 }
+
+// ================= ART LIST: things =================
+// what he carries, plays with and eats: one entry each, drawn in a 44 × 44 box round its centre; the key's argument is the size
+// it is drawn at ('item.ball|0.6' on the grass, 'item.ball|0.42' in his mouth)
+const ITEM_ART = ['onigiri', 'jerky', 'bento', 'clover', 'omamori', 'ball', 'duck', 'bone', 'bubbles', 'rope', 'kite', 'sprinkler', 'yarn', 'temari', 'simit', 'teaglass', 'gift', 'card', 'lantern', 'croissant', 'bouquet', 'twig'];
+for (const id of ITEM_ART) ART.def('item.' + id, { group: typeof ITEM !== 'undefined' && ITEM[id] ? ITEM[id].cat : 'held', box: { w: 44, h: 44, ox: 22, oy: 22 }, stick: false, draw: (c, a) => drawItem(c, id, +(a[0] === undefined ? 1 : a[0])), note: 'size' });
+ART.def('prop.backpack', { kind: 'paint', group: 'prop', box: { w: 56, h: 40, ox: 28, oy: 20 }, draw: (c, x = 0, y = 0, rot = 0) => backpack(c, x, y, rot), note: 'his red pack' });
+ART.def('prop.kite', { group: 'prop', box: { w: 50, h: 70, ox: 25, oy: 35 }, stick: false, draw: c => drawKite(c, false), note: 'the kite in the air (no tail)' });
+ART.def('prop.kitebow', { group: 'prop', box: { w: 16, h: 12, ox: 8, oy: 6 }, stick: false, draw: (c, a) => kiteBow(c, 0, 0, a[0]), note: 'one bow of the kite\'s tail: colour' });
+ART.def('prop.snowman', { group: 'prop', box: { w: 90, h: 100, ox: 45, oy: 84 }, k: 1.4, stick: false, draw: (c, a) => drawSnowman(c, +a[0], +a[1] / 10), note: 'stage 0–2 | melt 0–10' });
+ART.def('fx.rainbow', { kind: 'kept', group: 'fx', box: { w: 90, h: 50, ox: 45, oy: 46 }, draw: res => { const cv = mk(90 * res, 50 * res), c = cv.getContext('2d'); c.scale(res, res); c.translate(45, 46); drawRainbow(c, 40); return cv; }, note: 'the little rainbow over the sprinkler' });
+ART.def('visitor.sparrow', { group: 'visitor', box: { w: 60, h: 60, ox: 30, oy: 48 }, stick: false, draw: (c, a) => drawBird(c, +(a[0] || 0)), note: 'frame' });
+
+// souvenirs: one small paper object per place, origin at the middle of its base. The boxes are measured from the drawings.
+const SOUVENIR_BOX = {
+  chiangmai: { w: 58, h: 68, ox: 29, oy: 61 },
+  pai: { w: 51, h: 43, ox: 22, oy: 38 },
+  krabi: { w: 47, h: 40, ox: 23, oy: 33 },
+  floatingmarket: { w: 45, h: 66, ox: 22, oy: 59 },
+  inthanon: { w: 45, h: 46, ox: 22, oy: 39 },
+  fuji: { w: 53, h: 45, ox: 26, oy: 39 },
+  fushimi: { w: 49, h: 47, ox: 24, oy: 41 },
+  guilin: { w: 60, h: 56, ox: 30, oy: 52 },
+  swiss: { w: 41, h: 56, ox: 20, oy: 49 },
+  istanbul: { w: 45, h: 56, ox: 22, oy: 45 },
+  egypt: { w: 49, h: 50, ox: 24, oy: 43 },
+  hoian: { w: 44, h: 62, ox: 18, oy: 55 },
+  bali: { w: 56, h: 86, ox: 27, oy: 73 },
+  venice: { w: 58, h: 56, ox: 25, oy: 53 },
+  santorini: { w: 41, h: 58, ox: 20, oy: 51 },
+  holland: { w: 58, h: 58, ox: 27, oy: 51 },
+  paris: { w: 27, h: 60, ox: 14, oy: 57 },
+  furano: { w: 48, h: 51, ox: 24, oy: 47 },
+  dunhuang: { w: 42, h: 52, ox: 20, oy: 45 },
+  tekapo: { w: 43, h: 54, ox: 21, oy: 47 },
+  kenya: { w: 28, h: 58, ox: 15, oy: 55 },
+  antarctica: { w: 48, h: 61, ox: 24, oy: 54 },
+};
+for (const id in SOUVENIR_BOX) ART.def('souvenir.' + id, { group: 'souvenir', box: SOUVENIR_BOX[id], stick: false, draw: (c, a) => drawSouvenir(c, id, +((a && a[0]) === undefined ? 1 : a[0])), note: 'size' });

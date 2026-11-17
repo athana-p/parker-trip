@@ -59,3 +59,7 @@ function motes(ctx, t, w, h, n = 12, seed = 91, rgb = '255,236,190') {
   }
   ctx.restore();
 }
+
+// ---- art list: light (drawn fresh every frame)
+ART.def('fx.glow', { kind: 'live', group: 'fx', draw: (ctx, x, y, r, rgb, a) => glow(ctx, x, y, r, rgb, a), note: 'a soft round glow: (ctx, x, y, r, "r,g,b", alpha)' });
+ART.def('live.motes', { kind: 'live', group: 'live', draw: (ctx, t, w, h, n, seed, rgb) => motes(ctx, t, w, h, n, seed, rgb), note: 'dust motes drifting in the light' });
