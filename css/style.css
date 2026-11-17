@@ -17,8 +17,9 @@ body { font-family: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsof
 .toast { pointer-events: none; position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 96px); transform: translateX(-50%); font-size: 15px; padding: 9px 16px; white-space: nowrap; transition: opacity 0.6s, transform 0.6s; }
 .toast.hidden { opacity: 0; transform: translateX(-50%) translateY(8px); pointer-events: none; }
 /* ---- bottom bar ---- */
-#bar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; gap: 14px; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 16px); pointer-events: none; transition: opacity 0.3s, transform 0.3s; }
-#bar.hidden { opacity: 0; transform: translateY(12px); }
+#bar, #roomBar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; gap: 14px; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 16px); pointer-events: none; transition: opacity 0.3s, transform 0.3s; }
+#bar.hidden, #roomBar.hidden { opacity: 0; transform: translateY(12px); pointer-events: none; }
+#bar.hidden .btn, #roomBar.hidden .btn { pointer-events: none; }
 .barbtn { font-size: 16px; padding: 4px 18px 4px 8px; gap: 4px; }
 .toast { bottom: calc(env(safe-area-inset-bottom, 0px) + 84px); }
 /* ---- panels: a sheet of paper sliding up ---- */
@@ -68,7 +69,7 @@ body { font-family: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsof
 .dbg-title { font-weight: 700; }
 @media (prefers-reduced-motion: reduce) { .sheet, #bar, .card, .toast { transition: none; } }
 /* ---- album ---- */
-#bar { gap: 10px; }
+#bar, #roomBar { gap: 10px; }
 .barbtn { padding: 4px 14px 4px 6px; }
 .album { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .album-cell { font: inherit; color: var(--ink); position: relative; aspect-ratio: 3 / 2; max-width: 100%; padding: 0; border: 3px solid #fff; border-radius: 6px; background: #fff; overflow: hidden; cursor: pointer; box-shadow: 0 3px 8px rgba(60, 30, 40, 0.18); }

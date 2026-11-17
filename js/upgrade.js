@@ -12,9 +12,10 @@ function upgradeHouse() {
   return true;
 }
 function startHouseBuild(from, to) {
+  if (ROOMV.on) leaveRoomNow();                                  // it's built from the yard
   if (VIS.on && VIS.kind === 'sparrow') visitorLeave();         // she may be sitting on the old roof
   if (LAY) LAY.old = null;
-  applyHouse(to);
+  applyHouse(to); tidyField();
   const by = Y(HOUSE.d), r = rng(700 + to);
   const ps = (lv) => ART.get('house.' + lv).pieces(HOUSES[lv].x0, by);
   Object.assign(HOUSEFX, {

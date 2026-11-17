@@ -34,18 +34,39 @@ function currentTod() { return DEV.get('tod') || timeOfDay(new Date(Clock.now())
 function sleepTime() { const h = new Date(Clock.now()).getHours(), [a, b] = HABITS.bedtime; return h >= a || h < b; }
 
 // ---------- dandelions ----------
-function spotFree(x, d) {
+function spotFree(x, d, self) {
   const h = houseAt();
   if (Math.abs(x - h.path) < 22 && d > 110) return false;             // keep his stepping-stone path clear
   if (h.porch && x > h.porch[0] - 12 && x < h.porch[1] + 12 && d > 214) return false;   // and the porch steps
   if (x > 296 && x < 368 && d > 205) return false;                   // mailbox post
-  return S.field.every(f => Math.hypot(f.x - x, (f.d - d) * 1.6) > 34);
+  if (!clearOfThings(x, d, self)) return false;
+  return S.field.every(f => f === self || Math.hypot(f.x - x, (f.d - d) * 1.6) > 34);
+}
+// nothing you tap should stand on top of anything else you tap: dandelions and gifts keep clear of the toys,
+// the gifts, the gift box and the snowman (so a flower is never hidden in a crowd and hard to reach)
+function clearOfThings(x, d, self) {
+  const near = (ox, od, r) => Math.hypot(ox - x, (od - d) * 1.6) < r;
+  for (const t of S.toys) { const p = S.toyPos[t]; if (p && p !== self && near(p.x, p.d, t === 'rope' ? 56 : 46)) return false; }
+  for (const g of S.gifts) if (g !== self && near(g.x, g.d, 42)) return false;
+  if (near(GIFTBOX.x, GIFTBOX.d, 44)) return false;
+  if (S.snowman && !S.snowman.twig && near(S.snowman.x, S.snowman.d, 60)) return false;
+  return true;
+}
+// flowers that ended up in a crowd (a toy rolled there, a gift landed, the house grew) move to a free spot
+function tidyField() {
+  let moved = 0;
+  for (const f of S.field) {
+    if (spotFree(f.x, f.d, f)) continue;
+    for (let i = 0; i < 60; i++) { const x = Math.round(26 + Math.random() * (SCENE_W - 52)), d = Math.round(96 + Math.random() * 136); if (spotFree(x, d, f)) { f.x = x; f.d = d; moved++; break; } }
+  }
+  if (moved) writeSave(S);
+  return moved;
 }
 function spawnDandelion(born) {
   for (let tries = 0; tries < 40; tries++) {
-    const x = 26 + Math.random() * (SCENE_W - 52), d = 96 + Math.random() * 136;
+    const x = Math.round(26 + Math.random() * (SCENE_W - 52)), d = Math.round(96 + Math.random() * 136);
     if (!spotFree(x, d)) continue;
-    S.field.push({ id: ++S.seq, x: Math.round(x), d: Math.round(d), kind: Math.random() < PUFF_CHANCE ? 'puff' : 'yellow', born });
+    S.field.push({ id: ++S.seq, x, d, kind: Math.random() < PUFF_CHANCE ? 'puff' : 'yellow', born });
     return true;
   }
   return false;
@@ -90,6 +111,7 @@ function pickNext() {
   const tod = currentTod(), company = TT < (P.awakeUntil || 0), asleep = sleepTime() && !company;
   const w = { ...HABITS.idle[company && sleepTime() ? 'company' : asleep ? 'night' : tod === 'night' ? 'evening' : tod] };
   if (!asleep) { for (const t of S.toys) if (HABITS.toys[t]) w[t] = HABITS.toys[t]; w.eat = HABITS.eat; }
+  if (P.inRoom) return roomPickNext();                                                // indoors (js/room.js)
   if (P.wet) return shakeOff();
   if (HOUSEFX.on) return faceThen(-1, () => setMode('expect', 2));                    // the new house is going up: he watches
   if (!asleep && (S.houseSeen || 1) < houseLevel()) return inspectHouse();           // a new house he hasn't been round yet
@@ -123,6 +145,7 @@ function goTo(x, d, then, o = {}) { const f = Math.sign(x - P.x) || P.face; face
 // you picked a toy from his toy list: he goes to play with it (waking up first if he was asleep)
 function toyWeatherOk(id) { const w = ITEM[id] && ITEM[id].weather; return !w || (w === 'wind' ? WX.kind === 'wind' : WX.kind === 'sunny' && WX.season !== 'winter' && currentTod() !== 'night'); }
 function playToy(id) {
+  if (ROOMV.on) leaveRoomNow();             // toys are for the yard: out you both go
   if (!P.present || P.pack || /packup|departLook|arrive|gift/.test(P.mode)) return;
   if (TOY_START[id]) return TOY_START[id]();
   wakeThen(() => { P.want = id; pickNext(); });
@@ -134,8 +157,8 @@ const TOY_TAP = {};
 // a touch on the toys: every toy under the finger is a candidate and the one nearest the finger wins.
 // A toy that can't be played right now (kite without wind, sprinkler without sun) only answers if nothing else is there,
 // so it never hides the ball or the rope lying next to it.
-function toyPick(x, y, id) {
-  const cands = [], grab = () => { try { cv.setPointerCapture(id); } catch (err) { } return true; };
+function toyCands(x, y, id, cands = []) {
+  const grab = () => { try { cv.setPointerCapture(id); } catch (err) { } return true; };
   if (S.toys.includes('ball') && P.hold !== 'ball') { const [bx, by] = ballScreen(), d = Math.hypot(x - bx, y - by); if (d <= 30) cands.push([d, () => ballGrab(x, y, id) && grab()]); }
   if (S.toys.includes('rope') && !TUG.on && P.hold !== 'rope') { const [a, b] = ropeEnds(), d = Math.min(Math.hypot(x - a[0], y - a[1]), Math.hypot(x - b[0], y - b[1]), Math.hypot(x - (a[0] + b[0]) / 2, y - a[1])); if (d <= 30) cands.push([d, () => ropeGrab(x, y, id) && grab()]); }
   for (const tid of S.toys) {
@@ -143,10 +166,14 @@ function toyPick(x, y, id) {
     const s = depthScale(t.d); if (!(Math.abs(x - t.x) < 26 * s && y > Y(t.d) - 44 * s && y < Y(t.d) + 6)) continue;
     cands.push([Math.hypot(x - t.x, y - (Y(t.d) - 18 * s)) + (toyWeatherOk(tid) ? 0 : 1000), () => (f(), true)]);
   }
+  return cands;
+}
+function pickNearest(cands) {
   cands.sort((p, q) => p[0] - q[0]);
   for (const [, act] of cands) if (act()) return true;            // (the rope says no while he's away: then the next one gets it)
   return false;
-}                    // toys that start with a tap of yours (filled in by each toy below)
+}
+const toyPick = (x, y, id) => pickNearest(toyCands(x, y, id));                    // toys that start with a tap of yours (filled in by each toy below)
 // asleep when you want to play: he wakes slowly first (stretchy blink), then joins in. Returns true if he had to wake.
 function wakeThen(fn) {
   if (P.mode === 'inhouse' || P.mode === 'goin') { if (sleepTime()) P.awakeUntil = TT + HABITS.companyTime; comeOut(fn); return true; }
@@ -223,7 +250,7 @@ function updateParker(dt) {
   if (!P.present) return;
   if (P.mode === 'trot') {
     const dx = P.data.x - P.x, dd = P.data.d - P.d, L = Math.hypot(dx, dd), step = (P.data.speed || HABITS.trotSpeed) * dt;
-    if (WX.look === 'snow' && (P.walked = (P.walked || 0) + Math.min(step, L)) > HABITS.printEvery) leavePrint();
+    if (WX.look === 'snow' && !P.inRoom && (P.walked = (P.walked || 0) + Math.min(step, L)) > HABITS.printEvery) leavePrint();
     if (L <= step) { P.x = P.data.x; P.d = P.data.d; const then = P.data.then; then ? then() : pickNext(); }
     else { P.x += dx / L * step; P.d += dd / L * step; }
     return;
@@ -252,7 +279,7 @@ function updateParker(dt) {
   else if (P.mode === 'stir') setMode(P.data.back, P.data.left);
   else if (P.mode === 'packup') setMode('departLook', 1.7);
   else if (P.mode === 'drowsy') { const then = P.data.then; if (then) then(); else { setMode('wag', HABITS.reactionTime.wag); SFX.pop(); } }
-  else if (P.mode === 'departLook') goTo(480, P.d, () => { P.present = false; P.pack = false; setMode('away'); });
+  else if (P.mode === 'departLook') { if (P.inRoom) ROOMV.doorOpenUntil = TT + 4; goTo(P.inRoom ? roomR().door.x : 480, P.d, () => { P.present = false; P.pack = false; P.inRoom = false; P.onBed = false; setMode('away'); }); }
   else if (P.mode === 'arrive') { P.pack = false; setMode('sigh', HABITS.sighTime, { lie: false }); }
   else if (P.mode === 'nudge') kickBall();
   else if (P.mode === 'shake') { S.toyPos.duck = { x: clamp(P.x + 34 * P.face, 30, 370), d: clamp(P.d - 6, 96, 226) }; P.hold = null; writeSave(S); setMode('sigh', HABITS.sighTime, { lie: false }); }
@@ -376,10 +403,12 @@ function startDeparture() {
 }
 function startArrival() {
   P.present = true; P.pack = true; P.hold = null; P.x = 450; P.d = 150; P.face = -1;
+  if (ROOMV.on) { const R = roomR(); putInRoom(R.door.x); P.face = 1; ROOMV.doorOpenUntil = TT + 1; return setMode('trot', null, { x: R.door.x + 90, d: ROOM_D, then: () => setMode('arrive', 1.8) }); }   // you're indoors: he comes in to find you
   setMode('trot', null, { x: 236, d: 150, then: () => setMode('arrive', 1.8) });
 }
 function bagRustle() {          // the sound of a plastic bag: he comes running
   if (!P.present || P.pack || /packup|departLook|arrive|belly/.test(P.mode)) return;
+  if (P.inRoom) { if (/sleep|nap/.test(P.mode)) return setMode('stir', HABITS.stirTime, { back: P.mode, left: Math.max(10, P.until - TT) }); P.onBed = false; return goTo(clamp(ROOMV.cam + 200, 44, roomR().w - 44), ROOM_D, () => setMode('expect', HABITS.expectTime)); }
   if (P.mode === 'inhouse') return wakeThen(() => goTo(200, 104, () => setMode('expect', HABITS.expectTime)));     // the bag! out he comes
   if (/sleep|nap/.test(P.mode)) return setMode('stir', HABITS.stirTime, { back: P.mode, left: Math.max(10, P.until - TT) });
   if (P.hold === 'duck') S.toyPos.duck = { x: clamp(P.x + 30 * P.face, 30, 370), d: P.d };
@@ -469,7 +498,7 @@ function parkerDrawing() {
   if (P.noseSnowUntil > TT && !/^parker\.(shake|belly)/.test(key)) key += '|sn';
   return { key, sx, lift };
 }
-function parkerCenter() { if (P.mode === 'inhouse') return [DOOR.x, Y(DOOR.d) - 18]; const s = depthScale(P.d), lying = isLying(); return [P.x + (lying ? 20 : 4) * P.face * s, Y(P.d) - (lying ? 34 : 64) * s]; }
+function parkerCenter() { if (P.inRoom) return roomParkerCenter(); if (P.mode === 'inhouse') return [DOOR.x, Y(DOOR.d) - 18]; const s = depthScale(P.d), lying = isLying(); return [P.x + (lying ? 20 : 4) * P.face * s, Y(P.d) - (lying ? 34 : 64) * s]; }
 
 // ---------- particles ----------
 const FX = [];
@@ -503,6 +532,7 @@ function sleepZ() {
 
 // ---------- render ----------
 function drawScene() {
+  if (ROOMV.on) { drawRoom(); drawTransition(); return; }        // indoors (js/room.js)
   const L = LAY, p = L.p, H = V.H;
   ctx.setTransform(cv.width / SCENE_W, 0, 0, cv.width / SCENE_W, 0, 0);
   const fade = L.old ? clamp((TT - L.fadeT0) / 3) : 1;
@@ -592,6 +622,7 @@ function drawScene() {
   if (p.fireflies) ART.draw('live.fireflies', ctx, TT, H); else if (p.motes) ART.draw('live.motes', ctx, TT, SCENE_W, H * 0.8, 8, 91, p.motes);
   drawFX();
   drawSay();
+  drawTransition();
 }
 
 // ---------- input ----------
@@ -600,32 +631,34 @@ let press = null;          // a press on Parker: short = tap, held or rubbed = b
 function onParker(x, y) { const [px, py] = parkerCenter(), s = depthScale(P.d); return ((x - px) / (70 * s)) ** 2 + ((y - py) / (62 * s)) ** 2 < 1; }
 cv.addEventListener('pointerdown', e => {
   const [x, y] = toScene(e);
-  // dandelions first (nearest head within reach), front-most wins
-  let best = null, bd = 30;
-  for (const f of S.field) { const s = depthScale(f.d), hx = f.x, hy = Y(f.d) - 36 * s, dd = Math.hypot(x - hx, y - hy); if (dd < bd && Clock.now() - f.born > 600) { bd = dd; best = f; } }
+  if (ROOMV.trans) return;
+  if (ROOMV.on) return roomDown(e, x, y);
   if (kiteGrab(x, y, e.pointerId)) { try { cv.setPointerCapture(e.pointerId); } catch (err) { } return; }
   if (tapBubble(x, y)) return;
-  const g = giftAt(x, y); if (g) return pickGift(g);
-  if (Math.abs(x - GIFTBOX.x) < 24 && y > Y(GIFTBOX.d) - 38 && y < Y(GIFTBOX.d) + 6) { S.giftNew = false; return openPanel('gifts'); }
-  if (best) return collect(best);
+  // dandelions, gifts, the gift box and the toys: whichever is nearest your finger wins (none hides another)
+  const cands = [];
+  for (const f of S.field) { const s = depthScale(f.d), dd = Math.hypot(x - f.x, y - (Y(f.d) - 36 * s)); if (dd < 30 && Clock.now() - f.born > 600) cands.push([dd, () => (collect(f), true)]); }
+  for (const g of S.gifts) { const dd = Math.hypot(x - g.x, y - (Y(g.d) - 12)); if (dd < 30) cands.push([dd, () => (pickGift(g), true)]); }
+  if (!HOUSEFX.on && Math.abs(x - GIFTBOX.x) < 24 && y > Y(GIFTBOX.d) - 38 && y < Y(GIFTBOX.d) + 6) cands.push([Math.hypot(x - GIFTBOX.x, y - (Y(GIFTBOX.d) - 16)), () => { S.giftNew = false; openPanel('gifts'); return true; }]);
+  if (pickNearest(toyCands(x, y, e.pointerId, cands))) return;
   if (snowmanTap(x, y)) return;
-  if (toyPick(x, y, e.pointerId)) return;
   if (P.present && onParker(x, y)) { press = { id: e.pointerId, t0: TT, x, y, dist: 0, rub: false }; try { cv.setPointerCapture(e.pointerId); } catch (err) { } return; }
   if (tapVisitor(x, y)) return;
   const mb = Y(MAILBOX.d);
   if (x > MAILBOX.x - 42 && x < MAILBOX.x + 42 && y > mb - 136 && y < mb - 70) return openPanel('mail');
   const hb = Y(HOUSE.d), ht = houseAt().tap;
-  if (!HOUSEFX.on && x > ht[0] && x < ht[1] && y > hb - ht[2] && y < hb + ht[3]) return openPanel('shelf');
+  if (!HOUSEFX.on && x > ht[0] && x < ht[1] && y > hb - ht[2] && y < hb + ht[3]) return houseLevel() > 1 ? enterRoom() : openPanel('shelf');   // the cabin and the big house: go in
 });
 cv.addEventListener('pointermove', e => {
+  if (ROOMV.on && roomMove(e, toScene(e)[0])) return;
   if (FETCH.drag && e.pointerId === FETCH.drag.id) { const [x, y] = toScene(e); return ballFollow(x, y); }
   if (TUG.on && e.pointerId === TUG.id) { const [x, y] = toScene(e); TUG.ax = x; TUG.ay = y; return; }
   if (KITE.drag && e.pointerId === KITE.drag.id) { const [x, y] = toScene(e); return kiteMove(x, y); }
   if (!press || e.pointerId !== press.id) return;
   const [x, y] = toScene(e); press.dist += Math.hypot(x - press.x, y - press.y); press.x = x; press.y = y;
 });
-cv.addEventListener('pointerup', e => { if (FETCH.drag && e.pointerId === FETCH.drag.id) return ballThrow(); if (TUG.on && e.pointerId === TUG.id) return ropeRelease(); if (KITE.drag && e.pointerId === KITE.drag.id) return kiteUp(); if (!press || e.pointerId !== press.id) return; press.rub ? endBelly() : tapParker(); press = null; });
-cv.addEventListener('pointercancel', () => { if (FETCH.drag) { FETCH.drag = null; } KITE.drag = null; if (TUG.on) ropeRelease(); if (press && press.rub) endBelly(); press = null; });
+cv.addEventListener('pointerup', e => { if (ROOMV.on && roomUp(e)) return; if (FETCH.drag && e.pointerId === FETCH.drag.id) return ballThrow(); if (TUG.on && e.pointerId === TUG.id) return ropeRelease(); if (KITE.drag && e.pointerId === KITE.drag.id) return kiteUp(); if (!press || e.pointerId !== press.id) return; press.rub ? endBelly() : tapParker(); press = null; });
+cv.addEventListener('pointercancel', () => { ROOMV.drag = null; if (FETCH.drag) { FETCH.drag = null; } KITE.drag = null; if (TUG.on) ropeRelease(); if (press && press.rub) endBelly(); press = null; });
 function checkRub() {
   if (!press || press.rub || /sleep|nap|stir|packup|departLook|arrive|gift|inhouse|goin/.test(P.mode) || P.pack) return;
   if (TT - press.t0 > HABITS.bellyRub.hold || press.dist > HABITS.bellyRub.rubDistance) {
@@ -686,6 +719,7 @@ function boot() {
   if (!S) { S = defaultSave(now); for (let i = 0; i < START_DANDELIONS; i++) spawnDandelion(now + 400 + i * 350); S.nextSpawnAt = now + SPAWN_INTERVAL; writeSave(S); }
   if (debugOn()) { try { Clock.offset = +localStorage.getItem(CLOCK_KEY) || 0; } catch (e) { } loadWxForce(); }
   applyHouse(houseLevel());
+  tidyField();
   const lastSeen = S.lastSeen || now;
   tickSpawns();
   advanceWorld(Clock.now());                 // whatever happened while the game was closed
@@ -708,7 +742,7 @@ function boot() {
     Clock.tick(dt);
     if (TT > todAt) { todAt = TT + 1; worldTick(); wxCheck(); }
     if (TT > saveAt) { saveAt = TT + 15; writeSave(S); }
-    checkRub(); updateParker(dt); updateBall(dt); updateVisitor(dt); updateBubbles(dt); updateYarn(dt); updateKite(dt); updateSprinkler(dt); updateChase(dt); updateWeather(dt, WX, V.H, TT); parkerExtras(); catPlayTick(); sayTick(); noteTick(); sleepZ(); updateFX(dt); drawScene();
+    roomTick(); checkRub(); updateParker(dt); updateBall(dt); updateVisitor(dt); updateBubbles(dt); updateYarn(dt); updateKite(dt); updateSprinkler(dt); updateChase(dt); updateWeather(dt, WX, V.H, TT); parkerExtras(); catPlayTick(); sayTick(); noteTick(); sleepZ(); updateFX(dt); drawScene();
     if (!window.READY) window.READY = true;
     requestAnimationFrame(loop);
   };
@@ -720,7 +754,7 @@ function boot() {
   idle(step);
 }
 // test hook (screenshots): advance the simulation deterministically
-window.__advance = secs => { for (let i = 0; i < secs * 30; i++) { TT += 1 / 30; checkRub(); updateParker(1 / 30); updateBall(1 / 30); updateVisitor(1 / 30); updateBubbles(1 / 30); updateYarn(1 / 30); updateKite(1 / 30); updateSprinkler(1 / 30); updateChase(1 / 30); updateWeather(1 / 30, WX, V.H, TT); parkerExtras(); catPlayTick(); sayTick(); updateFX(1 / 30); } drawScene(); };
+window.__advance = secs => { for (let i = 0; i < secs * 30; i++) { TT += 1 / 30; roomTick(); checkRub(); updateParker(1 / 30); updateBall(1 / 30); updateVisitor(1 / 30); updateBubbles(1 / 30); updateYarn(1 / 30); updateKite(1 / 30); updateSprinkler(1 / 30); updateChase(1 / 30); updateWeather(1 / 30, WX, V.H, TT); parkerExtras(); catPlayTick(); sayTick(); updateFX(1 / 30); } drawScene(); };
 // time of day or weather changed: rebuild the backdrop (it cross-fades), switch the weather sounds
 function wxCheck() {
   snowmanTick();
@@ -737,7 +771,7 @@ function worldTick() {
     if (e.type === 'leave') { if (live && P.present) startDeparture(); else P.present = false; showToast('toast.left', 3500); }
     if (e.type === 'card') { showToast('toast.mail', 4000); SFX.mail(); fx({ type: 'glow', x: MAILBOX.x, y: Y(MAILBOX.d) - 106, life: 1.2, r: 60, rgb: '255,236,170' }); }
     if (e.type === 'home') {
-      if (live) startArrival(); else { P.present = true; P.pack = false; P.x = 236; P.d = 150; P.face = -1; setMode('sit', 5); }
+      if (live) startArrival(); else { P.present = true; P.pack = false; P.x = 236; P.d = 150; P.face = -1; setMode('sit', 5); if (ROOMV.on) putInRoom(roomR().door.x + 90); }
       showToast(e.souvenir ? 'toast.souvenir' : 'toast.home', 4500);
       if (e.souvenir) fx({ type: 'glow', x: HOUSE.x + 60, y: Y(HOUSE.d) - 50, life: 2, r: 90, rgb: '255,236,170' });
     }
@@ -748,7 +782,7 @@ function worldTick() {
 }
 // ---------- festival cards handed over in person ----------
 function festGiftTick() {
-  const f = S.festPending; if (!f || S.trip || !P.present || (typeof UI !== 'undefined' && UI.panel)) return;
+  const f = S.festPending; if (!f || S.trip || !P.present || P.inRoom || (typeof UI !== 'undefined' && UI.panel)) return;
   if (P.mode === 'gift' || (P.carrying && /trot|turn/.test(P.mode))) return;
   if (/^(sleep|nap|stir|inhouse|goin)$/.test(P.mode)) { if (!P.giftHinted) { P.giftHinted = true; showToast('toast.giftLater', 4500); } return; }   // he'll give it when he's up
   if (P.pack || !/^(sit|lie|look|sniff|trot|sigh|eat|expect|watch|wag|tilt|hop|drowsy|shelter|flat|sunnap|waitthrow|pant)$/.test(P.mode)) return;
@@ -1088,7 +1122,7 @@ function sayKey(h) {
 }
 function sayTick() {
   const h = S.homeSay;
-  if (!h || SAY.on || !P.present || (typeof UI !== 'undefined' && UI.panel)) return;
+  if (!h || SAY.on || !P.present || P.inRoom || (typeof UI !== 'undefined' && UI.panel)) return;
   if (!/^(arrive|sit|sigh|look|sniff|wag|tilt|hop|lie|shelter|expect)$/.test(P.mode)) return;   // not while he's asleep or busy
   const key = sayKey(h); S.homeSay = null; writeSave(S);
   if (key) Object.assign(SAY, { on: true, key, t0: TT, until: TT + 4 + T_(key).length * (LANG === 'zh' ? 0.12 : 0.04), img: null, lang: null });
@@ -1146,7 +1180,7 @@ function startVisit(kind, forceGift) {
   }
   writeSave(S);
   // he notices, and sits watching it
-  if (P.present && /^(sit|lie|look|sniff)$/.test(P.mode)) faceThen(Math.sign(VIS.tx - P.x) || P.face, () => setMode('sit', rand([5, 9])));
+  if (P.present && !P.inRoom && /^(sit|lie|look|sniff)$/.test(P.mode)) faceThen(Math.sign(VIS.tx - P.x) || P.face, () => setMode('sit', rand([5, 9])));
 }
 function visitorLeave() {
   if (!VIS.on || VIS.phase === 'out') return;
@@ -1160,7 +1194,7 @@ function visitorLeave() {
 }
 function updateVisitor(dt) {
   if (!VIS.on) return;
-  const near = VIS.kind !== 'cat' && P.present && Math.abs(P.x - VIS.x) < 64 && (VIS.d == null || Math.abs(P.d - VIS.d) < 40) && /trot|chase/.test(P.mode);   // the cat doesn't mind him
+  const near = VIS.kind !== 'cat' && P.present && !P.inRoom && Math.abs(P.x - VIS.x) < 64 && (VIS.d == null || Math.abs(P.d - VIS.d) < 40) && /trot|chase/.test(P.mode);   // the cat doesn't mind him
   if (near && VIS.phase === 'stay') visitorLeave();             // he came over to say hello: off they go
   if (VIS.kind === 'sparrow') {
     const u = clamp((TT - VIS.t0) / 1.6), e = smooth(u);

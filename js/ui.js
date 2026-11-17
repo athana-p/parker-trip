@@ -15,6 +15,8 @@ function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.
 function buildBar() {
   const shopIco = iconCanvas(c => ART.paint('ui.icon.shop', c), 34), packIco = iconCanvas(c => ART.paint('ui.icon.pack', c), 34), albumIco = iconCanvas(c => ART.paint('ui.icon.album', c), 34);
   $('btnShop').prepend(shopIco); $('btnPack').prepend(packIco); $('btnAlbum').prepend(albumIco);
+  $('btnYard').prepend(iconCanvas(c => ART.paint('ui.icon.yard', c), 34)); $('btnHouse').prepend(iconCanvas(c => ART.paint('ui.icon.house', c), 34));   // indoors
+  $('btnYard').onclick = () => leaveRoom(); $('btnHouse').onclick = () => openPanel('shelf');
   $('btnAlbum').onclick = () => openPanel('album');
   // top-right: sound on/off and settings, drawn in code like everything else
   const drawMute = () => { const b = $('muteBtn'); b.innerHTML = ''; b.append(iconCanvas(c => ART.paint('ui.icon.sound', c, SFX.muted), 26)); b.setAttribute('aria-label', T(SFX.muted ? 'ui.soundOff' : 'ui.soundOn')); };
@@ -29,11 +31,11 @@ function buildBar() {
 function openPanel(kind) {
   UI.panel = kind; UI.side = 'front'; UI.view = null;
   if (kind === 'shop' || kind === 'pack') { bagRustle(); SFX.bag(); }
-  renderPanel(); $('panel').classList.remove('hidden'); $('bar').classList.add('hidden');
+  renderPanel(); $('panel').classList.remove('hidden'); showBars();
 }
 function closePanel() {
   if (UI.panel === 'shelf') { S.shelf.forEach(s => s.isNew = false); writeSave(S); }
-  UI.panel = null; $('panel').classList.add('hidden'); $('bar').classList.remove('hidden');
+  UI.panel = null; $('panel').classList.add('hidden'); showBars();
 }
 function renderPanel() {
   const body = $('panelBody'); body.innerHTML = '';
@@ -57,7 +59,7 @@ function renderShop(body) {
     btn.disabled = owned; if (!owned && S.dandelions < it.price) btn.classList.add('poor');
     btn.onclick = () => {
       if (S.dandelions < it.price) { showToast('ui.notEnough', 2000); return; }
-      if (buy(it.id)) { refreshCoins(); if (it.cat === 'toy') P.want = it.id; renderPanel(); }
+      if (buy(it.id)) { refreshCoins(); if (it.cat === 'toy') { P.want = it.id; tidyField(); } renderPanel(); }
     };
     const right = el('div', 'item-buy'); right.append(price, btn);
     row.append(itemIcon(it.id), txt, right); list.append(row);

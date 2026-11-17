@@ -98,6 +98,10 @@ const SFX = {
     if (!this.ok()) return; const t = this.ctx.currentTime;
     for (let i = 0; i < 3; i++) this.noise(t + i * 0.07, { dur: 0.08, v: 0.06, f: 2400 - i * 300, q: 2, a: 0.006 });
   },
+  door(open) {                       // the door: a soft wooden knock of the latch, a little creak going in
+    if (!this.ok()) return; const t = this.ctx.currentTime;
+    this.noise(t, { dur: 0.06, v: 0.1, type: 'lowpass', f: 900, a: 0.003 }); this.tone(open ? 300 : 260, t + 0.02, { type: 'triangle', a: 0.01, d: 0.18, v: 0.03, to: open ? 360 : 220 });
+  },
   paper(i = 0) {                     // a piece of the new house landing: a soft papery tap, a little higher each time
     if (!this.ok()) return; const t = this.ctx.currentTime;
     this.noise(t, { dur: 0.07, v: 0.09, type: 'bandpass', f: 2600, q: 1.4, a: 0.004 }); this.tone(520 + (i % 8) * 45, t, { type: 'triangle', a: 0.004, d: 0.12, v: 0.035 });

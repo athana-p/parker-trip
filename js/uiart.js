@@ -40,3 +40,14 @@ ART.def('ui.shareSheet', { kind: 'paint', group: 'ui', note: 'paper table with c
   piece(x, rectP(0, 0, w, h), '#e8dcc8', { scr: 0.2 });
   for (const [img, dx] of cards) { castShadow(x, k => k.drawImage(img, dx, m), 16, 4, 10, 0.3); x.drawImage(img, dx, m); }
 } });
+
+// the bar indoors: back out to the yard (a little sun over grass), and his house (a tiny house)
+ART.def('ui.icon.yard', { kind: 'paint', group: 'ui', box: { w: 34, h: 34, ox: 17, oy: 17 }, note: 'back to the yard', draw: c => {
+  glow(c, 4, -4, 14, '255,236,170', 0.6); pp(c, circ(4, -4, 7), '#f8d36a', 0.15);
+  tornPiece(c, stripPts(-16, 16, x => 5 + 2 * Math.sin(x / 5), 15, 4), '#8cc874', { amp: 1.2, seed: 5, shadow: 0.15, mul: 0.4 });
+  for (const x of [-9, -2, 9]) tuft(c, x, 8, 6, '#5fa463', 60 + x);
+} });
+ART.def('ui.icon.house', { kind: 'paint', group: 'ui', box: { w: 34, h: 34, ox: 17, oy: 17 }, note: 'his house', draw: c => {
+  pp(c, rectP(-10, -3, 20, 16), '#f6cf86', 0.2); pp(c, poly([[-14, -2], [0, -14], [14, -2]]), '#e8604c', 0.2); pp(c, slab([0, -15], [-15, -1], 3), '#c94b3b', 0); pp(c, slab([0, -15], [15, -1], 3), '#c94b3b', 0);
+  pp(c, archDoor(0, 13, 8, 11), '#5b8ed1', 0.08); pp(c, circ(0, -7, 2.2), '#fff6e6', 0);
+} });
