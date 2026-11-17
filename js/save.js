@@ -7,9 +7,9 @@ const Clock = {
 };
 const CLOCK_KEY = 'parker-trip-debug-clock';
 
-const SAVE_KEY = 'parker-trip-save', LANG_KEY = 'parker-trip-lang', SAVE_VERSION = 6;
+const SAVE_KEY = 'parker-trip-save', LANG_KEY = 'parker-trip-lang', SAVE_VERSION = 7;
 function defaultSave(now) {
-  return addV6(addV5(addV4(addV3(addV2({ v: SAVE_VERSION, createdAt: now, lastSeen: now, dandelions: 0, field: [], nextSpawnAt: now, seq: 0, seenHint: false })))));
+  return addV7(addV6(addV5(addV4(addV3(addV2({ v: SAVE_VERSION, createdAt: now, lastSeen: now, dandelions: 0, field: [], nextSpawnAt: now, seq: 0, seenHint: false }))))));
 }
 // upgrade older saves step by step here when the format changes (v1 → v2 → …)
 function migrateSave(s) {
@@ -19,6 +19,7 @@ function migrateSave(s) {
   if (s.v === 3) { addV4(s); s.v = 4; }
   if (s.v === 4) { addV5(s); s.v = 5; }
   if (s.v === 5) { addV6(s); s.v = 6; }
+  if (s.v === 6) { addV7(s); s.v = 7; }
   return s;
 }
 function loadSave() { try { return migrateSave(JSON.parse(localStorage.getItem(SAVE_KEY))); } catch (e) { return null; } }
@@ -49,4 +50,9 @@ function addV5(s) {
 function addV6(s) {
   if (!s.albumSolo) { s.albumSolo = {}; for (const id in (s.album || {})) s.albumSolo[id] = true; }
   return s;
+}
+// v7: his house — house: 1 the doghouse, 2 the log cabin, 3 the big house with a porch; houseSeen: the biggest house he has
+//     already been round sniffing (a new one he hasn't seen yet gets a look round the first time he's home and awake).
+function addV7(s) {
+  return Object.assign(s, { house: 1, houseSeen: 1, ...s });
 }

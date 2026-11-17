@@ -56,11 +56,12 @@ function cloudSprites(p, res) {
   });
 }
 // overlay drawn with multiply each frame: tint the yard (not the sky) + soft vignette. Smooth, so low-res is fine.
-function buildMulOverlay(p, H) {
+function buildMulOverlay(p, H, lv = 1) {
   const L = makeLayer(0, 0, SCENE_W, H, 1), c = L.ctx, hz = H - 330, [r, g, b] = p.tint;
   c.fillStyle = '#fff'; c.fillRect(0, 0, SCENE_W, H);
   const g1 = c.createLinearGradient(0, hz - 60, 0, hz + 40); g1.addColorStop(0, 'rgba(255,255,255,1)'); g1.addColorStop(1, `rgb(${r},${g},${b})`);
   c.fillStyle = g1; c.fillRect(0, hz - 60, SCENE_W, H);
+  if (lv > 1) { c.fillStyle = `rgb(${r},${g},${b})`; for (const q of houseOutline(lv, HOUSES[lv].x0, H - HOUSE.d)) c.fill(q); }   // the bigger roofs reach up into the sky: tint them like the yard
   vignette(c, SCENE_W, H, p.vig, 0.42, 1.0);
   return L;
 }
@@ -73,32 +74,7 @@ function buildScrOverlay(p, H) {
 
 // ---- the yard itself (same for every time of day — the overlay tints it; it changes with the season and snow) ----
 const HOUSE = { x: 24, d: 250 }, MAILBOX = { x: 330, d: 232 }, LAMP = { x: 222, d: 292 };
-function doghouse(c, x0, by) {
-  const C = { wall: '#f6cf86', plank: '#eab86c', side: '#e2ac62', trim: '#fff6e6', roof: '#e8604c', roofL: '#f27d5f', roofD: '#c94b3b', door: '#4a2f2b' };
-  const fx0 = x0, fx1 = x0 + 120, mx = x0 + 60, top = by - 70, peak = by - 132, dx = 40, dy = -18;
-  pp(c, rectP(x0 - 12, by - 4, 176, 12), '#c98b55', 0.3); piece(c, rectP(x0 - 12, by - 4, 176, 3), '#e3aa73', { mul: 0.4 });   // deck
-  pp(c, poly([[fx1, by], [fx1 + dx, by + dy], [fx1 + dx, top + dy], [fx1, top]]), C.side, 0.2);                             // side wall
-  for (let k = 1; k < 5; k++) piece(c, poly([[fx1, by - k * 14], [fx1 + dx, by + dy - k * 14], [fx1 + dx, by + dy - k * 14 + 2], [fx1, by - k * 14 + 2]]), '#d39b54', { mul: 0.4, scr: 0 });
-  pp(c, poly([[fx0, by], [fx0, top], [mx, peak], [fx1, top], [fx1, by]]), C.wall, 0.25);                                     // front
-  clipped(c, poly([[fx0, by], [fx0, top], [mx, peak], [fx1, top], [fx1, by]]), () => { for (let k = 1; k < 9; k++) piece(c, rectP(fx0, by - k * 14, 120, 2), C.plank, { mul: 0.4, scr: 0 }); });
-  for (const x of [fx0, fx1 - 8]) pp(c, rectP(x, top, 8, by - top), C.trim, 0.12);
-  // roof: side plane with scalloped shingles, then the front bargeboards
-  const R = poly([[mx, peak - 8], [mx + dx, peak - 8 + dy], [fx1 + dx + 14, top + dy + 10], [fx1 + 14, top + 10]]);
-  pp(c, R, C.roof, 0.28);
-  clipped(c, R, () => { for (let r = 0; r < 6; r++) for (let k = 0; k < 8; k++) { const u = (r + 0.5) / 6, x = lerp(mx, fx1 + 14, u) + k * 6.2 - 6, y = lerp(peak - 8, top + 10, u) + k * -2.8 + 4; piece(c, circ(x, y, 4.4), r % 2 ? C.roofL : C.roof, { mul: 0.4, scr: 0.15 }); } });
-  const eaveL = [fx0 - 14, top + 10], eaveR = [fx1 + 14, top + 10];
-  pp(c, slab([mx, peak - 8], eaveL, 12), C.roofD, 0.25); pp(c, slab([mx, peak - 8], eaveR, 12), C.roofD, 0.25);
-  pp(c, slab([mx, peak - 4], [fx0 - 10, top + 12], 6), C.trim, 0.1); pp(c, slab([mx, peak - 4], [fx1 + 10, top + 12], 6), C.trim, 0.1);
-  pp(c, slab([mx, peak - 8], [mx + dx, peak - 8 + dy], 7), C.roofD, 0.15);
-  // nameplate with a paw print, in the gable
-  pp(c, rectP(mx - 15, top - 30, 30, 20), '#c98b55', 0.2); pp(c, rectP(mx - 12, top - 27, 24, 14), '#f4dcb2', 0);
-  pawPrint(c, mx, top - 19, 0.62, '#b56a4a');
-  // arched door with his blue cushion inside
-  const door = new Path2D(); door.moveTo(mx - 24, by); door.lineTo(mx - 24, by - 34); door.arc(mx, by - 34, 24, Math.PI, 0); door.lineTo(mx + 24, by); door.closePath();
-  pp(c, door, C.door, 0.1);
-  clipped(c, door, () => { castShadow(c, door, 6, 0, 4, 0.5); pp(c, ell(mx, by - 4, 22, 9), '#7aaad6', 0.15); pp(c, ell(mx, by - 7, 17, 5), '#9cc2e6', 0); });
-  pp(c, slab([mx - 28, by - 1], [mx + 28, by - 1], 5), C.trim, 0.12);
-}
+// (the doghouse and the bigger houses are drawn in js/house.js)
 function mailbox(c, x, by) {
   pp(c, rectP(x - 6, by - 84, 12, 84), '#b77b4e', 0.25); piece(c, rectP(x - 6, by - 84, 4, 84), '#cf9466', { mul: 0.4 });
   pp(c, rectP(x - 20, by - 86, 40, 7), '#a56c43', 0.2);
@@ -132,8 +108,10 @@ function lampPost(c, x, by) {     // a little garden lantern, lit at dusk and ni
 function bowl(c, x, by) {
   pp(c, ell(x, by - 6, 20, 8), '#5b8ed1', 0.28); pp(c, ell(x, by - 10, 18, 5), '#e9f1fb', 0); pp(c, ell(x, by - 10, 13, 3), '#c7854a', 0);
 }
-function buildYard(H, res, look = 'spring') {
-  const W = SCENE_W, y0 = H - 440, L = makeLayer(0, y0, W, H, res), c = L.ctx, Y = d => H - d, K = YARD_LOOK[look];
+function buildYard(H, res, look = 'spring', lv = 1, bare = false) {
+  // lv = the house (1 doghouse, 2 cabin, 3 big house); bare = everything but the house (the upgrade animation builds it in)
+  const h = HOUSES[lv], W = SCENE_W, y0 = H - (lv > 1 ? 500 : 440), L = makeLayer(0, y0, W, H, res), c = L.ctx, Y = d => H - d, K = YARD_LOOK[look];
+  const covered = lv > 1 && !bare ? (x, y) => houseCovers(lv, h.x0, Y(HOUSE.d), x, y) : () => false;
   strip(c, -20, W + 20, x => Y(318) + 4 * fbm1(x / 70, 2), H, K.lawn[0], { seed: 80, rimCol: K.rims[0], shadow: 0.16 });
   fence(c, Y(296), H);
   if (K.caps) fenceSnow(c, Y);
@@ -144,19 +122,19 @@ function buildYard(H, res, look = 'spring') {
     for (let k = 0; k < K.nBushFl; k++) flower(c, x + (rb() - 0.5) * w * 1.3, Y(304) - rb() * w * 0.5, 4 + rb() * 2, K.bushFl[k % K.bushFl.length], 100 + x + k, false);
   }
   strip(c, -20, W + 20, x => Y(286) + 3 * fbm1(x / 90, 3), H, K.lawn[1], { seed: 82, rimCol: K.rims[1], shadow: 0.2 });
-  lampPost(c, LAMP.x, Y(LAMP.d) + 2);
-  doghouse(c, HOUSE.x, Y(HOUSE.d));
-  bowl(c, 206, Y(246));
+  if (h.lamp.post) lampPost(c, h.lamp.x, Y(h.lamp.d) + 2);
+  if (!bare) ART.paint('house.' + lv, c, h.x0, Y(HOUSE.d));
+  bowl(c, h.bowl[0], Y(h.bowl[1]));
   strip(c, -20, W + 20, x => Y(220) + 3 * fbm1(x / 110, 4), H, K.lawn[2], { seed: 83, rimCol: K.rims[2], shadow: 0.1, amp: 2.5, rimA: 0.5 });
   mailbox(c, MAILBOX.x, Y(MAILBOX.d));
-  if (K.caps) yardSnowCaps(c, Y);
-  for (const [x, d, r] of [[84, 238, 15], [96, 200, 14], [78, 162, 15], [94, 124, 14]]) {     // stepping stones from his door
+  if (K.caps) { if (lv === 1) yardSnowCaps(c, Y); else { Y_ = Y; ART.paint('house.snow', c, bare ? 0 : lv, h.x0, Y(HOUSE.d), h); } }
+  for (const [x, d, r] of h.stones) {     // stepping stones from his door
     const st = ell(x, Y(d), r, r * 0.42); castShadow(c, st, 2, 0.5, 2, 0.25); piece(c, st, '#ece2cf', { mul: 0.5 }); piece(c, ell(x - 2, Y(d) - 1, r * 0.7, r * 0.22), '#f8f1e4', { mul: 0.3 });
   }
-  for (let k = 0; k < K.nTuft; k++) tuft(c, 10 + rb() * (W - 20), Y(286 - rb() * 190), 9 + rb() * 6, rb() < 0.5 ? K.tuft[0] : K.tuft[1], 400 + k);
-  for (let k = 0; k < K.nFl; k++) flower(c, 120 + rb() * 260, Y(110 + rb() * 150), 3.5 + rb() * 1.5, K.fl[k % K.fl.length], 500 + k, false);
-  if (K.fallen) yardFallen(c, Y, K, rng(85));
-  if (K.petals) yardPetals(c, Y, rng(86), K.petals);
+  for (let k = 0; k < K.nTuft; k++) { const x = 10 + rb() * (W - 20), y = Y(286 - rb() * 190), th = 9 + rb() * 6, col = rb() < 0.5 ? K.tuft[0] : K.tuft[1]; if (!covered(x, y)) tuft(c, x, y, th, col, 400 + k); }
+  for (let k = 0; k < K.nFl; k++) { const x = 120 + rb() * 260, y = Y(110 + rb() * 150), r = 3.5 + rb() * 1.5; if (!covered(x, y)) flower(c, x, y, r, K.fl[k % K.fl.length], 500 + k, false); }
+  if (K.fallen) yardFallen(c, Y, K, rng(85), undefined, undefined, covered);
+  if (K.petals) yardPetals(c, Y, rng(86), K.petals, covered);
   return L;
 }
 function buildFore(H, res, look = 'spring') {
@@ -195,9 +173,9 @@ const DANDELION_BOX = { w: 60, h: 66, ox: 28, oy: 56 };
 // backdrops, built once per time of day / season and kept by the game (w = the scene's 400 units; h follows the screen)
 ART.def('scene.sky', { kind: 'layer', group: 'scene', box: { w: SCENE_W, h: 'screen', ox: 0, oy: 0 }, draw: (p, H, res) => buildSky(p, H, res), note: 'sky, sun or moon, hills, trees behind the fence: (palette, H, res)' });
 ART.def('scene.clouds', { kind: 'layer', group: 'scene', box: { w: 164, h: 78, ox: 82, oy: 60 }, draw: (p, res) => cloudSprites(p, res), note: 'three clouds (the largest box is given): (palette, res)' });
-ART.def('scene.yard', { kind: 'layer', group: 'scene', box: { w: SCENE_W, h: 440, ox: 0, oy: 440 }, draw: (H, res, look) => buildYard(H, res, look), note: 'lawn, fence, bushes, doghouse, mailbox, lamp, bowl, stones: (H, res, season look)' });
+ART.def('scene.yard', { kind: 'layer', group: 'scene', box: { w: SCENE_W, h: 440, ox: 0, oy: 440 }, draw: (H, res, look, lv, bare) => buildYard(H, res, look, lv, bare), note: 'lawn, fence, bushes, house, mailbox, lamp, bowl, stones: (H, res, season look, house level, without the house); 500 high for the cabin and the big house' });
 ART.def('scene.fore', { kind: 'layer', group: 'scene', box: { w: SCENE_W, h: 90, ox: 0, oy: 90 }, draw: (H, res, look) => buildFore(H, res, look), note: 'grass in front of everything: (H, res, season look)' });
-ART.def('scene.light.mul', { kind: 'layer', group: 'scene', box: { w: SCENE_W, h: 'screen', ox: 0, oy: 0 }, draw: (p, H) => buildMulOverlay(p, H), note: 'time-of-day tint over the yard (multiplied)' });
+ART.def('scene.light.mul', { kind: 'layer', group: 'scene', box: { w: SCENE_W, h: 'screen', ox: 0, oy: 0 }, draw: (p, H, lv) => buildMulOverlay(p, H, lv), note: 'time-of-day tint over the yard and the house (multiplied): (palette, H, house level)' });
 ART.def('scene.light.scr', { kind: 'layer', group: 'scene', box: { w: SCENE_W, h: 'screen', ox: 0, oy: 0 }, draw: (p, H) => buildScrOverlay(p, H), note: 'time-of-day glow (screened)' });
 ART.def('prop.dandelion', { group: 'prop', box: DANDELION_BOX, stick: false, draw: (c, a) => drawDandelion(c, a[0]), note: 'yellow | puff' });
 ART.def('live.mailFlag', { kind: 'live', group: 'live', box: { w: 34, h: 34, ox: 30, oy: 30 }, draw: (ctx, x, by, up) => mailboxFlag(ctx, x, by, up), note: 'the mailbox flag, up when there is post: (ctx, x, baseY, up)' });

@@ -317,7 +317,9 @@ function drawBird(c, k = 0) {
 // what he carries, plays with and eats: one entry each, drawn in a 44 × 44 box round its centre; the key's argument is the size
 // it is drawn at ('item.ball|0.6' on the grass, 'item.ball|0.42' in his mouth)
 const ITEM_ART = ['onigiri', 'jerky', 'bento', 'clover', 'omamori', 'ball', 'duck', 'bone', 'bubbles', 'rope', 'kite', 'sprinkler', 'yarn', 'temari', 'simit', 'teaglass', 'gift', 'card', 'lantern', 'croissant', 'bouquet', 'twig'];
-for (const id of ITEM_ART) ART.def('item.' + id, { group: typeof ITEM !== 'undefined' && ITEM[id] ? ITEM[id].cat : 'held', box: { w: 44, h: 44, ox: 22, oy: 22 }, stick: false, draw: (c, a) => drawItem(c, id, +(a[0] === undefined ? 1 : a[0])), note: 'size' });
+// a few toys reach outside the 44 box when they lie on the grass: their boxes fit the whole drawing (measured at size 1)
+const ITEM_BOX = { rope: { w: 78, h: 26, ox: 39, oy: 12 }, kite: { w: 43, h: 82, ox: 21, oy: 29 }, bubbles: { w: 49, h: 58, ox: 24, oy: 35 }, sprinkler: { w: 55, h: 41, ox: 32, oy: 20 } };
+for (const id of ITEM_ART) ART.def('item.' + id, { group: typeof ITEM !== 'undefined' && ITEM[id] ? ITEM[id].cat : 'held', box: ITEM_BOX[id] || { w: 44, h: 44, ox: 22, oy: 22 }, stick: false, draw: (c, a) => drawItem(c, id, +(a[0] === undefined ? 1 : a[0])), note: 'size' });
 ART.def('prop.backpack', { kind: 'paint', group: 'prop', box: { w: 56, h: 40, ox: 28, oy: 20 }, draw: (c, x = 0, y = 0, rot = 0) => backpack(c, x, y, rot), note: 'his red pack' });
 ART.def('prop.kite', { group: 'prop', box: { w: 50, h: 70, ox: 25, oy: 35 }, stick: false, draw: c => drawKite(c, false), note: 'the kite in the air (no tail)' });
 ART.def('prop.kitebow', { group: 'prop', box: { w: 16, h: 12, ox: 8, oy: 6 }, stick: false, draw: (c, a) => kiteBow(c, 0, 0, a[0]), note: 'one bow of the kite\'s tail: colour' });

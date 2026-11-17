@@ -17,13 +17,13 @@ function layout() {
   V.cssW = r.width; V.cssH = r.height; V.H = SCENE_W * r.height / r.width;
   V.k = r.width * dpr / SCENE_W; V.res = Math.min(3, V.k);
   cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
-  ART.res = V.res; ART.clear(); LAY = null; buildStatic(TOD);
+  ART.res = V.res; ART.clear(); finishHouseBuild(); LAY = null; buildStatic(TOD);
 }
 function buildStatic(tod) {
   const p = wxPalette(PALETTES[tod], WX), old = LAY, look = WX.look;
-  const L = { tod, look, sky: ART.layer('scene.sky', p, V.H, V.res), clouds: ART.layer('scene.clouds', p, V.res), mul: ART.layer('scene.light.mul', p, V.H), scr: ART.layer('scene.light.scr', p, V.H), p };
-  const same = old && old.look === look;            // the yard only changes with the season (and snow on the ground)
-  L.yard = same ? old.yard : ART.layer('scene.yard', V.H, V.res, look);
+  const lv = houseLevel(), L = { tod, look, house: lv, sky: ART.layer('scene.sky', p, V.H, V.res), clouds: ART.layer('scene.clouds', p, V.res), mul: ART.layer('scene.light.mul', p, V.H, lv), scr: ART.layer('scene.light.scr', p, V.H), p };
+  const same = old && old.look === look;            // the yard only changes with the season (and snow on the ground), and with the house
+  L.yard = same && old.house === lv ? old.yard : ART.layer('scene.yard', V.H, V.res, look, lv);
   L.fore = same ? old.fore : ART.layer('scene.fore', V.H, V.res, look);
   if (old) { L.old = old; L.fadeT0 = TT; old.old = null; }
   LAY = L;
@@ -35,7 +35,9 @@ function sleepTime() { const h = new Date(Clock.now()).getHours(), [a, b] = HABI
 
 // ---------- dandelions ----------
 function spotFree(x, d) {
-  if (Math.abs(x - 88) < 22 && d > 110) return false;                 // keep his stepping-stone path clear
+  const h = houseAt();
+  if (Math.abs(x - h.path) < 22 && d > 110) return false;             // keep his stepping-stone path clear
+  if (h.porch && x > h.porch[0] - 12 && x < h.porch[1] + 12 && d > 214) return false;   // and the porch steps
   if (x > 296 && x < 368 && d > 205) return false;                   // mailbox post
   return S.field.every(f => Math.hypot(f.x - x, (f.d - d) * 1.6) > 34);
 }
@@ -89,6 +91,8 @@ function pickNext() {
   const w = { ...HABITS.idle[company && sleepTime() ? 'company' : asleep ? 'night' : tod === 'night' ? 'evening' : tod] };
   if (!asleep) { for (const t of S.toys) if (HABITS.toys[t]) w[t] = HABITS.toys[t]; w.eat = HABITS.eat; }
   if (P.wet) return shakeOff();
+  if (HOUSEFX.on) return faceThen(-1, () => setMode('expect', 2));                    // the new house is going up: he watches
+  if (!asleep && (S.houseSeen || 1) < houseLevel()) return inspectHouse();           // a new house he hasn't been round yet
   if (!asleep && S.gifts.length) w.sniffgift = HABITS.giftSniff;
   if (!asleep && S.snowman && !S.snowman.twig && S.snowman.stage >= 1) w.sniffsnowman = HABITS.snowmanSniff;
   const rule = !asleep && !company && HABITS.weather[WX.hot ? 'hot' : WX.kind];
@@ -103,7 +107,7 @@ function pickNext() {
   if (k === 'rope') { const t = S.toyPos.rope, side = Math.sign(t.x - P.x) || 1; return goTo(clamp(t.x - 40 * side, 30, 370), clamp(t.d, 100, 224), () => faceThen(side, () => { P.hold = 'rope'; setMode('ropewin', HABITS.ropeShake); })); }
   if (k === 'duck') { const t = S.toyPos.duck, side = Math.sign(t.x - P.x) || 1; return goTo(clamp(t.x - 36 * side, 40, 360), t.d, () => faceThen(side, () => { P.hold = 'duck'; setMode('shake', HABITS.shakeTime); })); }
   if (k === 'bone') { const t = S.toyPos.bone, side = Math.sign(t.x - P.x) || 1; return goTo(clamp(t.x - 64 * side, 40, 360), clamp(t.d, 100, 224), () => faceThen(side, () => { P.hold = 'bone'; setMode('chew', rand(HABITS.duration.chew)); })); }
-  if (k === 'eat') return goTo(160, 226, () => faceThen(1, () => setMode('eat', rand(HABITS.duration.eat))));
+  if (k === 'eat') { const e = houseAt().eat; return goTo(e[0], e[1], () => faceThen(1, () => setMode('eat', rand(HABITS.duration.eat)))); }
   if (k === 'trot') { const [x, d] = randomSpot(); return goTo(x, d, Math.random() < 0.45 ? () => setMode('sniff', rand(HABITS.duration.sniff)) : null); }
   if (k === 'sigh') return setMode('sigh', HABITS.sighTime, { lie: false });
   if (WX_ACTS[k]) return WX_ACTS[k]();
@@ -270,7 +274,7 @@ function updateParker(dt) {
   else if (P.mode === 'sunbelly') setMode('sigh', HABITS.sighTime, { lie: true });
   else if (P.mode === 'chase') { setMode('hop', HABITS.reactionTime.hop); SFX.pop(); }
   else if (P.mode === 'snap') { P.noseSnowUntil = TT + HABITS.noseSnow; setMode('tilt', HABITS.reactionTime.tilt + 0.6); }
-  else if (P.mode === 'sniff' && P.data.next) P.data.next();
+  else if ((P.mode === 'sniff' || P.mode === 'admire') && P.data.next) P.data.next();
   else if (P.mode === 'sigh') P.data.lie ? setMode('lie', rand(HABITS.duration.lie)) : setMode('sit', rand([3, 6]));
   else if (HABITS.reactions.includes(P.mode)) Math.random() < HABITS.sighAfterHappy ? setMode('sigh', HABITS.sighTime, { lie: false }) : setMode('sit', rand([3, 6]));
   else pickNext();
@@ -457,6 +461,7 @@ function parkerDrawing() {
     case 'shake': key = `parker.sit|happy|0|${f % 4 < 2 ? -0.24 : 0.24}|0|duck`; break;
     case 'chew': key = `parker.lie|calm|0|bone|${f % 6 < 3 ? 0.02 : 0.12}`; break;
     case 'eat': key = `parker.sniff|${Math.floor(f / 2) % 2}`; break;
+    case 'admire': key = `parker.sit|happy|${f % 6 < 3 ? 0.2 : -0.12}|-0.3`; break;      // looking up at the new door / window
     case 'expect': key = `parker.sit|${open}|${f % 6 < 3 ? 0.18 : -0.12}|0`; break;
     case 'hop': { const u = clamp((TT - P.t0) / 0.6); lift = 16 * Math.sin(Math.PI * u); key = 'parker.sit|happy|0.1|0'; break; }
     default: key = `parker.sit|${open}|0|0`;
@@ -508,7 +513,8 @@ function drawScene() {
   const cs = WX.kind === 'wind' ? 5 : 1;
   L.clouds.forEach((cl, i) => { const span = SCENE_W + 200, x = ((i * 157 + TT * cs * (3 + i * 1.5)) % span) - 100; drawLayer(ctx, cl, x, hz * [0.2, 0.42, 0.1][i]); });
   ctx.restore();
-  if (L.old && L.old.yard !== L.yard) { drawLayer(ctx, L.old.yard); ctx.save(); ctx.globalAlpha = fade; drawLayer(ctx, L.yard); ctx.restore(); }   // the season / snow changes softly
+  if (HOUSEFX.on) { drawLayer(ctx, HOUSEFX.bare); drawHouseBuild(); }                 // the new house going up, piece by piece
+  else if (L.old && L.old.yard !== L.yard) { drawLayer(ctx, L.old.yard); ctx.save(); ctx.globalAlpha = fade; drawLayer(ctx, L.yard); ctx.restore(); }   // the season / snow changes softly
   else drawLayer(ctx, L.yard);
   if (WX.hot) ART.draw('live.shade.hot', ctx, SHADE[0] - 6, Y(SHADE[1] - 2));           // cool shade in front of the house on a hot afternoon
   drawPrints();
@@ -524,7 +530,7 @@ function drawScene() {
   if (P.present) items.push({ d: P.d, parker: true });
   for (const g of S.gifts) items.push({ d: g.d, g });
   if (VIS.on && VIS.kind !== 'sparrow') items.push({ d: VIS.d, vis: true });
-  items.push({ d: GIFTBOX.d, box: true });
+  if (!HOUSEFX.on) items.push({ d: GIFTBOX.d, box: true });
   if (S.snowman) items.push({ d: S.snowman.d, snowman: true });
   items.sort((a, b) => b.d - a.d);
   const now = Clock.now();
@@ -552,7 +558,7 @@ function drawScene() {
       if (grow > 0) drawSprite(sprite(`prop.dandelion|${f.kind}`), f.x, Y(f.d), { scale: s * lerp(0.2, 1, grow), alpha: Math.min(1, grow * 3), rot: sw });
     } else {
       const s = depthScale(P.d), dr = parkerDrawing(), lying = isLying();
-      if (P.mode === 'inhouse') { drawSprite(sprite(dr.key), DOOR.x, Y(DOOR.d), { shA: 0 }); continue; }        // only his face in the doorway
+      if (P.mode === 'inhouse') { if (houseLevel() > 1) drawSprite(sprite(`house.${houseLevel()}.doorOpen`), DOOR.x, Y(DOOR.d), { shA: 0 }); drawSprite(sprite(dr.key), DOOR.x, Y(DOOR.d), { shA: 0 }); continue; }        // only his face in the doorway
       const hk = 1 / (1 + dr.lift / 34);                               // the higher he jumps, the smaller and paler his shadow
       ART.draw('live.shadow.parker', ctx, P.x + (lying ? 14 * P.face : 0) * s, Y(P.d) + 1, (lying ? 70 : 52) * s * Math.max(0.6, Math.abs(dr.sx)) * (0.5 + 0.5 * hk), 6 * s * (0.5 + 0.5 * hk), hk);
       if ((P.prevLift || 0) > 5 && dr.lift < 1) dustPuff(P.x, Y(P.d));
@@ -608,8 +614,8 @@ cv.addEventListener('pointerdown', e => {
   if (tapVisitor(x, y)) return;
   const mb = Y(MAILBOX.d);
   if (x > MAILBOX.x - 42 && x < MAILBOX.x + 42 && y > mb - 136 && y < mb - 70) return openPanel('mail');
-  const hb = Y(HOUSE.d);
-  if (x > HOUSE.x - 14 && x < HOUSE.x + 200 && y > hb - 150 && y < hb + 6) return openPanel('shelf');
+  const hb = Y(HOUSE.d), ht = houseAt().tap;
+  if (!HOUSEFX.on && x > ht[0] && x < ht[1] && y > hb - ht[2] && y < hb + ht[3]) return openPanel('shelf');
 });
 cv.addEventListener('pointermove', e => {
   if (FETCH.drag && e.pointerId === FETCH.drag.id) { const [x, y] = toScene(e); return ballFollow(x, y); }
@@ -679,6 +685,7 @@ function boot() {
   S = loadSave();
   if (!S) { S = defaultSave(now); for (let i = 0; i < START_DANDELIONS; i++) spawnDandelion(now + 400 + i * 350); S.nextSpawnAt = now + SPAWN_INTERVAL; writeSave(S); }
   if (debugOn()) { try { Clock.offset = +localStorage.getItem(CLOCK_KEY) || 0; } catch (e) { } loadWxForce(); }
+  applyHouse(houseLevel());
   const lastSeen = S.lastSeen || now;
   tickSpawns();
   advanceWorld(Clock.now());                 // whatever happened while the game was closed
@@ -1103,7 +1110,12 @@ function drawSay() {
 const VIS = { on: false, next: 25 };
 const GIFTBOX = { x: 168, d: 249 };
 const VIS_SPEED = { cat: 34, squirrel: 70 };
-function birdPerches() { return [[150 + Math.random() * 60, Y(296) - 34, null], [MAILBOX.x - 6, Y(MAILBOX.d) - 128, null], ...[0, 1].map(() => { const d = 100 + Math.random() * 110; return [60 + Math.random() * 280, Y(d), d]; })]; }
+function birdPerches() {
+  const h = houseAt(), [a, b] = h.perches[0];
+  const ps = [[a + Math.random() * (b - a), Y(296) - 34, null], [MAILBOX.x - 6, Y(MAILBOX.d) - 128, null], ...[0, 1].map(() => { const d = 100 + Math.random() * 110; return [60 + Math.random() * 280, Y(d), d]; })];
+  if (h.ridgePerch && !HOUSEFX.on) ps.push([...houseRidgePoint(h.level, 0.2 + Math.random() * 0.6), null]);     // the bigger houses' roof ridge
+  return ps;
+}
 function giftSpot(x0, d0) {             // a free spot on the lawn (near x0/d0 if given)
   for (let i = 0; i < 40; i++) {
     const x = x0 != null ? clamp(x0 + (Math.random() - 0.5) * (20 + i * 4), 30, 370) : 40 + Math.random() * 320, d = d0 != null ? clamp(d0 + (Math.random() - 0.5) * (10 + i * 2), 100, 220) : 100 + Math.random() * 120;
@@ -1112,7 +1124,7 @@ function giftSpot(x0, d0) {             // a free spot on the lawn (near x0/d0 i
   return [x0 != null ? clamp(x0, 30, 370) : 200, d0 != null ? clamp(d0, 100, 220) : 160];
 }
 function visitTick() {
-  if (VIS.on || TT < VIS.next) return;
+  if (VIS.on || TT < VIS.next || HOUSEFX.on) return;
   const now = Clock.now();
   VIS.next = TT + rand(P.present ? VISIT.homeEvery : VISIT.awayEvery) * (WX.kind === 'rain' ? VISIT.rainSlow : 1);
   if (visitorsSleep(now) || WX.heavy || (P.present && /packup|departLook|arrive|gift/.test(P.mode))) return;

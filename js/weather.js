@@ -146,14 +146,15 @@ function yardSnowCaps(c, Y) {         // doghouse roof, mailbox, lamp
   snowCap(c, ellipsePts(MAILBOX.x - 2, Y(MAILBOX.d) - 128, 38, 7, 24), 803);
   snowCap(c, ellipsePts(LAMP.x + 14, Y(LAMP.d) - 74, 10, 3.5, 16), 804);
 }
-function yardFallen(c, Y, look, rb, dRange = [96, 290], n = look.fallen || 0) {
+function yardFallen(c, Y, look, rb, dRange = [96, 290], n = look.fallen || 0, covered = null) {
   for (let k = 0; k < n; k++) {
     const x = 10 + rb() * (SCENE_W - 20), y = Y(dRange[0] + rb() * (dRange[1] - dRange[0]));
+    if (covered && covered(x, y)) { rb(); rb(); rb(); continue; }
     leaf(c, x, y, 7 + rb() * 4, 2.6 + rb(), rb() * TAU, look.leafCols[k % look.leafCols.length]);
   }
 }
-function yardPetals(c, Y, rb, n) {
-  for (let k = 0; k < n; k++) piece(c, ell(20 + rb() * (SCENE_W - 40), Y(100 + rb() * 180), 2.4, 1.4, rb() * TAU), k % 2 ? '#f6c3d2' : '#fbe1e8', { mul: 0.4 });
+function yardPetals(c, Y, rb, n, covered = null) {
+  for (let k = 0; k < n; k++) { const x = 20 + rb() * (SCENE_W - 40), y = Y(100 + rb() * 180), a = rb() * TAU; if (!covered || !covered(x, y)) piece(c, ell(x, y, 2.4, 1.4, a), k % 2 ? '#f6c3d2' : '#fbe1e8', { mul: 0.4 }); }
 }
 
 // ---------- moving weather: rain strips, paper snowflakes, blown leaves & petals, fog banks ----------
@@ -188,6 +189,7 @@ function buildFog(res) {
 }
 // the doghouse roof line, where far rain lands instead of the ground
 function roofY(x, H) {
+  const lv = houseLevel(); if (lv > 1) return houseRoofY(lv, x, H - HOUSE.d, HOUSES[lv].x0);
   const by = H - HOUSE.d, x0 = HOUSE.x, mx = x0 + 60;
   if (x < x0 - 12 || x > x0 + 176) return null;
   if (x < mx) return lerp(by - 60, by - 140, (x - (x0 - 12)) / (mx - x0 + 12));

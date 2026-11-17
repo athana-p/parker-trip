@@ -1,9 +1,9 @@
 // Offline play: cache the game's own files; serve from cache first, refresh in the background.
 // Bump CACHE when files change so players get the new version.
-const CACHE = 'parker-trip-v24';
+const CACHE = 'parker-trip-v25';
 const ASSETS = ['./', 'index.html', 'manifest.webmanifest', 'css/style.css',
-  'js/paper.js', 'js/art.js', 'js/bg.js', 'js/parker.js', 'js/strings.js', 'js/postcards.js', 'js/items.js', 'js/festivals.js', 'js/props.js', 'js/friends.js', 'js/visitors.js', 'js/yard.js', 'js/weather.js', 'js/fx.js', 'js/uiart.js',
-  'js/habits.js', 'js/audio.js', 'js/save.js', 'js/world.js', 'js/ui.js', 'js/game.js',
+  'js/paper.js', 'js/art.js', 'js/bg.js', 'js/parker.js', 'js/strings.js', 'js/postcards.js', 'js/items.js', 'js/festivals.js', 'js/props.js', 'js/friends.js', 'js/visitors.js', 'js/yard.js', 'js/house.js', 'js/weather.js', 'js/fx.js', 'js/uiart.js',
+  'js/habits.js', 'js/audio.js', 'js/save.js', 'js/world.js', 'js/ui.js', 'js/upgrade.js', 'js/game.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });

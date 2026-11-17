@@ -116,3 +116,10 @@ body { font-family: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsof
 .toy-note-hint { margin: 0; font-size: 12px; color: #a0807a; }
 @keyframes noteIn { from { opacity: 0; transform: translate(-50%, -40%) rotate(-6deg) scale(0.8); } to { opacity: 1; transform: translate(-50%, -50%) rotate(-2deg); } }
 .album-heart { position: absolute; top: 3px; right: 5px; font-size: 13px; color: #e2574a; text-shadow: 0 0 3px #fff, 0 0 2px #fff; pointer-events: none; }
+/* his house panel: the house he lives in and the next one */
+.house-card { display: grid; grid-template-columns: 104px 1fr; gap: 10px; align-items: center; background: #fff; border-radius: 16px; padding: 10px; margin-bottom: 6px; }
+.house-text { min-width: 0; display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
+.house-now { font-size: 12px; color: #a08a7e; }
+.house-buy { margin-top: 4px; display: inline-flex; align-items: center; gap: 4px; }
+.house-buy.sure { background: #f59f6a; color: #fff; }
+.house-short { font-size: 12px; color: #a08a7e; }

@@ -107,6 +107,7 @@ function renderMail(body) {
   body.append(keep);
 }
 function renderShelf(body) {
+  body.append(houseCard());
   body.append(el('p', 'note', T('ui.shelf.note')));
   const rows = Math.ceil(DESTS.length / 4), dpr = Math.min(2, window.devicePixelRatio || 1), W = 340, H = 26 + rows * 108, c = document.createElement('canvas');
   c.width = W * dpr; c.height = H * dpr; c.className = 'shelf'; const x = c.getContext('2d'); x.scale(dpr, dpr);
@@ -349,6 +350,10 @@ function buildDebug(force) {
   const at = el('button', 'dbg-b', T('dbg.allToys')); at.onclick = () => { for (const it of ITEMS) if (it.cat === 'toy' && !S.toys.includes(it.id)) { S.toys.push(it.id); S.toyPos[it.id] = { ...TOY_SPOTS[it.id] }; } writeSave(S); if (UI.panel) renderPanel(); }; acts.append(at);
   const ft = el('button', 'dbg-b', T('dbg.friendToy')); ft.onclick = () => { const f = Object.keys(FRIEND_TOY).find(f => !S.toys.includes(FRIEND_TOY[f])) || 'cat', toy = FRIEND_TOY[f]; if (!S.toys.includes(toy)) { S.toys.push(toy); S.toyPos[toy] = { ...TOY_SPOTS[toy] }; } S.toyNote = { friend: f, toy }; writeSave(S); }; acts.append(ft);
   const ih = el('button', 'dbg-b', T('dbg.inhouse')); ih.onclick = () => { if (P.present) goInHouse(60); }; acts.append(ih);
+  const hr = el('div', 'dbg-row'); hr.append(el('b', '', T('dbg.house')));
+  for (const lv of [1, 2, 3]) { const b = el('button', 'dbg-b', String(lv)); b.onclick = () => { finishHouseBuild(); S.house = lv; S.houseSeen = lv; applyHouse(lv); writeSave(S); LAY = null; buildStatic(TOD); if (UI.panel) renderPanel(); }; hr.append(b); }
+  const hb = el('button', 'dbg-b', T('dbg.houseFx')); hb.onclick = () => { if (HOUSEFX.on) return; const lv = houseLevel(), from = lv < HOUSE_MAX ? lv : lv - 1; S.house = from + 1; writeSave(S); startHouseBuild(from, from + 1); }; hr.append(hb);
+  const hs = el('button', 'dbg-b', T('dbg.houseSniff')); hs.onclick = () => { if (houseLevel() > 1) { S.houseSeen = houseLevel() - 1; writeSave(S); if (P.present) pickNext(); } }; hr.append(hs);
   const ml = el('button', 'dbg-b', T('dbg.melt')); ml.onclick = () => { const m = S.snowman; if (m && !m.twig) { m.meltFrom = Clock.now() - MELT_MS * 0.6; m.melt = 0.6; } }; acts.append(ml);
   const vr = el('div', 'dbg-row'); vr.append(el('b', '', T('dbg.visit')));
   for (const v of ['sparrow', 'cat', 'squirrel']) { const b = el('button', 'dbg-b', T('vis.' + v)); b.onclick = () => { VIS.on = false; startVisit(v, true); }; vr.append(b); }
@@ -364,7 +369,7 @@ function buildDebug(force) {
   };
   pick('dbg.season', 'season', SEASONS.map(k => [k, T('season.' + k)]));
   pick('dbg.weather', 'kind', [...WEATHER_KINDS.map(k => [k, T('wx.' + k)]), ['heavy', T('wx.heavy')]]);
-  d.append(el('div', 'dbg-title', T('dbg.title')), row, acts, dates, fests, wxr, vr, el('div', 'dbg-status'));
+  d.append(el('div', 'dbg-title', T('dbg.title')), row, acts, dates, fests, wxr, vr, hr, el('div', 'dbg-status'));
   window.debugRefresh = () => {
     d.querySelectorAll('[data-sp]').forEach(b => b.classList.toggle('on', +b.dataset.sp === Clock.speed));
     try { localStorage.setItem(CLOCK_KEY, String(Clock.offset)); } catch (e) { }
@@ -375,4 +380,29 @@ function buildDebug(force) {
     d.querySelector('.dbg-status').textContent = `${new Date(now).toLocaleString()} · ${st} · mail ${S.mail.length}${fe ? ' · 🎉 ' + fe : ''}${S.festPending ? ' (pending)' : ''}${w}`;
   };
   debugRefresh();
+}
+
+// the house card at the top of his house panel: the house he lives in, and the next one, built with dandelions.
+// Never a timer, never a nag: if there aren't enough dandelions yet, it just says how many more.
+function houseCard() {
+  const lv = houseLevel(), next = lv < HOUSE_MAX ? lv + 1 : 0, card = el('div', 'house-card');
+  const pic = document.createElement('canvas'), dpr = Math.min(2, window.devicePixelRatio || 1), W = 104, H = 76;
+  pic.width = W * dpr; pic.height = H * dpr; pic.style.width = W + 'px'; pic.style.height = H + 'px';
+  const x = pic.getContext('2d'); x.scale(dpr, dpr); ART.paint('ui.houseThumb', x, next || lv, W, H);
+  const txt = el('div', 'house-text');
+  txt.append(el('div', 'house-now', T('ui.house.now', LANG, { name: T('house.' + lv) })));
+  if (!next) { txt.append(el('div', 'item-desc', T('ui.house.max'))); card.append(pic, txt); return card; }
+  const price = HOUSES[next].price, short = price - S.dandelions;
+  txt.append(el('div', 'item-name', T('ui.house.next', LANG, { name: T('house.' + next) })), el('div', 'item-desc', T('house.' + next + '.desc')));
+  const btn = el('button', 'pill btn buy house-buy' + (short > 0 ? ' poor' : '')), cost = el('span', 'price');
+  cost.append(coinMini(), document.createTextNode(price)); btn.append(cost, document.createTextNode(' ' + T('ui.house.build')));
+  let sure = false;
+  btn.onclick = () => {
+    if (short > 0) { toastText(T('ui.house.short', LANG, { n: short }), 2600); return; }
+    if (!sure) { sure = true; btn.textContent = T('ui.house.sure'); btn.classList.add('sure'); setTimeout(() => { if (btn.isConnected && UI.panel === 'shelf') renderPanel(); }, 3500); return; }
+    closePanel(); upgradeHouse();
+  };
+  txt.append(btn);
+  if (short > 0) txt.append(el('div', 'house-short', T('ui.house.short', LANG, { n: short })));
+  card.append(pic, txt); return card;
 }
