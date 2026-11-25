@@ -200,7 +200,8 @@ function roomPickNext() {
   if (sleepTime() && TT >= (P.awakeUntil || 0)) return roomBed('sleep');
   if (was) return setMode('sigh', HABITS.sighTime, { lie: false });            // just hopped off his bed
   const things = [[R.door.x, 'door'], ...R.windows.map(w => [w.x, 'window']), ...decorItems().map(r => [decorAnchor(r, g) || [0], r]).filter(([a, r]) => a[0] && (decorDef(r.id).kind !== 'wall' || r.yc > 150)).map(([a]) => [a[0], 'thing'])];
-  const k = pickWeighted({ walk: 3, sniff: 2.6, sit: 1.6, bed: decorBed() ? 1.6 : 0.4, window: 1, sigh: 0.5 });
+  const cn = catNapSpot(), k = pickWeighted({ walk: 3, sniff: 2.6, sit: 1.6, bed: decorBed() ? 1.6 : 0.4, window: 1, sigh: 0.5, catnap: cn ? 1.4 : 0 });
+  if (k === 'catnap') return goTo(clamp(cn[0], 44, R.w - 44), ROOM_D, () => faceThen(cn[1], () => { setMode('nap', rand([20, 40])); const [hx, hy] = roomParkerCenter(); fx({ type: 'spr', key: 'fx.heart', x: hx, y: hy - 30, vy: -20, sway: 1, life: 1.6, scale: 0.8 }); }));   // a nap next to the cat in her bed
   const lo = 44, hi = R.w - 44;
   if (k === 'walk') { const x = clamp(P.x + (Math.random() < 0.5 ? -1 : 1) * (60 + Math.random() * 180), lo, hi); return goTo(x, ROOM_D, Math.random() < 0.4 ? () => setMode('sniff', rand(HABITS.duration.sniff)) : null); }
   if (k === 'sniff') { const [tx] = things[Math.floor(Math.random() * things.length)], side = tx > P.x ? 1 : -1; return goTo(clamp(tx - 46 * side, lo, hi), ROOM_D, () => faceThen(side, () => setMode('sniff', rand([2, 3.5])))); }
@@ -259,6 +260,7 @@ function roomTap(x, y) {
   if (Math.abs(rx - R.door.x) < R.door.w / 2 + 4 && y > g.F0 - R.door.h && y < g.F0 + 6) return leaveRoom();       // the door: back out to the yard
   if (noteOnBed()) { const b = decorBed(), a = decorAnchor(b, g); if (Math.hypot(rx - a[0] - 28, y - (a[1] - 22)) < 28) return openNote(); }   // his note, on his bed
   const r = decorHit(rx, y, g); if (!r) return;
+  if (homeTapRoom(r)) return;                                                                                       // the cat's bed, the squirrel's stump
   if (r.id === 'book') { ROOMV.wiggle = { id: r.id, t0: TT }; return openBook(); }                                  // his book: open it
   if (isSmall(r.id)) { const id = r.id.slice(3); ROOMV.wiggle = { id: r.id, t0: TT }; SFX.pop(); toastText(`${T('sv.' + id)} · ${T('pc.' + id + '.name')}`, 2200); return; }   // a souvenir: it wiggles and says what it is
   if (r.id === 'bed' && P.present && P.inRoom && !/sleep|nap|stir/.test(P.mode)) return roomBed('lie');         // his bed: come and lie down

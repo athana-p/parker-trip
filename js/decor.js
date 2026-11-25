@@ -15,6 +15,8 @@ const DECOR = {
   shelfL: { kind: 'wall', art: 'furn.shelf.long', surf: [-74, 74], name: 'decor.shelfL' },
   shelfS: { kind: 'wall', art: 'furn.shelf.short', surf: [-42, 42], name: 'decor.shelfS' },
   book: { kind: 'small', art: 'furn.book', name: 'book.title' },          // "Parker Sees the World" (comes with his first note)
+  sqnest: { kind: 'floor', art: 'furn.sqnest', name: 'decor.sqnest' },    // the visitors' homes (they come when one moves in)
+  catbed: { kind: 'floor', art: 'furn.catbed', name: 'decor.catbed' },
 };
 const DECOR_START = { bed: 1, shelfL: 4, shelfS: 3 };          // what comes with the cabin
 // each house's own arrangement (yc = height of a wall thing's top below the ceiling)
@@ -90,6 +92,7 @@ function decorDefault(lv) {
   for (const [id, p] of DECOR_DEFAULT[lv] || []) if (placedCount(id) < (S.furn[id] || 0)) decorAdd(id, p);
   for (const s of S.shelf) { S.decor.seen[s.id] = true; autoPlaceSmall('sv:' + s.id); }
   if (S.furn.book) { S.decor.seen.book = true; autoPlaceBook(); }
+  for (const id of ['sqnest', 'catbed']) if (S.furn[id]) { S.decor.seen[id] = true; autoPlaceFloor(id); }
 }
 // a small thing goes on the first free spot: shelves (top to bottom, left to right), sills, then the back of the floor
 function autoPlaceSmall(id, prefer) {
@@ -117,6 +120,12 @@ function autoPlaceBook() {
   }
   return autoPlaceSmall('book');
 }
+// a floor thing finds itself a free spot: the back row first, from the middle of the room outwards
+function autoPlaceFloor(id) {
+  const g = roomGeom(), R = roomR(), mid = R.w / 2;
+  for (const row of [0, 1, 2]) for (let d = 0; d < R.w / 2; d += 12) for (const x of d ? [mid + d, mid - d] : [mid]) if (decorValid({ uid: -1, id, x, row }, g, R)) return decorAdd(id, { x, row });
+  return null;
+}
 function decorEnsure() {
   const lv = houseLevel(); if (lv < 2) return;
   S.furn = S.furn || {}; for (const id in DECOR_START) S.furn[id] = Math.max(S.furn[id] || 0, DECOR_START[id]);
@@ -127,6 +136,7 @@ function decorEnsure() {
   for (const kind of ['wall', 'floor', 'small']) for (const r of decorItems().filter(o => decorDef(o.id).kind === kind)) if (!S.decor.items.includes(r)) continue; else if (!decorValid(r, g, R)) { decorRemove(r); back++; }
   for (const s of S.shelf) if (!S.decor.seen[s.id]) { S.decor.seen[s.id] = true; if (!placedCount('sv:' + s.id)) autoPlaceSmall('sv:' + s.id); }   // new souvenirs set themselves out
   if (S.furn.book && !S.decor.seen.book) { S.decor.seen.book = true; if (!placedCount('book')) autoPlaceBook(); }                      // so does his book
+  for (const id of ['sqnest', 'catbed']) if (S.furn[id] && !S.decor.seen[id]) { S.decor.seen[id] = true; if (!placedCount(id)) autoPlaceFloor(id); }   // and a visitor's new home
   if (back) toastText(T('decor.back'), 3500);
   writeSave(S);
 }
@@ -147,6 +157,7 @@ function drawDecorScene(g, R, drawParker) {
     const wig = ROOMV.wiggle && ROOMV.wiggle.id === r.id ? Math.sin((TT - ROOMV.wiggle.t0) * 24) * 0.12 * clamp(1 - (TT - ROOMV.wiggle.t0) / 0.6) : 0;
     if (isSmall(r.id)) { const s = S.shelf.find(q => 'sv:' + q.id === r.id); if (s && s.isNew) ART.draw('fx.glow', ctx, a[0], a[1] - 16, 30, '255,236,170', 0.5 + 0.15 * Math.sin(TT * 2)); }
     drawSprite(sprite(d.key), a[0], a[1], { sx: r.f ? -1 : 1, scale: a[2] * sn, rot: wig, shA: d.kind === 'wall' ? 0.25 : 0.2 });
+    if (r.id === 'catbed' || r.id === 'sqnest') drawHomeOverlay(r, a);           // who lives in it (js/homes.js)
     if (DECO.on && DECO.sel === r) { const rc = decorRect(r, g, a); ctx.save(); ctx.setLineDash([4, 3]); ctx.strokeStyle = 'rgba(255,250,235,0.95)'; ctx.lineWidth = 1.6; ctx.strokeRect(rc[0] - 3, rc[1] - 3, rc[2] - rc[0] + 6, rc[3] - rc[1] + 6); ctx.restore(); }
     for (const o of items) if (o.surf === 'on:' + r.uid) put(o);          // what sits on it
   };
@@ -157,6 +168,7 @@ function drawDecorScene(g, R, drawParker) {
     for (const r of items.filter(o => decorDef(o.id).kind === 'floor' && o.row === row).sort((a, b) => a.x - b.x)) put(r);
     for (const r of items) if (r.surf === 'row:' + row) put(r);
     if (row === prow) drawParker(row);
+    if (HOMEV.run && HOMEV.run.row === row) drawHomeRun(g);
   }
   if (DECO.on && (DECO.held || DECO.sel)) {     // the door and windows: keep them clear
     const bad = DECO.held && !DECO.held.ok;

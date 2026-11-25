@@ -245,6 +245,7 @@ function renderPals(body) {
     const txt = el('div', 'pal-text');
     txt.append(el('div', 'pal-name', seen ? (p.name ? `${p.name} · ${T('vis.' + k)}` : T('vis.' + k)) : '？'));
     txt.append(el('div', 'pal-line', seen ? T(`pal.${k}.${lv}`) : T('ui.gifts.notYet')));
+    if (palLives(k)) txt.append(el('div', 'pal-line home', '⌂ ' + T('pal.home.' + k)));
     if (seen) {
       const gs = GIFTS.filter(g => p.gifts[g]);
       if (gs.length) { const row = el('div', 'pal-gifts'); for (const g of gs) { const chip = el('span', 'pal-gift'); chip.append(paperIcon(26, x => ART.paint('gift.' + g, x), ART.get('gift.' + g).box, 0.7), document.createTextNode('× ' + p.gifts[g])); chip.title = T('gift.' + g); row.append(chip); } txt.append(row); }
@@ -433,7 +434,10 @@ function buildDebug(force) {
   }
   const dsh = el('button', 'dbg-b', T('dbg.dishes')); dsh.onclick = () => { for (const k of PALS.order) { if (S.dishes[k]) continue; const id = PALS.snack[k]; S.inv[id] = (S.inv[id] || 0) + 1; putDish(id); } }; pr.append(dsh);
   const hun = el('button', 'dbg-b', T('dbg.hungry')); hun.onclick = () => { for (const k of PALS.order) { S.pals[k].today = 0; } writeSave(S); }; pr.append(hun);
-  d.append(el('div', 'dbg-title', T('dbg.title')), row, acts, dates, fests, wxr, vr, pr, hr, el('div', 'dbg-status'));
+  const hm = el('div', 'dbg-row'); hm.append(el('b', '', T('dbg.homes')));
+  for (const k of PALS.order) { const b = el('button', 'dbg-b', T('vis.' + k) + ' ' + T('dbg.moveIn')); b.onclick = () => { if (houseLevel() < 3) { finishHouseBuild(); S.house = 3; S.houseSeen = 3; applyHouse(3); LAY = null; buildStatic(TOD); } palSetLevel(k, 3); delete S.homes[k]; VIS.on = false; MOVEIN.on = false; if (moveInCan()) startMoveIn(k); else { Object.assign(MOVEIN, { on: true, k, x: moveInSpot()[0], d: moveInSpot()[1], phase: 'wait', done: false }); moveInDone(); } }; hm.append(b); }
+  const hr0 = el('button', 'dbg-b', T('dbg.homesReset')); hr0.onclick = () => { S.homes = {}; for (const id of ['sqnest', 'catbed']) { S.furn[id] = 0; if (S.decor) { S.decor.items = S.decor.items.filter(r => r.id !== id); delete S.decor.seen[id]; } } writeSave(S); if (UI.panel) renderPanel(); }; hm.append(hr0);
+  d.append(el('div', 'dbg-title', T('dbg.title')), row, acts, dates, fests, wxr, vr, pr, hm, hr, el('div', 'dbg-status'));
   d.insertBefore(nr, d.querySelector('.dbg-status'));
   window.debugRefresh = () => {
     d.querySelectorAll('[data-sp]').forEach(b => b.classList.toggle('on', +b.dataset.sp === Clock.speed));

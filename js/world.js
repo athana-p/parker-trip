@@ -109,6 +109,7 @@ function visitorsSleep(t) { const h = new Date(t).getHours(), [a, b] = VISIT.nig
 function pickVisitor(t) {
   const se = weatherAt(t).season, w = { ...VISIT.who }; if (se === 'autumn') w.squirrel *= 1.6; if (se === 'winter') w.squirrel *= 0.5;
   for (const k in w) if (dishFor(k, t)) w[k] *= PALS.dishPull;        // a snack waiting for it brings it round more often
+  for (const k of ['cat', 'squirrel']) if (palAtHome(k, t)) w[k] = 0;   // one that lives here and is at home just now is indoors
   return pickWeighted(w);
 }
 function canGift(t) { return S.gifts.length < VISIT.groundCap && t - (S.lastGiftAt || 0) >= VISIT.giftGap * 60000; }

@@ -7,9 +7,9 @@ const Clock = {
 };
 const CLOCK_KEY = 'parker-trip-debug-clock';
 
-const SAVE_KEY = 'parker-trip-save', LANG_KEY = 'parker-trip-lang', SAVE_VERSION = 10;
+const SAVE_KEY = 'parker-trip-save', LANG_KEY = 'parker-trip-lang', SAVE_VERSION = 11;
 function defaultSave(now) {
-  return addV10(addV9(addV8(addV7(addV6(addV5(addV4(addV3(addV2({ v: SAVE_VERSION, createdAt: now, lastSeen: now, dandelions: 0, field: [], nextSpawnAt: now, seq: 0, seenHint: false })))))))));
+  return addV11(addV10(addV9(addV8(addV7(addV6(addV5(addV4(addV3(addV2({ v: SAVE_VERSION, createdAt: now, lastSeen: now, dandelions: 0, field: [], nextSpawnAt: now, seq: 0, seenHint: false }))))))))));
 }
 // upgrade older saves step by step here when the format changes (v1 → v2 → …)
 function migrateSave(s) {
@@ -23,6 +23,7 @@ function migrateSave(s) {
   if (s.v === 7) { addV8(s); s.v = 8; }
   if (s.v === 8) { addV9(s); s.v = 9; }
   if (s.v === 9) { addV10(s); s.v = 10; }
+  if (s.v === 10) { addV11(s); s.v = 11; }
   return s;
 }
 function loadSave() { try { return migrateSave(JSON.parse(localStorage.getItem(SAVE_KEY))); } catch (e) { return null; } }
@@ -85,3 +86,6 @@ function addV10(s) {
   if (!s.dishes) s.dishes = {};
   return s;
 }
+// v11: the visitors' homes (big house only) — homes: { sparrow|squirrel|cat: { at (when it moved in), nuts (the squirrel's
+//     hidden nuts, 0–5) } }. The squirrel's stump and the cat's bed are furniture (furn.sqnest / furn.catbed) in the room.
+function addV11(s) { if (!s.homes) s.homes = {}; return s; }

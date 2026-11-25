@@ -555,6 +555,7 @@ function drawScene() {
   else if (L.old && L.old.yard !== L.yard) { drawLayer(ctx, L.old.yard); ctx.save(); ctx.globalAlpha = fade; drawLayer(ctx, L.yard); ctx.restore(); }   // the season / snow changes softly
   else drawLayer(ctx, L.yard);
   if (noteOnBed()) ART.draw('fx.glow', ctx, DOOR.x, Y(DOOR.d) - 40, 40, '255,240,196', 0.25 + ((TT % 3.2) < 0.9 ? 0.45 * Math.sin(Math.PI * (TT % 3.2) / 0.9) : 0));   // something waits for you indoors   // something waits for you indoors
+  drawNestYard();
   if (WX.hot) ART.draw('live.shade.hot', ctx, SHADE[0] - 6, Y(SHADE[1] - 2));           // cool shade in front of the house on a hot afternoon
   drawPrints();
   drawYarnThread();
@@ -573,10 +574,12 @@ function drawScene() {
   const ns = !HOUSEFX.on && noteYardSpot(); if (ns) items.push({ d: ns.d, note: ns });
   if (S.snowman) items.push({ d: S.snowman.d, snowman: true });
   for (const k in S.dishes) if (S.dishes[k]) items.push({ d: S.dishes[k].d, dish: k });
+  if (MOVEIN.on && MOVEIN.phase !== 'bring') items.push({ d: MOVEIN.d, mig: true });
   items.sort((a, b) => b.d - a.d);
   const now = Clock.now();
   for (const it of items) {
     if (it.note) { drawNoteAt(ctx, it.note.x, Y(it.note.d), depthScale(it.note.d)); continue; }
+    if (it.mig) { drawMoveInGift(); continue; }
     if (it.dish) { const q = S.dishes[it.dish]; drawSprite(sprite('prop.dish|' + it.dish), q.x, Y(q.d), { scale: depthScale(q.d) }); continue; }
     if (it.g) {
       const g = it.g, s = depthScale(g.d), tw = 0.5 + 0.5 * Math.sin(TT * 1.6 + g.id);
@@ -585,6 +588,7 @@ function drawScene() {
     } else if (it.vis) {
       const s = depthScale(VIS.d), dr = visitorDrawing();
       drawSprite(sprite(dr.key), VIS.x, Y(VIS.d) - dr.lift, { sx: VIS.face, scale: s });
+      if (MOVEIN.on && MOVEIN.phase === 'bring') drawMoveInGift();
     } else if (it.snowman) { drawSnowmanItem();
     } else if (it.box) {
       if (S.giftNew) ART.draw('fx.glow', ctx, GIFTBOX.x, Y(GIFTBOX.d) - 14, 34, '255,236,170', 0.35 + 0.1 * Math.sin(TT * 2));
@@ -653,6 +657,7 @@ cv.addEventListener('pointerdown', e => {
   for (const f of S.field) { const s = depthScale(f.d), dd = Math.hypot(x - f.x, y - (Y(f.d) - 36 * s)); if (dd < 30 && Clock.now() - f.born > 600) cands.push([dd, () => (collect(f), true)]); }
   for (const g of S.gifts) { const dd = Math.hypot(x - g.x, y - (Y(g.d) - 12)); if (dd < 30) cands.push([dd, () => (pickGift(g), true)]); }
   { const nd = noteHitYard(x, y); if (nd != null) cands.push([nd, () => (openNote(), true)]); }          // his note
+  { const nt = nestTap(x, y); if (nt) cands.push(nt); }      // the sparrow's nest
   for (const k in S.dishes) { const q = S.dishes[k]; if (!q) continue; const dd = Math.hypot(x - q.x, y - (Y(q.d) - 6)); if (dd < 26) cands.push([dd, () => dishTap(k)]); }   // a snack waiting
   if (!HOUSEFX.on && Math.abs(x - GIFTBOX.x) < 24 && y > Y(GIFTBOX.d) - 38 && y < Y(GIFTBOX.d) + 6) cands.push([Math.hypot(x - GIFTBOX.x, y - (Y(GIFTBOX.d) - 16)), () => { S.giftNew = false; openPanel('gifts'); return true; }]);
   if (pickNearest(toyCands(x, y, e.pointerId, cands))) return;
@@ -759,7 +764,7 @@ function boot() {
     Clock.tick(dt);
     if (TT > todAt) { todAt = TT + 1; worldTick(); wxCheck(); }
     if (TT > saveAt) { saveAt = TT + 15; writeSave(S); }
-    roomTick(); checkRub(); updateParker(dt); if (PV.mode) drawPaperView(); updateBall(dt); updateVisitor(dt); updateBubbles(dt); updateYarn(dt); updateKite(dt); updateSprinkler(dt); updateChase(dt); updateWeather(dt, WX, V.H, TT); parkerExtras(); catPlayTick(); sayTick(); noteTick(); sleepZ(); updateFX(dt); drawScene();
+    roomTick(); checkRub(); updateParker(dt); if (PV.mode) drawPaperView(); updateBall(dt); updateVisitor(dt); updateBubbles(dt); updateYarn(dt); updateKite(dt); updateSprinkler(dt); updateChase(dt); updateWeather(dt, WX, V.H, TT); parkerExtras(); catPlayTick(); sayTick(); noteTick(); homeTick(); sleepZ(); updateFX(dt); drawScene();
     if (!window.READY) window.READY = true;
     requestAnimationFrame(loop);
   };
@@ -771,7 +776,7 @@ function boot() {
   idle(step);
 }
 // test hook (screenshots): advance the simulation deterministically
-window.__advance = secs => { for (let i = 0; i < secs * 30; i++) { TT += 1 / 30; roomTick(); checkRub(); updateParker(1 / 30); updateBall(1 / 30); updateVisitor(1 / 30); updateBubbles(1 / 30); updateYarn(1 / 30); updateKite(1 / 30); updateSprinkler(1 / 30); updateChase(1 / 30); updateWeather(1 / 30, WX, V.H, TT); parkerExtras(); catPlayTick(); sayTick(); updateFX(1 / 30); } drawScene(); };
+window.__advance = secs => { for (let i = 0; i < secs * 30; i++) { TT += 1 / 30; roomTick(); checkRub(); updateParker(1 / 30); updateBall(1 / 30); updateVisitor(1 / 30); updateBubbles(1 / 30); updateYarn(1 / 30); updateKite(1 / 30); updateSprinkler(1 / 30); updateChase(1 / 30); updateWeather(1 / 30, WX, V.H, TT); parkerExtras(); catPlayTick(); sayTick(); homeTick(); updateFX(1 / 30); } drawScene(); };
 // time of day or weather changed: rebuild the backdrop (it cross-fades), switch the weather sounds
 function wxCheck() {
   snowmanTick();
@@ -1182,7 +1187,7 @@ function visitTick() {
   const now = Clock.now();
   VIS.next = TT + rand(P.present ? VISIT.homeEvery : VISIT.awayEvery) * (WX.kind === 'rain' ? VISIT.rainSlow : 1);
   if (visitorsSleep(now) || WX.heavy || (P.present && /packup|departLook|arrive|gift/.test(P.mode))) return;
-  startVisit(pickVisitor(now));
+  const mk = moveInPick(); mk ? startMoveIn(mk) : startVisit(pickVisitor(now));     // a good friend at the big house: it comes to move in
 }
 // he is home, out in the yard and not busy: a good friend may come and play
 function parkerFree() { return P.present && !P.inRoom && !P.pack && !P.hold && !P.carrying && /^(sit|lie|look|sniff|sigh|wag|tilt|expect|shelter|watch)$/.test(P.mode); }
@@ -1195,13 +1200,14 @@ function startVisit(kind, forceGift) {
   const lv = palLv(kind), dish = dishFor(kind, now), out = P.present && !P.inRoom;
   const gift = forceGift || (canGift(now) && Math.random() < VISIT.giftChance) ? rollGift(kind, now) : null;
   const from = Math.random() < 0.5 ? -40 : SCENE_W + 40, stay = rand(VISIT.stay[kind]) * (lv >= 1 ? PALS.stayUp : 1) * (dish ? PALS.eatStay : 1);
-  const extra = { lv, dish: dish ? kind : null, ate: false, eatAt: Infinity, taps: 0, hopAt: -9, head: false, steal: null, hold: 0 };
+  const extra = { lv, dish: dish ? kind : null, ate: false, eatAt: Infinity, taps: 0, hopAt: -9, head: false, steal: null, hold: 0, td: null, movein: false }, lives = palLives(kind);
   if (kind === 'sparrow') {
     let tx, ty, d;
     if (dish) { tx = clamp(dish.x + (Math.random() < 0.5 ? -20 : 20), 30, 370); d = dish.d; ty = Y(d); }           // down by the seeds
     else if (lv >= 3 && parkerFree() && Math.random() < PALS.play.sparrow) { extra.head = true; [tx, ty] = headPoint(); d = null; setMode('headbird', stay + 6); }   // on his head
     else { const ps = birdPerches(lv >= 2 && out ? P : null); [tx, ty, d] = ps[Math.floor(Math.random() * ps.length)]; }
-    Object.assign(VIS, { on: true, kind, phase: 'in', x0: from, y0: ty - 160, tx, ty, x: from, y: ty - 160, d, t0: TT, face: Math.sign(tx - from), stay, pose: 0, poseAt: 0, gift, ...extra });
+    const [x0, y0] = lives ? nestAt() : [from, ty - 160];            // one that lives here flies out of its nest
+    Object.assign(VIS, { on: true, kind, phase: 'in', x0, y0, tx, ty, x: x0, y: y0, d, t0: TT, face: Math.sign(tx - x0) || 1, stay, pose: 0, poseAt: 0, gift, ...extra });
     SFX.chirp();
   } else {
     let tx = 70 + Math.random() * 260, td = 110 + Math.random() * 100;
@@ -1209,7 +1215,8 @@ function startVisit(kind, forceGift) {
     else if (kind === 'squirrel' && lv >= 3 && parkerFree() && ballStill() && Math.random() < PALS.play.squirrel) { const bp = S.toyPos.ball; extra.steal = 'go'; tx = clamp(bp.x - 22 * (Math.sign(bp.x - from) || 1), 30, 370); td = clamp(bp.d, 100, 224); }   // after his ball!
     else if (lv >= 2 && out && Math.random() < 0.7) { const sd = Math.random() < 0.5 ? -1 : 1; tx = clamp(P.x + sd * rand([78, 104]), 40, 360); if (Math.abs(tx - P.x) < 70) tx = clamp(P.x - sd * 90, 40, 360); td = clamp(P.d + rand([-8, 8]), 104, 220); }   // comes to sit near him
     else if (P.present && Math.abs(tx - P.x) < 90) tx = clamp(P.x + (tx < P.x ? -110 : 110), 50, 350);
-    Object.assign(VIS, { on: true, kind, phase: 'in', x: from, d: td, tx, t0: TT, face: Math.sign(tx - from), stay, pose: 'sit', poseAt: 0, gift, ...extra });
+    if (lives) { Object.assign(VIS, { on: true, kind, phase: 'in', x: DOOR.x, d: DOOR.d - 6, tx, t0: TT, face: Math.sign(tx - DOOR.x) || 1, stay, pose: 'sit', poseAt: 0, gift, ...extra, td }); SFX.door(true); }   // one that lives here comes out of the door
+    else Object.assign(VIS, { on: true, kind, phase: 'in', x: from, d: td, tx, t0: TT, face: Math.sign(tx - from), stay, pose: 'sit', poseAt: 0, gift, ...extra });
     if (kind === 'squirrel') SFX.chitter();
   }
   writeSave(S);
@@ -1218,7 +1225,8 @@ function startVisit(kind, forceGift) {
 }
 // it has arrived where it was going
 function visitorArrive() {
-  VIS.phase = 'stay'; VIS.until = TT + VIS.stay;
+  VIS.phase = 'stay'; VIS.until = TT + VIS.stay; if (VIS.td != null) { VIS.d = VIS.td; VIS.td = null; }
+  if (VIS.movein) return moveInArrive();
   if (VIS.dish && !VIS.ate) { VIS.eatAt = TT + rand([2.6, 4]); VIS.face = Math.sign(S.dishes[VIS.dish] ? S.dishes[VIS.dish].x - VIS.x : VIS.face) || 1; }
   if (VIS.kind === 'sparrow') return;
   if (!VIS.dish) { VIS.face = Math.random() < 0.5 ? 1 : -1; if (P.present && !P.inRoom) VIS.face = Math.sign(P.x - VIS.x) || 1; }
@@ -1236,8 +1244,10 @@ function visitorLeave() {
     fx({ type: 'glow', x, y: Y(d) - 10, life: 0.9, r: 30, rgb: '255,240,200' });
   }
   if (VIS.head) { VIS.head = false; if (P.mode === 'headbird') { setMode('wag', HABITS.reactionTime.wag); SFX.pop(); } }
-  if (VIS.kind === 'sparrow') Object.assign(VIS, { phase: 'out', x0: VIS.x, y0: VIS.y, tx: VIS.x + VIS.face * 260, ty: VIS.y - 220, t0: TT });
-  else { VIS.face = VIS.x < 200 ? -1 : 1; Object.assign(VIS, { phase: 'out', tx: VIS.face < 0 ? -60 : SCENE_W + 60, t0: TT }); }
+  const home = palLives(VIS.kind);         // one that lives here goes home: back to its nest, or in at the door
+  if (VIS.kind === 'sparrow') { const [nx, ny] = home ? nestAt() : [VIS.x + VIS.face * 260, VIS.y - 220]; if (home) VIS.face = Math.sign(nx - VIS.x) || 1; Object.assign(VIS, { phase: 'out', x0: VIS.x, y0: VIS.y, tx: nx, ty: ny, t0: TT }); }
+  else if (home) { VIS.face = Math.sign(DOOR.x - VIS.x) || -1; Object.assign(VIS, { phase: 'out', tx: DOOR.x, td: DOOR.d - 6, t0: TT }); }
+  else { VIS.face = VIS.x < 200 ? -1 : 1; Object.assign(VIS, { phase: 'out', tx: VIS.face < 0 ? -60 : SCENE_W + 60, td: null, t0: TT }); }
 }
 // a friendly sparrow doesn't fly off when he comes over: it just hops to another perch
 function sparrowMove() {
@@ -1252,6 +1262,7 @@ function visitorEat() {
   for (let i = 0; i < 2; i++) fx({ type: 'spr', key: 'fx.heart', x: VIS.x + (i ? 10 : -8), y: (VIS.kind === 'sparrow' ? VIS.y - 26 : Y(VIS.d) - (VIS.kind === 'cat' ? 90 : 48) * depthScale(VIS.d)) - i * 8, vy: -24, sway: 1, life: 1.3 + i * 0.3, scale: 0.6 });
   const up = palLevelUp(k);
   if (up) setTimeout(() => palAnnounce(k, up), 900);
+  else if (k === 'squirrel' && palLives('squirrel')) { squirrelStash(); toastText(capFirst(T_('home.stash').replace('{who}', palWho(k))), 3200); }
   else toastText(capFirst(T_('pal.ate').replace('{who}', palWho(k, true)).replace('{what}', T_('item.' + PALS.snack[k] + '.a'))), 3200);
 }
 function updateVisitor(dt) {
@@ -1288,11 +1299,12 @@ function updateVisitor(dt) {
     return;
   }
   const dx = VIS.tx - VIS.x, step = VIS_SPEED[VIS.kind] * dt * (VIS.phase === 'out' ? 1.4 : 1);
-  if (Math.abs(dx) <= step) {
+  if (VIS.td != null) VIS.d += clamp(VIS.td - VIS.d, -step * 0.8, step * 0.8);     // to and from the door it walks across the lawn too
+  if (Math.abs(dx) <= step && (VIS.td == null || Math.abs(VIS.td - VIS.d) < 2)) {
     VIS.x = VIS.tx;
     if (VIS.phase === 'in') visitorArrive();
     else VIS.on = false;
-  } else VIS.x += Math.sign(dx) * step;
+  } else if (Math.abs(dx) > step) VIS.x += Math.sign(dx) * step;
 }
 // ---- a squirrel who is his good friend steals his ball, and the two of them chase round the yard ----
 function stealStart() {
@@ -1427,6 +1439,7 @@ function drawVisitor() {                 // the sparrow (it perches up high, so 
   if (!VIS.on || VIS.kind !== 'sparrow') return;
   const hop = VIS.phase === 'stay' ? tapHop() : 0, k = VIS.phase !== 'stay' || hop > 3 ? 2 + Math.floor(TT * 12) % 2 : VIS.pose;
   drawSprite(sprite(`visitor.sparrow|${k}`), VIS.x, VIS.y - hop, { sx: VIS.face, scale: VIS.head ? Math.min(1, depthScale(P.d) * 1.1) : 1 });
+  if (MOVEIN.on && MOVEIN.phase === 'bring') drawMoveInGift();
 }
 // ---------- gifts on the ground ----------
 function giftAt(x, y) { let best = null, bd = 30; for (const g of S.gifts) { const dd = Math.hypot(x - g.x, y - (Y(g.d) - 12)); if (dd < bd) { bd = dd; best = g; } } return best; }
