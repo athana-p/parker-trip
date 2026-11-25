@@ -70,7 +70,7 @@ function renderShop(body) {
   body.append(list);
 }
 function renderPack(body) {
-  if (S.trip) { body.append(el('p', 'note', T('ui.pack.away'))); return; }
+  if (S.trip) { body.append(el('p', 'note', T('ui.pack.away'))); renderSnacks(body); return; }
   const slots = el('div', 'slots');
   for (const slot of ['food', 'charm']) {
     const id = S.pack[slot], b = el('button', 'slot' + (id ? ' full' : ''));
@@ -81,11 +81,26 @@ function renderPack(body) {
   }
   body.append(slots, el('p', 'note', T(S.pack.food ? 'ui.pack.ready' : 'ui.pack.note')));
   renderToyList(body);
+  renderSnacks(body);
   body.append(el('h3', 'sub', T('ui.inv')));
-  const inv = ITEMS.filter(i => i.cat !== 'toy' && S.inv[i.id] > 0);
+  const inv = ITEMS.filter(i => i.cat !== 'toy' && i.cat !== 'snack' && S.inv[i.id] > 0);
   if (!inv.length) { body.append(el('p', 'note', T('ui.inv.none'))); return; }
   const grid = el('div', 'inv');
   for (const it of inv) { const b = el('button', 'inv-item'); b.append(itemIcon(it.id, 46), el('div', 'inv-name', T('item.' + it.id)), el('div', 'inv-count', '×' + S.inv[it.id])); b.onclick = () => { packItem(it.id); renderPanel(); }; grid.append(b); }
+  body.append(grid);
+}
+// snacks for the little visitors: tap one to put it out in the yard (one dish each at a time)
+function renderSnacks(body) {
+  const have = ITEMS.filter(i => i.cat === 'snack' && (S.inv[i.id] > 0 || S.dishes[i.pal]));
+  if (!have.length) return;
+  body.append(el('h3', 'sub', T('ui.snacks')), el('p', 'note', T('ui.snacks.note')));
+  const grid = el('div', 'inv');
+  for (const it of have) {
+    const out = !!S.dishes[it.pal], b = el('button', 'inv-item' + (out ? ' waiting' : ''));
+    b.append(itemIcon(it.id, 46), el('div', 'inv-name', T('item.' + it.id)), el('div', 'inv-count', (S.inv[it.id] ? '×' + S.inv[it.id] : '') + (out ? (S.inv[it.id] ? ' · ' : '') + T('ui.snack.out') : '')));
+    b.onclick = () => { if (putDish(it.id)) closePanel(); };
+    grid.append(b);
+  }
   body.append(grid);
 }
 // his toys: tap one and he goes to play with it. Toys from friends wear a little "friend" tag; some wait for the weather.
@@ -144,7 +159,7 @@ function renderGifts(body) {
   for (const g of GIFTS) {
     const n = S.giftBox[g] || 0, cell = el('div', 'gift-cell' + (n ? '' : ' none'));
     const ic = paperIcon(64, x => { if (!n) { x.globalAlpha = 0.18; x.filter = 'grayscale(1)'; } ART.paint('gift.' + g, x); }, ART.get('gift.' + g).box, 1.7);
-    cell.append(ic, el('div', 'gift-name', n ? T('gift.' + g) : (g === 'clover' ? '★ ?' : '?')), el('div', 'gift-count', n ? '× ' + n : ''));
+    cell.append(ic, el('div', 'gift-name', n ? T('gift.' + g) : (g === 'clover' || GIFT_RARE[g] ? '★ ?' : '?')), el('div', 'gift-count', n ? '× ' + n : ''));
     grid.append(cell);
   }
   body.append(grid);
@@ -168,11 +183,12 @@ function flipCard(id, onFlip, year, friend) {
 function renderAlbum(body) {
   if (UI.view) return renderAlbumView(body);
   const tabs = el('div', 'tabs');
-  for (const t of ['places', 'fests', 'friends']) { const b = el('button', 'tab' + ((UI.tab || 'places') === t ? ' on' : ''), T('ui.album.' + t)); b.onclick = () => { UI.tab = t; renderPanel(); }; tabs.append(b); }
+  for (const t of ['places', 'fests', 'friends', 'pals']) { const b = el('button', 'tab' + ((UI.tab || 'places') === t ? ' on' : ''), T('ui.album.' + t)); b.onclick = () => { UI.tab = t; renderPanel(); }; tabs.append(b); }
   body.append(tabs);
   const grid = el('div', 'album'), jobs = [];
   const thumb = (cell, id, year, friend) => { const c = document.createElement('canvas'); c.width = 180; c.height = 120; cell.prepend(c); jobs.push(() => c.getContext('2d').drawImage(ART.card(id, 'front', 0.4, year, friend), 0, 0, 180, 120)); };
   if (UI.tab === 'friends') return renderFriends(body);
+  if (UI.tab === 'pals') return renderPals(body);
   if (UI.tab === 'fests') {
     body.append(el('p', 'note', T('ui.album.festNote')));
     for (const f of FESTIVALS) {
@@ -216,6 +232,35 @@ function renderFriends(body) {
     grid.append(card);
   }
   body.append(grid);
+}
+// the little visitors page: a card each — its name (once you have given it one), a line about how close you are
+// (never a number), the gifts it has left you. From "familiar" on you can name it.
+function renderPals(body) {
+  body.append(el('p', 'note', T('ui.pals.note')));
+  const list = el('div', 'pals');
+  for (const k of PALS.order) {
+    const p = S.pals[k], lv = palLv(k), seen = (S.visits[k] || 0) > 0, card = el('div', 'pal' + (seen ? '' : ' unknown'));
+    const id = 'visitor.' + k, pose = { sparrow: 0, cat: 'sit', squirrel: 'nibble' }[k], kk = { sparrow: 1.25, cat: 0.42, squirrel: 0.7 }[k];
+    card.append(paperIcon(84, x => { if (!seen) { x.globalAlpha = 0.22; x.filter = 'grayscale(1)'; } ART.paint(id, x, pose); }, ART.get(id).box, kk));
+    const txt = el('div', 'pal-text');
+    txt.append(el('div', 'pal-name', seen ? (p.name ? `${p.name} · ${T('vis.' + k)}` : T('vis.' + k)) : '？'));
+    txt.append(el('div', 'pal-line', seen ? T(`pal.${k}.${lv}`) : T('ui.gifts.notYet')));
+    if (seen) {
+      const gs = GIFTS.filter(g => p.gifts[g]);
+      if (gs.length) { const row = el('div', 'pal-gifts'); for (const g of gs) { const chip = el('span', 'pal-gift'); chip.append(paperIcon(26, x => ART.paint('gift.' + g, x), ART.get('gift.' + g).box, 0.7), document.createTextNode('× ' + p.gifts[g])); chip.title = T('gift.' + g); row.append(chip); } txt.append(row); }
+      else txt.append(el('div', 'pal-line dim', T('ui.pals.noGifts')));
+    }
+    if (lv >= 2) {
+      const row = el('div', 'pal-nameRow'), inp = document.createElement('input');
+      inp.className = 'pal-input'; inp.maxLength = PALS.nameMax; inp.value = p.name || ''; inp.placeholder = T('ui.pals.namePh'); inp.setAttribute('aria-label', T('ui.pals.namePh'));
+      const ok = el('button', 'pill btn', T(p.name ? 'ui.pals.rename' : 'ui.pals.name'));
+      const save = () => { const v = inp.value.replace(/\s+/g, ' ').trim().slice(0, PALS.nameMax); if (v === (p.name || '')) return; p.name = v; writeSave(S); SFX.pop(); if (v) toastText(T('ui.pals.named').replace('{name}', v), 2600); renderPanel(); };
+      ok.onclick = save; inp.onkeydown = e => { if (e.key === 'Enter') save(); };
+      row.append(inp, ok); txt.append(row);
+    }
+    card.append(txt); list.append(card);
+  }
+  body.append(list);
 }
 function renderAlbumView(body) {
   const id = UI.view, fest = id.startsWith('fest-'), fid = fest ? id.slice(5) : null, year = fest ? UI.viewYear : undefined, meet = id.startsWith('meet-');
@@ -380,7 +425,15 @@ function buildDebug(force) {
   };
   pick('dbg.season', 'season', SEASONS.map(k => [k, T('season.' + k)]));
   pick('dbg.weather', 'kind', [...WEATHER_KINDS.map(k => [k, T('wx.' + k)]), ['heavy', T('wx.heavy')]]);
-  d.append(el('div', 'dbg-title', T('dbg.title')), row, acts, dates, fests, wxr, vr, hr, el('div', 'dbg-status'));
+  const pr = el('div', 'dbg-row'); pr.append(el('b', '', T('dbg.pals')));
+  for (const k of PALS.order) {
+    const sel = document.createElement('select'); sel.className = 'dbg-b'; sel.setAttribute('aria-label', T('vis.' + k));
+    for (let lv = 0; lv <= 3; lv++) { const o = document.createElement('option'); o.value = lv; o.textContent = `${T('vis.' + k)} ${T('dbg.pal.' + lv)}`; sel.append(o); }
+    sel.value = palLv(k); sel.onchange = () => { palSetLevel(k, +sel.value); if (UI.panel) renderPanel(); }; pr.append(sel);
+  }
+  const dsh = el('button', 'dbg-b', T('dbg.dishes')); dsh.onclick = () => { for (const k of PALS.order) { if (S.dishes[k]) continue; const id = PALS.snack[k]; S.inv[id] = (S.inv[id] || 0) + 1; putDish(id); } }; pr.append(dsh);
+  const hun = el('button', 'dbg-b', T('dbg.hungry')); hun.onclick = () => { for (const k of PALS.order) { S.pals[k].today = 0; } writeSave(S); }; pr.append(hun);
+  d.append(el('div', 'dbg-title', T('dbg.title')), row, acts, dates, fests, wxr, vr, pr, hr, el('div', 'dbg-status'));
   d.insertBefore(nr, d.querySelector('.dbg-status'));
   window.debugRefresh = () => {
     d.querySelectorAll('[data-sp]').forEach(b => b.classList.toggle('on', +b.dataset.sp === Clock.speed));

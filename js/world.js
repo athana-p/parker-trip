@@ -106,10 +106,15 @@ function festivalTick(now) {
 }
 // ---- small visitors and their gifts (stage 4) ----
 function visitorsSleep(t) { const h = new Date(t).getHours(), [a, b] = VISIT.night; return h >= a || h < b; }
-function pickVisitor(t) { const se = weatherAt(t).season, w = { ...VISIT.who }; if (se === 'autumn') w.squirrel *= 1.6; if (se === 'winter') w.squirrel *= 0.5; return pickWeighted(w); }
+function pickVisitor(t) {
+  const se = weatherAt(t).season, w = { ...VISIT.who }; if (se === 'autumn') w.squirrel *= 1.6; if (se === 'winter') w.squirrel *= 0.5;
+  for (const k in w) if (dishFor(k, t)) w[k] *= PALS.dishPull;        // a snack waiting for it brings it round more often
+  return pickWeighted(w);
+}
 function canGift(t) { return S.gifts.length < VISIT.groundCap && t - (S.lastGiftAt || 0) >= VISIT.giftGap * 60000; }
 function rollGift(from, t) {
-  let kind = Math.random() < VISIT.clover ? 'clover' : pickWeighted(VISIT.gifts[from]);
+  const lv = palLv(from), w = { ...VISIT.gifts[from] }; if (lv >= 2) w[PALS.levelGift[from]] = PALS.levelGiftW;   // closer friends bring nicer things
+  let kind = lv >= 3 && Math.random() < PALS.rareChance ? PALS.rare[from] : Math.random() < VISIT.clover ? 'clover' : pickWeighted(w);
   if (kind === 'flower' && weatherAt(t).season === 'winter') kind = from === 'squirrel' ? 'pinecone' : 'pebble';   // no flowers to pick in winter
   const dand = kind === 'clover' ? VISIT.cloverDand : Math.random() < VISIT.dandChance ? Math.round(rnd(VISIT.dand)) : 0;
   return { kind, from, dand };
@@ -124,8 +129,23 @@ function offlineVisits(from, to) {
   for (const t of times) {
     if (visitorsSleep(t) || weatherAt(t).heavy) continue;
     const who = pickVisitor(t); S.visits[who] = (S.visits[who] || 0) + 1;
+    if (dishFor(who, t)) { palEat(who, t); OFFLINE_ATE.push(who); }      // it found the snack you put out
     if (n < O.max && canGift(t) && Math.random() < O.giftChance) { const [x, d] = giftSpot(); dropGift(rollGift(who, t), x, d, t); n++; }
   }
   writeSave(S);
   return n;
 }
+// ---- getting to know the little visitors (plan 2, stage 2): friendship only grows, and only through snacks ----
+const OFFLINE_ATE = [];                 // who ate a snack while the game was closed (told once on opening)
+const dayKey = t => { const d = new Date(t); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
+function palLv(k) { const p = S.pals && S.pals[k]; return p ? PALS.lv[k].filter(n => p.pts >= n).length : 0; }
+function palHungry(k, t) { const p = S.pals[k]; return (p.day === dayKey(t) ? p.today : 0) < PALS.cap[k]; }
+function dishFor(k, t) { return S.dishes && S.dishes[k] && S.pals[k] && palHungry(k, t) ? S.dishes[k] : null; }   // a snack it will eat now
+function palEat(k, t) {
+  const p = S.pals[k], dk = dayKey(t); if (p.day !== dk) { p.day = dk; p.today = 0; }
+  p.today++; p.pts++; S.dishes[k] = null; writeSave(S);
+}
+function palLevelUp(k) { const lv = palLv(k), p = S.pals[k]; if (lv <= p.lv) return 0; p.lv = lv; writeSave(S); return lv; }   // a new level, once
+function palName(k) { const n = S.pals && S.pals[k] && S.pals[k].name; return n || ''; }
+function palWho(k) { return palName(k) || T_('vis.' + k + '.the'); }
+function palSetLevel(k, lv) { const p = S.pals[k]; p.pts = lv ? PALS.lv[k][lv - 1] : 0; p.lv = lv; p.day = ''; p.today = 0; writeSave(S); }   // debug

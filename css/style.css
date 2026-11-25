@@ -14,7 +14,7 @@ body { font-family: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsof
 .btn:active { transform: translateY(1px) scale(0.97); }
 #coins.bump { animation: bump 0.35s ease-out; }
 @keyframes bump { 40% { transform: scale(1.12); } 100% { transform: scale(1); } }
-.toast { pointer-events: none; position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 96px); transform: translateX(-50%); font-size: 15px; padding: 9px 16px; white-space: nowrap; transition: opacity 0.6s, transform 0.6s; }
+.toast { pointer-events: none; position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 96px); transform: translateX(-50%); font-size: 15px; padding: 9px 16px; white-space: normal; width: max-content; max-width: calc(100% - 32px); text-align: center; line-height: 1.4; transition: opacity 0.6s, transform 0.6s; }
 .toast.hidden { opacity: 0; transform: translateX(-50%) translateY(8px); pointer-events: none; }
 /* ---- bottom bar ---- */
 #bar, #roomBar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; gap: 14px; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 16px); pointer-events: none; transition: opacity 0.3s, transform 0.3s; }
@@ -152,3 +152,19 @@ body { font-family: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsof
 .pv-prev, .pv-next { font-size: 22px; padding: 2px 14px; }
 .pv-close { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 70px); right: 14px; }
 .book-btn { gap: 6px; align-items: center; }
+/* the little visitors page in the album (plan 2, stage 2) */
+.tabs { flex-wrap: wrap; }
+.pals { display: flex; flex-direction: column; gap: 8px; }
+.pal { background: #fff; border-radius: 16px; padding: 10px 12px 12px 6px; display: flex; gap: 8px; align-items: flex-start; }
+.pal.unknown { opacity: .75; }
+.pal canvas { flex: none; }
+.pal-text { flex: 1; min-width: 0; padding-top: 4px; }
+.pal-name { font-weight: 600; font-size: 15px; overflow-wrap: anywhere; }
+.pal-line { font-size: 13px; line-height: 1.45; margin: 3px 0 6px; }
+.pal-line.dim { opacity: .6; }
+.pal-gifts { display: flex; flex-wrap: wrap; gap: 4px; }
+.pal-gift { display: inline-flex; align-items: center; gap: 1px; font-size: 12px; background: #f6eedd; border-radius: 999px; padding: 0 9px 0 2px; }
+.pal-nameRow { display: flex; gap: 6px; margin-top: 9px; }
+.pal-input { flex: 1; min-width: 0; font: inherit; font-size: 16px; color: var(--ink); background: #fffaf0; border: 1.5px solid #e6d4b4; border-radius: 999px; padding: 5px 12px; }
+.pal-input:focus { outline: 3px solid #f6c96a; outline-offset: 1px; }
+.pal-nameRow .btn { flex: none; padding: 6px 14px; }

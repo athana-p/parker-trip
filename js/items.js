@@ -13,11 +13,14 @@ const ITEMS = [
   { id: 'rope', cat: 'toy', price: 12 },
   { id: 'kite', cat: 'toy', price: 18, weather: 'wind' },        // only flies on windy days
   { id: 'sprinkler', cat: 'toy', price: 22, weather: 'sun' },    // only on sunny days (not in winter, not at night)
+  { id: 'seed', cat: 'snack', price: 4, pal: 'sparrow' },    // snacks for the little visitors: put one out in the yard
+  { id: 'nuts', cat: 'snack', price: 5, pal: 'squirrel' },
+  { id: 'fish', cat: 'snack', price: 6, pal: 'cat' },
   { id: 'yarn', cat: 'toy', friend: 'cat' },          // gifts from friends (not sold): after the second time he meets them
   { id: 'temari', cat: 'toy', friend: 'kinako' },
 ];
 const ITEM = Object.fromEntries(ITEMS.map(i => [i.id, i]));
-const CATS = ['food', 'charm', 'toy'];
+const CATS = ['food', 'charm', 'toy', 'snack'];
 
 // real places; ★ rare ones are more likely with a charm
 const DESTS = [
@@ -57,3 +60,23 @@ const VISIT = {
   offline: { minHours: 2, slotHours: 3, slots: 6, giftChance: 0.5, max: 2 },   // while the game was closed: 0–2 gifts waiting
   night: [22, 5],                 // nobody visits between these hours
 };
+// getting to know the little visitors (plan 2, stage 2). A hidden friendship for each, four levels: 0 stranger → 1 knows
+// you by sight → 2 familiar → 3 good friends. It only ever grows, and only through snacks: put one out in the yard and
+// the one it is for comes more often and stays longer; when it eats it, the friendship grows a step — at most `cap`
+// steps a day (when it's had enough for the day it leaves the dish for tomorrow; nothing is ever wasted).
+const PALS = {
+  order: ['sparrow', 'squirrel', 'cat'],
+  snack: { sparrow: 'seed', squirrel: 'nuts', cat: 'fish' },
+  cap: { sparrow: 2, squirrel: 1, cat: 1 },               // meals that count per day
+  lv: { sparrow: [3, 8, 16], squirrel: [3, 10, 22], cat: [5, 16, 40] },   // meals to reach levels 1, 2, 3
+  dishPull: 3,                    // a snack waiting for it: that visitor comes this many times more often…
+  eatStay: 1.5,                   // …and stays this much longer
+  stayUp: 1.3,                    // from level 1 on, every visit is this much longer
+  levelGift: { sparrow: 'bluefeather', squirrel: 'walnut', cat: 'yarnbit' },    // from level 2: a gift only they bring
+  levelGiftW: 3,                  // its weight among their usual gifts
+  rare: { sparrow: 'button', squirrel: 'goldacorn', cat: 'bell' },             // level 3: their own rare gift
+  rareChance: 0.08,
+  nameMax: 8,                     // a name can be this long (from level 2)
+  play: { sparrow: 0.6, cat: 0.7, squirrel: 0.6 },      // level 3: chance they play with him when he's out and free
+};
+const DISH_SPOTS = { sparrow: [92, 196], squirrel: [330, 128], cat: [214, 214] };   // where each dish would like to go (moved if busy)

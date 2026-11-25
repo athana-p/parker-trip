@@ -7,9 +7,9 @@ const Clock = {
 };
 const CLOCK_KEY = 'parker-trip-debug-clock';
 
-const SAVE_KEY = 'parker-trip-save', LANG_KEY = 'parker-trip-lang', SAVE_VERSION = 9;
+const SAVE_KEY = 'parker-trip-save', LANG_KEY = 'parker-trip-lang', SAVE_VERSION = 10;
 function defaultSave(now) {
-  return addV9(addV8(addV7(addV6(addV5(addV4(addV3(addV2({ v: SAVE_VERSION, createdAt: now, lastSeen: now, dandelions: 0, field: [], nextSpawnAt: now, seq: 0, seenHint: false }))))))));
+  return addV10(addV9(addV8(addV7(addV6(addV5(addV4(addV3(addV2({ v: SAVE_VERSION, createdAt: now, lastSeen: now, dandelions: 0, field: [], nextSpawnAt: now, seq: 0, seenHint: false })))))))));
 }
 // upgrade older saves step by step here when the format changes (v1 → v2 → …)
 function migrateSave(s) {
@@ -22,6 +22,7 @@ function migrateSave(s) {
   if (s.v === 6) { addV7(s); s.v = 7; }
   if (s.v === 7) { addV8(s); s.v = 8; }
   if (s.v === 8) { addV9(s); s.v = 9; }
+  if (s.v === 9) { addV10(s); s.v = 10; }
   return s;
 }
 function loadSave() { try { return migrateSave(JSON.parse(localStorage.getItem(SAVE_KEY))); } catch (e) { return null; } }
@@ -73,5 +74,14 @@ function addV9(s) {
     for (const id in (s.album || {})) mark(id); for (const it of (s.shelf || [])) mark(it.id, it.at); for (const id in (s.albumFriend || {})) mark(id);
     for (const f in (s.friends || {})) mark(s.friends[f].place, s.friends[f].metAt); mark(s.lastDest);
   }
+  return s;
+}
+// v10: getting to know the little visitors — pals: { sparrow|squirrel|cat: { pts (meals eaten, only ever grows), day (the
+//     date of the last meal), today (meals that day), lv (the level last announced), name, gifts ({ kind: count } received
+//     from them, counted from this version on: older gifts don't say who left them) } }; dishes: snacks put out in the
+//     yard ({ sparrow|squirrel|cat: { x, d, at } }).
+function addV10(s) {
+  if (!s.pals) { s.pals = {}; for (const k of ['sparrow', 'squirrel', 'cat']) s.pals[k] = { pts: 0, day: '', today: 0, lv: 0, name: '', gifts: {} }; }
+  if (!s.dishes) s.dishes = {};
   return s;
 }
