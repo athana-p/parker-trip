@@ -89,7 +89,7 @@ function decorDefault(lv) {
   S.decor.items = [];
   for (const [id, p] of DECOR_DEFAULT[lv] || []) if (placedCount(id) < (S.furn[id] || 0)) decorAdd(id, p);
   for (const s of S.shelf) { S.decor.seen[s.id] = true; autoPlaceSmall('sv:' + s.id); }
-  if (S.furn.book) { S.decor.seen.book = true; autoPlaceSmall('book'); }
+  if (S.furn.book) { S.decor.seen.book = true; autoPlaceBook(); }
 }
 // a small thing goes on the first free spot: shelves (top to bottom, left to right), sills, then the back of the floor
 function autoPlaceSmall(id, prefer) {
@@ -104,6 +104,19 @@ function autoPlaceSmall(id, prefer) {
   }
   return null;
 }
+// his book finds itself a spot on the floor: by the bed if there is room, else as near the middle as it can
+function autoPlaceBook() {
+  const g = roomGeom(), R = roomR(), surfs = decorSurfaces(g, R), bed = decorBed();
+  for (const key of ['row:0', 'row:1', 'row:2']) {
+    const s = surfs.find(q => q.key === key); if (!s) continue;
+    const want = clamp(bed ? bed.x - 90 : (s.x0 + s.x1) / 2, s.x0, s.x1);
+    for (let d = 0; d <= s.x1 - s.x0; d += 10) for (const x of d ? [want - d, want + d] : [want]) {
+      if (x < s.x0 || x > s.x1) continue;
+      if (decorValid({ uid: -1, id: 'book', surf: key, x, dx: 0 }, g, R)) return decorAdd('book', { surf: key, x, dx: 0 });
+    }
+  }
+  return autoPlaceSmall('book');
+}
 function decorEnsure() {
   const lv = houseLevel(); if (lv < 2) return;
   S.furn = S.furn || {}; for (const id in DECOR_START) S.furn[id] = Math.max(S.furn[id] || 0, DECOR_START[id]);
@@ -113,7 +126,7 @@ function decorEnsure() {
   const g = roomGeom(), R = roomR(); let back = 0;
   for (const kind of ['wall', 'floor', 'small']) for (const r of decorItems().filter(o => decorDef(o.id).kind === kind)) if (!S.decor.items.includes(r)) continue; else if (!decorValid(r, g, R)) { decorRemove(r); back++; }
   for (const s of S.shelf) if (!S.decor.seen[s.id]) { S.decor.seen[s.id] = true; if (!placedCount('sv:' + s.id)) autoPlaceSmall('sv:' + s.id); }   // new souvenirs set themselves out
-  if (S.furn.book && !S.decor.seen.book) { S.decor.seen.book = true; if (!placedCount('book')) autoPlaceSmall('book'); }                      // so does his book
+  if (S.furn.book && !S.decor.seen.book) { S.decor.seen.book = true; if (!placedCount('book')) autoPlaceBook(); }                      // so does his book
   if (back) toastText(T('decor.back'), 3500);
   writeSave(S);
 }
