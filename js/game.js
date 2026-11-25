@@ -50,6 +50,7 @@ function clearOfThings(x, d, self) {
   for (const g of S.gifts) if (g !== self && near(g.x, g.d, 42)) return false;
   if (near(GIFTBOX.x, GIFTBOX.d, 44)) return false;
   if (S.snowman && !S.snowman.twig && near(S.snowman.x, S.snowman.d, 60)) return false;
+  const ns = noteYardSpot(); if (ns && near(ns.x, ns.d, 38)) return false;
   return true;
 }
 // flowers that ended up in a crowd (a toy rolled there, a gift landed, the house grew) move to a free spot
@@ -546,6 +547,7 @@ function drawScene() {
   if (HOUSEFX.on) { drawLayer(ctx, HOUSEFX.bare); drawHouseBuild(); }                 // the new house going up, piece by piece
   else if (L.old && L.old.yard !== L.yard) { drawLayer(ctx, L.old.yard); ctx.save(); ctx.globalAlpha = fade; drawLayer(ctx, L.yard); ctx.restore(); }   // the season / snow changes softly
   else drawLayer(ctx, L.yard);
+  if (noteOnBed()) ART.draw('fx.glow', ctx, DOOR.x, Y(DOOR.d) - 40, 40, '255,240,196', 0.25 + ((TT % 3.2) < 0.9 ? 0.45 * Math.sin(Math.PI * (TT % 3.2) / 0.9) : 0));   // something waits for you indoors   // something waits for you indoors
   if (WX.hot) ART.draw('live.shade.hot', ctx, SHADE[0] - 6, Y(SHADE[1] - 2));           // cool shade in front of the house on a hot afternoon
   drawPrints();
   drawYarnThread();
@@ -561,10 +563,12 @@ function drawScene() {
   for (const g of S.gifts) items.push({ d: g.d, g });
   if (VIS.on && VIS.kind !== 'sparrow') items.push({ d: VIS.d, vis: true });
   if (!HOUSEFX.on) items.push({ d: GIFTBOX.d, box: true });
+  const ns = !HOUSEFX.on && noteYardSpot(); if (ns) items.push({ d: ns.d, note: ns });
   if (S.snowman) items.push({ d: S.snowman.d, snowman: true });
   items.sort((a, b) => b.d - a.d);
   const now = Clock.now();
   for (const it of items) {
+    if (it.note) { drawNoteAt(ctx, it.note.x, Y(it.note.d), depthScale(it.note.d)); continue; }
     if (it.g) {
       const g = it.g, s = depthScale(g.d), tw = 0.5 + 0.5 * Math.sin(TT * 1.6 + g.id);
       drawSprite(sprite(`gift.${g.kind}`), g.x, Y(g.d), { scale: s });
@@ -639,6 +643,7 @@ cv.addEventListener('pointerdown', e => {
   const cands = [];
   for (const f of S.field) { const s = depthScale(f.d), dd = Math.hypot(x - f.x, y - (Y(f.d) - 36 * s)); if (dd < 30 && Clock.now() - f.born > 600) cands.push([dd, () => (collect(f), true)]); }
   for (const g of S.gifts) { const dd = Math.hypot(x - g.x, y - (Y(g.d) - 12)); if (dd < 30) cands.push([dd, () => (pickGift(g), true)]); }
+  { const nd = noteHitYard(x, y); if (nd != null) cands.push([nd, () => (openNote(), true)]); }          // his note
   if (!HOUSEFX.on && Math.abs(x - GIFTBOX.x) < 24 && y > Y(GIFTBOX.d) - 38 && y < Y(GIFTBOX.d) + 6) cands.push([Math.hypot(x - GIFTBOX.x, y - (Y(GIFTBOX.d) - 16)), () => { S.giftNew = false; openPanel('gifts'); return true; }]);
   if (pickNearest(toyCands(x, y, e.pointerId, cands))) return;
   if (snowmanTap(x, y)) return;
@@ -724,6 +729,7 @@ function boot() {
   tickSpawns();
   advanceWorld(Clock.now());                 // whatever happened while the game was closed
   const waiting = offlineVisits(lastSeen, Clock.now());
+  notesTick(Clock.now());
   P.present = !S.trip;
   shown = S.dandelions; updateHUD(false); drawCoinIcon();
   if (!S.seenHint) setTimeout(() => { if (!S.seenHint) showToast('hint.tap'); }, 2500);
@@ -742,7 +748,7 @@ function boot() {
     Clock.tick(dt);
     if (TT > todAt) { todAt = TT + 1; worldTick(); wxCheck(); }
     if (TT > saveAt) { saveAt = TT + 15; writeSave(S); }
-    roomTick(); checkRub(); updateParker(dt); updateBall(dt); updateVisitor(dt); updateBubbles(dt); updateYarn(dt); updateKite(dt); updateSprinkler(dt); updateChase(dt); updateWeather(dt, WX, V.H, TT); parkerExtras(); catPlayTick(); sayTick(); noteTick(); sleepZ(); updateFX(dt); drawScene();
+    roomTick(); checkRub(); updateParker(dt); if (PV.mode) drawPaperView(); updateBall(dt); updateVisitor(dt); updateBubbles(dt); updateYarn(dt); updateKite(dt); updateSprinkler(dt); updateChase(dt); updateWeather(dt, WX, V.H, TT); parkerExtras(); catPlayTick(); sayTick(); noteTick(); sleepZ(); updateFX(dt); drawScene();
     if (!window.READY) window.READY = true;
     requestAnimationFrame(loop);
   };
@@ -779,6 +785,7 @@ function worldTick() {
   }
   visitTick();
   festGiftTick();
+  notesTick(Clock.now());                     // a note from him, once or twice a week
   if (window.debugRefresh) debugRefresh();
 }
 // ---------- festival cards handed over in person ----------

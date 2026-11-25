@@ -1792,6 +1792,19 @@ function pawPrint(c, x, y, s, col) {
   for (const [dx, dy] of [[-8, -4], [-3, -9], [3, -9], [8, -4]]) { c.beginPath(); c.ellipse(x + dx * s, y + dy * s, 2.6 * s, 3.2 * s, 0, 0, TAU); c.fill(); }
   c.restore();
 }
+// a postcard's stamp: perforated paper with a tiny scene of the place, 124 × 150 (also used in "Parker Sees the World")
+function pcStamp(pc, res) {
+  const id = pc.id, sw = 124, sh = 150;
+  const stamp = mk(sw * res, sh * res), sc = stamp.getContext('2d'); sc.scale(res, res);
+  piece(sc, rectP(0, 0, sw, sh), '#fffaf0', { mul: 0.4 });
+  piece(sc, rectP(10, 10, sw - 20, sh - 34), '#efc9a8', { mul: 0.5 });
+  sc.save(); sc.beginPath(); sc.rect(10, 10, sw - 20, sh - 34); sc.clip(); sc.translate(10, 10); sc.scale((sw - 20) / PC_W * 1.6, (sh - 34) / PC_H * 1.1); sc.translate(-180, -150); (pc.scene || pc.front).call(pc, sc, PC_W, PC_H, res); sc.restore();
+  sc.fillStyle = '#6b4a3f'; sc.font = `600 13px ${FONT}`; sc.textAlign = 'center'; sc.fillText(T(`pc.${id}.country`, 'en').split(', ').pop().toUpperCase(), sw / 2, sh - 10);
+  sc.globalCompositeOperation = 'destination-out';
+  for (let x = 0; x <= sw; x += 10) { sc.beginPath(); sc.arc(x, 0, 3.4, 0, TAU); sc.arc(x, sh, 3.4, 0, TAU); sc.fill(); }
+  for (let yy = 0; yy <= sh; yy += 10) { sc.beginPath(); sc.arc(0, yy, 3.4, 0, TAU); sc.arc(sw, yy, 3.4, 0, TAU); sc.fill(); }
+  return stamp;
+}
 function pcBack(c, W, H, pc, res, year, friend) {
   piece(c, rectP(0, 0, W, H), '#f8f0e1', { scr: 0.3 });
   tornPiece(c, [[W * 0.56 - 2, 60], [W * 0.56 + 2, 60], [W * 0.56 + 2, H - 60], [W * 0.56 - 2, H - 60]], '#dcc6a6', { amp: 0.8, seed: 5, rim: 0, shadow: 0.08 });
@@ -1807,14 +1820,7 @@ function pcBack(c, W, H, pc, res, year, friend) {
   pawPrint(c, W * 0.56 - 48, H - 100, 1.1, '#9a6b5c');
   // stamp: perforated paper with a tiny scene of this place
   const sx = W - 180, sy = 56, sw = 124, sh = 150;
-  const stamp = mk(sw * res, sh * res), sc = stamp.getContext('2d'); sc.scale(res, res);
-  piece(sc, rectP(0, 0, sw, sh), '#fffaf0', { mul: 0.4 });
-  piece(sc, rectP(10, 10, sw - 20, sh - 34), '#efc9a8', { mul: 0.5 });
-  sc.save(); sc.beginPath(); sc.rect(10, 10, sw - 20, sh - 34); sc.clip(); sc.translate(10, 10); sc.scale((sw - 20) / PC_W * 1.6, (sh - 34) / PC_H * 1.1); sc.translate(-180, -150); (pc.scene || pc.front).call(pc, sc, PC_W, PC_H, res); sc.restore();
-  sc.fillStyle = '#6b4a3f'; sc.font = `600 13px ${FONT}`; sc.textAlign = 'center'; sc.fillText(T(`pc.${id}.country`, 'en').split(', ').pop().toUpperCase(), sw / 2, sh - 10);
-  sc.globalCompositeOperation = 'destination-out';
-  for (let x = 0; x <= sw; x += 10) { sc.beginPath(); sc.arc(x, 0, 3.4, 0, TAU); sc.arc(x, sh, 3.4, 0, TAU); sc.fill(); }
-  for (let yy = 0; yy <= sh; yy += 10) { sc.beginPath(); sc.arc(0, yy, 3.4, 0, TAU); sc.arc(sw, yy, 3.4, 0, TAU); sc.fill(); }
+  const stamp = pcStamp(pc, res);
   c.save(); c.translate(sx + sw / 2, sy + sh / 2); c.rotate(0.04);
   castShadow(c, x => x.drawImage(stamp, -sw / 2, -sh / 2, sw, sh), 3, 1, 3, 0.25); c.drawImage(stamp, -sw / 2, -sh / 2, sw, sh); c.restore();
   // postmark (ink)
@@ -1853,3 +1859,4 @@ function postcardCanvas(id, side, res, year, friend) {
 // one entry per card, 900 × 600; ART.card(id, side, res, year, friend) gives the finished picture (kept once made)
 for (const pc of POSTCARDS) ART.def('card.' + pc.id, { kind: 'card', group: 'card', box: { w: PC_W, h: PC_H, ox: 0, oy: 0 }, draw: (c, W, H, res) => pc.front.call(pc, c, W, H, res), note: 'front; the back is drawn from the texts' });
 ART.card = (id, side, res, year, friend) => postcardCanvas(id, side, res, year, friend);
+ART.def('card.stamp', { kind: 'paint', group: 'card', box: { w: 124, h: 150, ox: 0, oy: 0 }, note: 'a place\'s stamp: ART.paint(\'card.stamp\', null, place id, res) → canvas', draw: (c, id, res) => pcStamp(pcEntry(id), res) });

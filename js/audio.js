@@ -102,6 +102,14 @@ const SFX = {
     if (!this.ok()) return; const t = this.ctx.currentTime;
     this.noise(t, { dur: 0.06, v: 0.1, type: 'lowpass', f: 900, a: 0.003 }); this.tone(open ? 300 : 260, t + 0.02, { type: 'triangle', a: 0.01, d: 0.18, v: 0.03, to: open ? 360 : 220 });
   },
+  unfold() {                         // a folded note opening: two soft papery crinkles
+    if (!this.ok()) return; const t = this.ctx.currentTime;
+    for (const [dt, f] of [[0, 1800], [0.09, 2600]]) this.noise(t + dt, { dur: 0.08, v: 0.07, type: 'bandpass', f, q: 1.2, a: 0.005 });
+  },
+  pageTurn() {                       // turning a page: a soft swish of paper
+    if (!this.ok()) return; const t = this.ctx.currentTime;
+    this.noise(t, { dur: 0.22, v: 0.06, type: 'bandpass', f: 1400, f2: 3200, q: 0.9, a: 0.03 });
+  },
   snap() {                           // something put down in its place: a crisp papery pat and a soft thump
     if (!this.ok()) return; const t = this.ctx.currentTime;
     this.noise(t, { dur: 0.05, v: 0.12, type: 'bandpass', f: 2200, q: 1.2, a: 0.002 }); this.tone(180, t, { type: 'sine', a: 0.003, d: 0.12, v: 0.08, to: 120 });

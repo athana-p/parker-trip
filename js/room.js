@@ -237,6 +237,7 @@ function drawRoom() {
     ART.draw('live.shadow.parker', ctx, x, sy + 1, (isLying() ? 70 : 52) * k * Math.max(0.6, Math.abs(dr.sx)), 6 * k, 1 / (1 + dr.lift / 34));
     drawSprite(sprite(dr.key), x, sy - dr.lift, { sx: dr.sx, scale: k });
   });
+  if (noteOnBed()) { const a = decorAnchor(decorBed(), g); drawNoteAt(ctx, a[0] + 28, a[1] - 14, a[2]); }      // a note waiting on his bed
   ctx.restore();
   // indoor light at dusk / night (over the house only)
   const area = new Path2D(); area.rect(-cam - 20, g.C - 140, R.w + 40, V.H);
@@ -256,7 +257,9 @@ function roomDown(e, x, y) {
 function roomTap(x, y) {
   const R = roomR(), g = roomGeom(), rx = x + ROOMV.cam;
   if (Math.abs(rx - R.door.x) < R.door.w / 2 + 4 && y > g.F0 - R.door.h && y < g.F0 + 6) return leaveRoom();       // the door: back out to the yard
+  if (noteOnBed()) { const b = decorBed(), a = decorAnchor(b, g); if (Math.hypot(rx - a[0] - 28, y - (a[1] - 22)) < 28) return openNote(); }   // his note, on his bed
   const r = decorHit(rx, y, g); if (!r) return;
+  if (r.id === 'book') { ROOMV.wiggle = { id: r.id, t0: TT }; return openBook(); }                                  // his book: open it
   if (isSmall(r.id)) { const id = r.id.slice(3); ROOMV.wiggle = { id: r.id, t0: TT }; SFX.pop(); toastText(`${T('sv.' + id)} · ${T('pc.' + id + '.name')}`, 2200); return; }   // a souvenir: it wiggles and says what it is
   if (r.id === 'bed' && P.present && P.inRoom && !/sleep|nap|stir/.test(P.mode)) return roomBed('lie');         // his bed: come and lie down
 }

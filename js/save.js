@@ -7,9 +7,9 @@ const Clock = {
 };
 const CLOCK_KEY = 'parker-trip-debug-clock';
 
-const SAVE_KEY = 'parker-trip-save', LANG_KEY = 'parker-trip-lang', SAVE_VERSION = 8;
+const SAVE_KEY = 'parker-trip-save', LANG_KEY = 'parker-trip-lang', SAVE_VERSION = 9;
 function defaultSave(now) {
-  return addV8(addV7(addV6(addV5(addV4(addV3(addV2({ v: SAVE_VERSION, createdAt: now, lastSeen: now, dandelions: 0, field: [], nextSpawnAt: now, seq: 0, seenHint: false })))))));
+  return addV9(addV8(addV7(addV6(addV5(addV4(addV3(addV2({ v: SAVE_VERSION, createdAt: now, lastSeen: now, dandelions: 0, field: [], nextSpawnAt: now, seq: 0, seenHint: false }))))))));
 }
 // upgrade older saves step by step here when the format changes (v1 → v2 → …)
 function migrateSave(s) {
@@ -21,6 +21,7 @@ function migrateSave(s) {
   if (s.v === 5) { addV6(s); s.v = 6; }
   if (s.v === 6) { addV7(s); s.v = 7; }
   if (s.v === 7) { addV8(s); s.v = 8; }
+  if (s.v === 8) { addV9(s); s.v = 9; }
   return s;
 }
 function loadSave() { try { return migrateSave(JSON.parse(localStorage.getItem(SAVE_KEY))); } catch (e) { return null; } }
@@ -61,4 +62,16 @@ function addV7(s) {
 //     it is then laid out the house's own way, every souvenir he has on a shelf); furn: furniture he owns ({ id: count }).
 function addV8(s) {
   return Object.assign(s, { decor: null, furn: {}, ...s });
+}
+// v9: "Parker Sees the World" — notes: { got: [{ id, at }], waiting: { id, at, spot } | null, nextAt, allOpen (debug) };
+//     been: the places he has been ({ place: first time }), for the notes that need a trip. Older saves didn't keep
+//     a list of trips, so it starts from every place he sent a card from, brought a souvenir from or met a friend in.
+function addV9(s) {
+  if (!s.notes) s.notes = { got: [], waiting: null, nextAt: Date.now() + (1 + Math.random() * 2) * 864e5, allOpen: false };
+  if (!s.been) {
+    s.been = {}; const mark = (id, at) => { if (id && !s.been[id]) s.been[id] = at || 1; };
+    for (const id in (s.album || {})) mark(id); for (const it of (s.shelf || [])) mark(it.id, it.at); for (const id in (s.albumFriend || {})) mark(id);
+    for (const f in (s.friends || {})) mark(s.friends[f].place, s.friends[f].metAt); mark(s.lastDest);
+  }
+  return s;
 }

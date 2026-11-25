@@ -142,3 +142,13 @@ body { font-family: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsof
 #decorTools { position: absolute; display: flex; gap: 6px; z-index: 5; }
 #decorTools.hidden { display: none; }
 #decorTools .btn { font-size: 13px; padding: 5px 12px; }
+/* his note, opened, and his little book */
+#paperView { position: absolute; inset: 0; z-index: 6; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: rgba(60, 40, 50, 0.38); transition: opacity 0.25s; }
+#paperView.hidden { opacity: 0; pointer-events: none; }
+#paperView.hidden * { pointer-events: none !important; }
+#paperView canvas { touch-action: none; }
+.pv-row { display: flex; align-items: center; gap: 12px; min-height: 40px; }
+.pv-hint { color: #fffaf0; font-size: 14px; text-shadow: 0 1px 2px rgba(60,40,50,.5); min-width: 120px; text-align: center; }
+.pv-prev, .pv-next { font-size: 22px; padding: 2px 14px; }
+.pv-close { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 70px); right: 14px; }
+.book-btn { gap: 6px; align-items: center; }

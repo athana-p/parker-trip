@@ -18,6 +18,7 @@ function buildBar() {
   $('btnYard').prepend(iconCanvas(c => ART.paint('ui.icon.yard', c), 34)); $('btnHouse').prepend(iconCanvas(c => ART.paint('ui.icon.house', c), 34));   // indoors
   $('btnYard').onclick = () => leaveRoom(); $('btnHouse').onclick = () => openPanel('shelf');
   $('btnDecor').prepend(iconCanvas(c => ART.paint('ui.icon.decor', c), 34)); $('btnDecor').onclick = () => startDecor();
+  wirePaperView();
   $('decorDone').onclick = () => endDecor(); $('toolFlip').onclick = () => toolFlip(); $('toolStore').onclick = () => toolStore();
   $('btnAlbum').onclick = () => openPanel('album');
   // top-right: sound on/off and settings, drawn in code like everything else
@@ -112,6 +113,7 @@ function renderMail(body) {
 }
 function renderShelf(body) {
   body.append(houseCard());
+  if (S.furn && S.furn.book) { const b = el('button', 'pill btn wide book-btn'); b.append(iconCanvas(c => { c.translate(0, 16); c.scale(0.8, 0.8); ART.paint('furn.book', c, []); }, 34), document.createTextNode(T('book.title'))); b.onclick = () => openBook(); body.append(b); }
   body.append(el('p', 'note', T('ui.shelf.note')));
   const rows = Math.ceil(DESTS.length / 4), dpr = Math.min(2, window.devicePixelRatio || 1), W = 340, H = 26 + rows * 108, c = document.createElement('canvas');
   c.width = W * dpr; c.height = H * dpr; c.className = 'shelf'; const x = c.getContext('2d'); x.scale(dpr, dpr);
@@ -358,6 +360,10 @@ function buildDebug(force) {
   for (const lv of [1, 2, 3]) { const b = el('button', 'dbg-b', String(lv)); b.onclick = () => { finishHouseBuild(); S.house = lv; S.houseSeen = lv; applyHouse(lv); writeSave(S); LAY = null; buildStatic(TOD); if (UI.panel) renderPanel(); }; hr.append(b); }
   const hb = el('button', 'dbg-b', T('dbg.houseFx')); hb.onclick = () => { if (HOUSEFX.on) return; const lv = houseLevel(), from = lv < HOUSE_MAX ? lv : lv - 1; S.house = from + 1; writeSave(S); startHouseBuild(from, from + 1); }; hr.append(hb);
   const dr = el('button', 'dbg-b', T('dbg.decorReset')); dr.onclick = () => { if (DECO.on) endDecor(); S.decor = null; if (ROOMV.on) decorEnsure(); writeSave(S); }; hr.append(dr);
+  const nr = el('div', 'dbg-row'); nr.append(el('b', '', T('book.title')));
+  const nn = el('button', 'dbg-b', T('dbg.noteNow')); nn.onclick = () => { if (S.notes.waiting) { showToast('dbg.noteWaiting', 2000); return; } S.notes.nextAt = 0; if (!notesTick(Clock.now())) showToast('dbg.noteNone', 2500); }; nr.append(nn);
+  const na = el('button', 'dbg-b', T('dbg.notesOpen')); na.onclick = () => { S.notes.allOpen = true; writeSave(S); showToast('dbg.notesOpenDone', 2000); }; nr.append(na);
+  const nb = el('button', 'dbg-b', T('dbg.notesReset')); nb.onclick = () => { S.notes.got = []; S.notes.waiting = null; S.notes.nextAt = Clock.now() + 864e5; writeSave(S); }; nr.append(nb);
   const hs = el('button', 'dbg-b', T('dbg.houseSniff')); hs.onclick = () => { if (houseLevel() > 1) { S.houseSeen = houseLevel() - 1; writeSave(S); if (P.present) pickNext(); } }; hr.append(hs);
   const ml = el('button', 'dbg-b', T('dbg.melt')); ml.onclick = () => { const m = S.snowman; if (m && !m.twig) { m.meltFrom = Clock.now() - MELT_MS * 0.6; m.melt = 0.6; } }; acts.append(ml);
   const vr = el('div', 'dbg-row'); vr.append(el('b', '', T('dbg.visit')));
@@ -375,6 +381,7 @@ function buildDebug(force) {
   pick('dbg.season', 'season', SEASONS.map(k => [k, T('season.' + k)]));
   pick('dbg.weather', 'kind', [...WEATHER_KINDS.map(k => [k, T('wx.' + k)]), ['heavy', T('wx.heavy')]]);
   d.append(el('div', 'dbg-title', T('dbg.title')), row, acts, dates, fests, wxr, vr, hr, el('div', 'dbg-status'));
+  d.insertBefore(nr, d.querySelector('.dbg-status'));
   window.debugRefresh = () => {
     d.querySelectorAll('[data-sp]').forEach(b => b.classList.toggle('on', +b.dataset.sp === Clock.speed));
     try { localStorage.setItem(CLOCK_KEY, String(Clock.offset)); } catch (e) { }

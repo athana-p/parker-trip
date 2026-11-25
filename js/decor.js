@@ -14,6 +14,7 @@ const DECOR = {
   bed: { kind: 'floor', art: 'furn.bed', name: 'decor.bed' },
   shelfL: { kind: 'wall', art: 'furn.shelf.long', surf: [-74, 74], name: 'decor.shelfL' },
   shelfS: { kind: 'wall', art: 'furn.shelf.short', surf: [-42, 42], name: 'decor.shelfS' },
+  book: { kind: 'small', art: 'furn.book', name: 'book.title' },          // "Parker Sees the World" (comes with his first note)
 };
 const DECOR_START = { bed: 1, shelfL: 4, shelfS: 3 };          // what comes with the cabin
 // each house's own arrangement (yc = height of a wall thing's top below the ceiling)
@@ -76,7 +77,7 @@ function decorValid(r, g = roomGeom(), R = roomR()) {
   if (d.kind === 'floor') { if (rect[0] < 16 || rect[2] > R.w - 16) return false; return !decorItems().some(o => o !== r && o.row === r.row && decorDef(o.id).kind === 'floor' && overlap(rect, decorRect(o, g), 6)); }
   const s = surfaceOf(r, g); if (!s) return false; const x = s.host ? s.host.x + r.dx : r.x;
   if (x < s.x0 - 1 || x > s.x1 + 1) return false;
-  return !decorItems().some(o => o !== r && isSmall(o.id) && o.surf === r.surf && Math.abs(decorAnchor(o, g)[0] - x) < SMALL_GAP - 4);
+  return !decorItems().some(o => o !== r && decorDef(o.id).kind === 'small' && o.surf === r.surf && Math.abs(decorAnchor(o, g)[0] - x) < SMALL_GAP - 4);
 }
 
 // ---------- setting up, checking, putting things away ----------
@@ -88,6 +89,7 @@ function decorDefault(lv) {
   S.decor.items = [];
   for (const [id, p] of DECOR_DEFAULT[lv] || []) if (placedCount(id) < (S.furn[id] || 0)) decorAdd(id, p);
   for (const s of S.shelf) { S.decor.seen[s.id] = true; autoPlaceSmall('sv:' + s.id); }
+  if (S.furn.book) { S.decor.seen.book = true; autoPlaceSmall('book'); }
 }
 // a small thing goes on the first free spot: shelves (top to bottom, left to right), sills, then the back of the floor
 function autoPlaceSmall(id, prefer) {
@@ -111,6 +113,7 @@ function decorEnsure() {
   const g = roomGeom(), R = roomR(); let back = 0;
   for (const kind of ['wall', 'floor', 'small']) for (const r of decorItems().filter(o => decorDef(o.id).kind === kind)) if (!S.decor.items.includes(r)) continue; else if (!decorValid(r, g, R)) { decorRemove(r); back++; }
   for (const s of S.shelf) if (!S.decor.seen[s.id]) { S.decor.seen[s.id] = true; if (!placedCount('sv:' + s.id)) autoPlaceSmall('sv:' + s.id); }   // new souvenirs set themselves out
+  if (S.furn.book && !S.decor.seen.book) { S.decor.seen.book = true; if (!placedCount('book')) autoPlaceSmall('book'); }                      // so does his book
   if (back) toastText(T('decor.back'), 3500);
   writeSave(S);
 }

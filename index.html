@@ -41,6 +41,7 @@
     <div class="sheet-head"><h2 id="panelTitle"></h2><button id="panelClose" class="pill btn" data-i18n="ui.close">关上</button></div>
     <div id="panelBody"></div>
   </section>
+  <div id="paperView" class="hidden" role="dialog"><canvas></canvas><div class="pv-row"><button class="pill btn pv-prev" aria-label="‹">‹</button><span class="pv-hint"></span><button class="pill btn pv-next" aria-label="›">›</button></div><button class="pill btn pv-close" data-i18n="ui.close">关上</button></div>
   <div id="dbg" hidden></div>
 </div>
 <script>
@@ -75,6 +76,8 @@ window.addEventListener('error', e => {
 <script src="js/upgrade.js"></script>
 <script src="js/room.js"></script>
 <script src="js/decor.js"></script>
+<script src="js/notes.js"></script>
+<script src="js/book.js"></script>
 <script src="js/game.js"></script>
 </body>
 </html>

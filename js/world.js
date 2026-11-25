@@ -59,7 +59,7 @@ function endTrip(at) {
     if (toy && f.count >= 2 && !S.toys.includes(toy)) { S.toys.push(toy); S.toyPos[toy] = { ...TOY_SPOTS[toy] }; S.toyNote = { friend: t.friend, toy }; }   // with a little note
   }
   S.homeSay = { dest: t.dest, friend: t.friend || null };     // he says something about it once he's home and awake
-  S.lastDest = t.dest; S.trip = null;
+  S.lastDest = t.dest; S.trip = null; if (!S.been[t.dest]) S.been[t.dest] = at;      // (the notes about a place need him to have been)
   return got;
 }
 function metFriend(id, at) { return S.friends[id] = S.friends[id] || { metAt: at, place: FRIENDS.find(f => f.id === id).place, count: 0, card: false };
