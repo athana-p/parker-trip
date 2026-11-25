@@ -70,8 +70,8 @@ function renderShop(body) {
   }
   body.append(list);
 }
-// the furniture shop (house plan, stage 5): floor things, wall things, wallpapers, floors — and, not for sale, the
-// little visitors' homes (they bring those themselves). Bought furniture sets itself out in his room.
+// the furniture shop (house plan, stage 5): floor things, wall things, wallpapers, floors. The little visitors' homes
+// are never listed: they bring those themselves, as a surprise. Bought furniture sets itself out in his room.
 function furnIcon(id, sz = 52) {
   const c = document.createElement('canvas'), dpr = Math.min(2, window.devicePixelRatio || 1); c.width = c.height = sz * dpr; c.style.width = c.style.height = sz + 'px'; c.className = 'furn-ico';
   const x = c.getContext('2d'), sp = sprite(decorDef(id).key), k = Math.min(sz * 1.5 / sp.w, sz * 1.05 / sp.h) * dpr;
@@ -114,9 +114,6 @@ function renderFurnShop(body) {
     }
     body.append(list);
   }
-  body.append(el('h3', 'shop-sec', T('furn.sec.homes'))); const list = el('div', 'items');
-  for (const [id, pal] of [['sqnest', 'squirrel'], ['catbed', 'cat']]) { const have = !!S.furn[id]; list.append(row(furnIcon(id), T('decor.' + id), capFirst(T('furn.home.' + (have ? 'have' : 'not'), LANG, { who: palWho(pal) })), el('div', 'item-note', T(have ? 'furn.home.in' : 'furn.home.free')), !have)); }
-  body.append(list);
 }
 // which postcard goes in a frame: every card you have, the one in it now marked; or take it out
 function renderFramePick(body) {
