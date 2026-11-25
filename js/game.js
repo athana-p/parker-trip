@@ -124,6 +124,7 @@ function pickNext() {
     for (const k in w) w[k] *= rule.calm;
     for (const k in rule.add) if (k !== 'sunbathe' || tod === 'morning' || tod === 'day') w[k] = rule.add[k];
   }
+  if (!asleep && !company) { const sk = snackToSneak(); if (sk) return sneakSnack(sk); }   // a snack put out while he was away: he gets there first
   const k = P.want && S.toys.includes(P.want) && !asleep ? P.want : pickWeighted(w); P.want = null;
   if (k === 'ball') return playBall(0);
   if (k === 'yarn') return yarnGo(0);
@@ -289,6 +290,7 @@ function updateParker(dt) {
   else if (P.mode === 'chew') { S.toyPos.bone = { x: clamp(P.x + 64 * P.face, 30, 370), d: P.d }; P.hold = null; writeSave(S); setMode('sigh', HABITS.sighTime, { lie: true }); }
   else if (P.mode === 'belly') setMode('sigh', HABITS.sighTime, { lie: true });
   else if (/^cat(boop|bow|side|sun)$/.test(P.mode)) catPlayEnd();
+  else if (P.mode === 'snack') snackDone();
   else if (P.mode === 'headbird') { setMode('wag', HABITS.reactionTime.wag); SFX.pop(); }
   else if (P.mode === 'bubblehop') bubbleNext();
   else if (P.mode === 'yarnbat') yarnAfter();
@@ -495,7 +497,7 @@ function parkerDrawing() {
     case 'watch': key = `parker.stand|calm`; break;
     case 'shake': key = `parker.sit|happy|0|${f % 4 < 2 ? -0.24 : 0.24}|0|duck`; break;
     case 'chew': key = `parker.lie|calm|0|bone|${f % 6 < 3 ? 0.02 : 0.12}`; break;
-    case 'eat': key = `parker.sniff|${Math.floor(f / 2) % 2}`; break;
+    case 'eat': case 'snack': key = `parker.sniff|${Math.floor(f / 2) % 2}`; break;
     case 'admire': key = `parker.sit|happy|${f % 6 < 3 ? 0.2 : -0.12}|-0.3`; break;      // looking up at the new door / window
     case 'expect': key = `parker.sit|${open}|${f % 6 < 3 ? 0.18 : -0.12}|0`; break;
     case 'hop': { const u = clamp((TT - P.t0) / 0.6); lift = 16 * Math.sin(Math.PI * u); key = 'parker.sit|happy|0.1|0'; break; }
@@ -1332,17 +1334,32 @@ function palAnnounce(k, lv) {
 const capFirst = t => t.charAt(0).toUpperCase() + t.slice(1);
 // a dish of snacks in the yard (from the backpack)
 function palNewsOnOpen(at) {
-  const msgs = [...new Set(OFFLINE_ATE)].map(k => () => toastText(capFirst(T_('pal.ateAway').replace('{who}', palWho(k, true)).replace('{what}', T_('item.' + PALS.snack[k] + '.a'))), 4200));
+  const msgs = [...new Set(PARKER_ATE)].map(k => () => parkerAteToast(k));
+  PARKER_ATE.length = 0;
+  msgs.push(...[...new Set(OFFLINE_ATE)].map(k => () => toastText(capFirst(T_('pal.ateAway').replace('{who}', palWho(k, true)).replace('{what}', T_('item.' + PALS.snack[k] + '.a'))), 4200)));
   for (const k of PALS.order) { const up = palLevelUp(k); if (up) msgs.push(() => palAnnounce(k, up)); }
   OFFLINE_ATE.length = 0;
   msgs.forEach((m, i) => setTimeout(m, at + i * 4800));
 }
+// Parker and the snacks: fish and nuts put out while he was away are fair game if he gets home before the visitor
+// does (he never touches the bird seed, nor a snack you put out while he's home).
+function snackToSneak() { return ['cat', 'squirrel'].find(k => S.dishes[k] && S.dishes[k].away && !(VIS.on && VIS.dish === k)) || null; }
+function sneakSnack(k) {
+  const q = S.dishes[k], side = Math.sign(q.x - P.x) || 1;
+  goTo(clamp(q.x - 34 * side, 30, 370), clamp(q.d, 100, 224), () => faceThen(side, () => S.dishes[k] ? setMode('snack', 2.6, { k }) : setMode('sniff', 1.5)));
+}
+function snackDone() {
+  const k = P.data.k, q = S.dishes[k];
+  if (q) { S.dishes[k] = null; writeSave(S); fx({ type: 'glow', x: q.x, y: Y(q.d) - 6, life: 0.7, r: 30, rgb: '255,240,200' }); parkerAteToast(k); }
+  setMode('sigh', HABITS.sighTime, { lie: false });
+}
+function parkerAteToast(k) { toastText(capFirst(T_('pal.parkerAte').replace('{what}', T_('item.' + PALS.snack[k] + '.a'))), 3600); }
 function putDish(id) {
   const k = ITEM[id].pal;
   if (S.dishes[k]) { toastText(capFirst(T_('dish.already').replace('{what}', T_('item.' + id + '.a'))), 2600); return false; }
   if (!(S.inv[id] > 0)) return false;
   const [x0, d0] = DISH_SPOTS[k], [x, d] = giftSpot(x0, d0);
-  S.inv[id]--; S.dishes[k] = { x: Math.round(x), d: Math.round(d), at: Clock.now() }; writeSave(S); tidyField();
+  S.inv[id]--; S.dishes[k] = { x: Math.round(x), d: Math.round(d), at: Clock.now(), away: !P.present || !!S.trip }; writeSave(S); tidyField();
   SFX.pop(); fx({ type: 'glow', x, y: Y(d) - 6, life: 0.9, r: 34, rgb: '255,240,200' });
   toastText(capFirst(T_('dish.put').replace('{what}', T_('item.' + id + '.a')).replace('{who}', palWho(k))), 3600);
   return true;

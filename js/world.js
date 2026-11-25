@@ -59,7 +59,7 @@ function endTrip(at) {
     if (toy && f.count >= 2 && !S.toys.includes(toy)) { S.toys.push(toy); S.toyPos[toy] = { ...TOY_SPOTS[toy] }; S.toyNote = { friend: t.friend, toy }; }   // with a little note
   }
   S.homeSay = { dest: t.dest, friend: t.friend || null };     // he says something about it once he's home and awake
-  S.lastDest = t.dest; S.trip = null; if (!S.been[t.dest]) S.been[t.dest] = at;      // (the notes about a place need him to have been)
+  S.lastDest = t.dest; S.trip = null; S.backAt = at; if (!S.been[t.dest]) S.been[t.dest] = at;      // (the notes about a place need him to have been)
   return got;
 }
 function metFriend(id, at) { return S.friends[id] = S.friends[id] || { metAt: at, place: FRIENDS.find(f => f.id === id).place, count: 0, card: false };
@@ -126,17 +126,22 @@ function offlineVisits(from, to) {
   if (!(hours >= O.minHours)) return 0;
   const slots = Math.max(1, Math.min(O.slots, Math.floor(hours / O.slotHours)));
   const times = [...Array(slots)].map(() => from + Math.random() * (to - from)).sort((a, b) => a - b);
+  const back = S.backAt > from && S.backAt <= to ? S.backAt : null;      // he came home in this time: from then on, fish and nuts left out are his
+  let home = !back;
   for (const t of times) {
+    if (!home && t >= back) { home = true; parkerSnacks(); }
     if (visitorsSleep(t) || weatherAt(t).heavy) continue;
     const who = pickVisitor(t); S.visits[who] = (S.visits[who] || 0) + 1;
     if (dishFor(who, t)) { palEat(who, t); OFFLINE_ATE.push(who); }      // it found the snack you put out
     if (n < O.max && canGift(t) && Math.random() < O.giftChance) { const [x, d] = giftSpot(); dropGift(rollGift(who, t), x, d, t); n++; }
   }
+  if (!home) parkerSnacks();
   writeSave(S);
   return n;
 }
+function parkerSnacks() { for (const k of ['cat', 'squirrel']) if (S.dishes[k] && S.dishes[k].away) { S.dishes[k] = null; PARKER_ATE.push(k); } }
 // ---- getting to know the little visitors (plan 2, stage 2): friendship only grows, and only through snacks ----
-const OFFLINE_ATE = [];                 // who ate a snack while the game was closed (told once on opening)
+const OFFLINE_ATE = [], PARKER_ATE = [];   // …and which snacks Parker got to first                 // who ate a snack while the game was closed (told once on opening)
 const dayKey = t => { const d = new Date(t); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
 function palLv(k) { const p = S.pals && S.pals[k]; return p ? PALS.lv[k].filter(n => p.pts >= n).length : 0; }
 function palHungry(k, t) { const p = S.pals[k]; return (p.day === dayKey(t) ? p.today : 0) < PALS.cap[k]; }
