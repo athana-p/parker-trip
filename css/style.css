@@ -140,7 +140,20 @@ body { font-family: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsof
 .decor-n { position: absolute; top: 3px; right: 5px; font-size: 11px; font-weight: 600; color: #a07a52; }
 .decor-empty { font-size: 13px; color: #8a6a5c; margin: 14px 4px; }
 #decorTools { position: absolute; display: flex; gap: 6px; z-index: 5; }
-#decorTools.hidden { display: none; }
+#decorTools.hidden, #decorTools .btn.hidden { display: none; }
+.decor-tabs { margin: 0 0 6px; }
+.decor-tabs .tab { font-size: 12.5px; padding: 3px 12px; }
+.decor-item.on { box-shadow: 0 0 0 2.5px #f6c96a inset; }
+/* the furniture shop and the postcard frame picker */
+.shop-sec { margin: 14px 2px 4px; font-size: 14px; color: #8a6a5c; }
+.furn-ico { flex: 0 0 auto; border-radius: 12px; background: #fff; }
+.item.soft { opacity: 0.85; }
+.item-note { font-size: 12px; color: #8a6a5c; text-align: right; max-width: 90px; line-height: 1.3; }
+.frame-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 8px; }
+.frame-cell { border: 0; background: #fff; border-radius: 12px; padding: 6px; font: inherit; color: var(--ink); display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.frame-cell canvas { width: 100%; height: auto; border-radius: 4px; }
+.frame-cell.on { box-shadow: 0 0 0 2.5px #f6c96a inset; }
+.frame-cell span { font-size: 12px; }
 #decorTools .btn { font-size: 13px; padding: 5px 12px; }
 /* his note, opened, and his little book */
 #paperView { position: absolute; inset: 0; z-index: 6; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: rgba(60, 40, 50, 0.38); transition: opacity 0.25s; }

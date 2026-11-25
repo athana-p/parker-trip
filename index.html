@@ -34,9 +34,10 @@
   </nav>
   <section id="decor" class="hidden">
     <div class="decor-head"><b data-i18n="ui.room.decor">装修</b><span class="decor-hint" data-i18n="decor.hint"></span><button id="decorDone" class="pill btn" data-i18n="decor.done">完成</button></div>
+    <div id="decorTabs" class="tabs decor-tabs"></div>
     <div id="decorTray" class="decor-tray"></div>
   </section>
-  <div id="decorTools" class="hidden"><button id="toolFlip" class="pill btn" data-i18n="decor.flip">翻转</button><button id="toolStore" class="pill btn" data-i18n="decor.store">收起</button></div>
+  <div id="decorTools" class="hidden"><button id="toolCard" class="pill btn" data-i18n="decor.card">明信片</button><button id="toolFlip" class="pill btn" data-i18n="decor.flip">翻转</button><button id="toolStore" class="pill btn" data-i18n="decor.store">收起</button></div>
   <section id="panel" class="sheet hidden" role="dialog" aria-labelledby="panelTitle">
     <div class="sheet-head"><h2 id="panelTitle"></h2><button id="panelClose" class="pill btn" data-i18n="ui.close">关上</button></div>
     <div id="panelBody"></div>
@@ -76,6 +77,7 @@ window.addEventListener('error', e => {
 <script src="js/upgrade.js"></script>
 <script src="js/room.js"></script>
 <script src="js/decor.js"></script>
+<script src="js/furn.js"></script>
 <script src="js/notes.js"></script>
 <script src="js/book.js"></script>
 <script src="js/homes.js"></script>

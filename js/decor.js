@@ -17,7 +17,18 @@ const DECOR = {
   book: { kind: 'small', art: 'furn.book', name: 'book.title' },          // "Parker Sees the World" (comes with his first note)
   sqnest: { kind: 'floor', art: 'furn.sqnest', name: 'decor.sqnest' },    // the visitors' homes (they come when one moves in)
   catbed: { kind: 'floor', art: 'furn.catbed', name: 'decor.catbed' },
+  // the furniture shop (stage 5). flat: lies on the floor (other things may stand on it); top: how high its surf is
+  rug: { kind: 'floor', art: 'furn.rug', name: 'decor.rug', flat: true, rows: [1, 2, 0] },
+  cushion: { kind: 'floor', art: 'furn.cushion', name: 'decor.cushion', rows: [1, 2, 0] },
+  plant: { kind: 'floor', art: 'furn.plant', name: 'decor.plant' },
+  floorlamp: { kind: 'floor', art: 'furn.floorlamp', name: 'decor.floorlamp', glow: 120 },
+  lowtable: { kind: 'floor', art: 'furn.lowtable', name: 'decor.lowtable', surf: [-36, 36], top: 33 },
+  bookcase: { kind: 'floor', art: 'furn.bookcase', name: 'decor.bookcase', surf: [-26, 26], top: 112 },
+  clock: { kind: 'wall', art: 'furn.clock', name: 'decor.clock', noFlip: true },
+  tapestry: { kind: 'wall', art: 'furn.tapestry', name: 'decor.tapestry' },
+  frame: { kind: 'wall', art: 'furn.frame', name: 'decor.frame', noFlip: true },     // r.pc = the postcard in it
 };
+const SHOP_FURN = ['rug', 'cushion', 'plant', 'floorlamp', 'lowtable', 'bookcase', 'clock', 'tapestry', 'frame'];
 const DECOR_START = { bed: 1, shelfL: 4, shelfS: 3 };          // what comes with the cabin
 // each house's own arrangement (yc = height of a wall thing's top below the ceiling)
 const DECOR_DEFAULT = {
@@ -32,6 +43,13 @@ const decorDef = id => isSmall(id) ? { kind: 'small', art: 'souvenir.' + id.slic
 const decorItems = () => (S.decor && S.decor.items) || [];
 const decorByUid = uid => decorItems().find(r => r.uid === uid);
 const placedCount = id => decorItems().filter(r => r.id === id).length;
+const decorKey = r => r.id === 'frame' ? 'furn.frame|' + (r.pc || '') : decorDef(r.id).key;      // a frame's picture depends on its card
+// the top of a thing that takes small things: a wall shelf (by its height on the wall) or a table / bookcase (by its row)
+function hostSurf(h, g) {
+  const d = decorDef(h.id);
+  if (d.kind === 'wall') return { y: g.C + h.yc, host: h, x0: h.x + d.surf[0], x1: h.x + d.surf[1] };
+  const k = ROW_K[h.row]; return { y: g.rows[h.row] - d.top * k, host: h, row: h.row, x0: h.x + d.surf[0] * k, x1: h.x + d.surf[1] * k };
+}
 
 // ---------- where things are ----------
 function decorAnchor(r, g) {
@@ -50,14 +68,14 @@ function decorRect(r, g, a = decorAnchor(r, g)) {
 function decorSurfaces(g, R, skipUid) {
   const out = [0, 1, 2].map(i => ({ key: 'row:' + i, x0: 26, x1: R.w - 26, y: g.rows[i], row: i }));
   R.windows.forEach((w, i) => out.push({ key: 'sill:' + i, x0: w.x - w.w / 2 + 4, x1: w.x + w.w / 2 - 4, y: g.C + w.top + w.h + 6 }));
-  for (const h of decorItems()) { const d = decorDef(h.id); if (d.surf && h.uid !== skipUid) out.push({ key: 'on:' + h.uid, x0: h.x + d.surf[0], x1: h.x + d.surf[1], y: g.C + h.yc, host: h }); }
+  for (const h of decorItems()) { const d = decorDef(h.id); if (d.surf && h.uid !== skipUid) out.push({ key: 'on:' + h.uid, ...hostSurf(h, g) }); }
   return out;
 }
 function surfaceOf(r, g) {
   const R = roomR(), k = r.surf || '';
   if (k.startsWith('row:')) { const i = +k.slice(4); return { y: g.rows[i], row: i, x0: 26, x1: R.w - 26 }; }
   if (k.startsWith('sill:')) { const w = R.windows[+k.slice(5)]; return w ? { y: g.C + w.top + w.h + 6, x0: w.x - w.w / 2 + 4, x1: w.x + w.w / 2 - 4 } : null; }
-  if (k.startsWith('on:')) { const h = decorByUid(+k.slice(3)); if (!h) return null; const d = decorDef(h.id); return { y: g.C + h.yc, host: h, x0: h.x + d.surf[0], x1: h.x + d.surf[1] }; }
+  if (k.startsWith('on:')) { const h = decorByUid(+k.slice(3)); return h ? hostSurf(h, g) : null; }
   return null;
 }
 // the door and the windows (with their frames, curtains and sills) must stay clear
@@ -66,6 +84,7 @@ function decorBlocks(g, R) {
   for (const w of R.windows) out.push([w.x - w.w / 2 - 18, g.C + w.top - 12, w.x + w.w / 2 + 18, g.C + w.top + w.h + 14]);
   return out;
 }
+const onWallShelf = o => { const k = o.surf || ''; if (!k.startsWith('on:')) return false; const h = decorByUid(+k.slice(3)); return !!h && decorDef(h.id).kind === 'wall'; };
 const overlap = (a, b, m = 0) => a[0] < b[2] - m && b[0] < a[2] - m && a[1] < b[3] - m && b[1] < a[3] - m;
 function decorValid(r, g = roomGeom(), R = roomR()) {
   const d = decorDef(r.id), rect = decorRect(r, g); if (!rect) return false;
@@ -74,11 +93,17 @@ function decorValid(r, g = roomGeom(), R = roomR()) {
   if (d.kind === 'wall') {
     if (rect[0] < 16 || rect[2] > R.w - 16 || rect[1] < g.C + 10 || rect[3] > g.F0 - 12) return false;
     if (decorItems().some(o => o !== r && decorDef(o.id).kind === 'wall' && overlap(rect, decorRect(o, g), 2))) return false;
+    if (!d.surf && decorItems().some(o => onWallShelf(o) && overlap(rect, decorRect(o, g), 2))) return false;      // a frame, a clock… doesn't cover what stands on a shelf
     return !decorItems().some(o => o.surf === 'on:' + r.uid && !decorValid(o, g, R));     // and what stands on it must fit too
   }
-  if (d.kind === 'floor') { if (rect[0] < 16 || rect[2] > R.w - 16) return false; return !decorItems().some(o => o !== r && o.row === r.row && decorDef(o.id).kind === 'floor' && overlap(rect, decorRect(o, g), 6)); }
+  if (d.kind === 'floor') {           // a rug may lie under things; things in the same row don't overlap
+    if (rect[0] < 16 || rect[2] > R.w - 16) return false;
+    if (decorItems().some(o => o !== r && o.row === r.row && decorDef(o.id).kind === 'floor' && !decorDef(o.id).flat === !d.flat && overlap(rect, decorRect(o, g), 6))) return false;
+    return !decorItems().some(o => o.surf === 'on:' + r.uid && !decorValid(o, g, R));
+  }
   const s = surfaceOf(r, g); if (!s) return false; const x = s.host ? s.host.x + r.dx : r.x;
   if (x < s.x0 - 1 || x > s.x1 + 1) return false;
+  if (onWallShelf(r) && decorItems().some(o => !decorDef(o.id).surf && decorDef(o.id).kind === 'wall' && overlap(rect, decorRect(o, g), 2))) return false;
   return !decorItems().some(o => o !== r && decorDef(o.id).kind === 'small' && o.surf === r.surf && Math.abs(decorAnchor(o, g)[0] - x) < SMALL_GAP - 4);
 }
 
@@ -88,8 +113,10 @@ function decorRemove(r) {           // back to the tray, with everything that si
   S.decor.items = S.decor.items.filter(o => o !== r && !(o.surf === 'on:' + r.uid));
 }
 function decorDefault(lv) {
+  const cards = decorItems().filter(r => r.id === 'frame' && r.pc).map(r => r.pc);
   S.decor.items = [];
   for (const [id, p] of DECOR_DEFAULT[lv] || []) if (placedCount(id) < (S.furn[id] || 0)) decorAdd(id, p);
+  for (const id of SHOP_FURN) for (let n = placedCount(id); n < (S.furn[id] || 0); n++) { const r = autoPlaceFurn(id); if (!r) break; if (id === 'frame' && cards.length) r.pc = cards.shift(); }   // what you bought finds a spot
   for (const s of S.shelf) { S.decor.seen[s.id] = true; autoPlaceSmall('sv:' + s.id); }
   if (S.furn.book) { S.decor.seen.book = true; autoPlaceBook(); }
   for (const id of ['sqnest', 'catbed']) if (S.furn[id]) { S.decor.seen[id] = true; autoPlaceFloor(id); }
@@ -123,7 +150,7 @@ function autoPlaceBook() {
 // a floor thing finds itself a free spot: the back row first, from the middle of the room outwards
 function autoPlaceFloor(id) {
   const g = roomGeom(), R = roomR(), mid = R.w / 2;
-  for (const row of [0, 1, 2]) for (let d = 0; d < R.w / 2; d += 12) for (const x of d ? [mid + d, mid - d] : [mid]) if (decorValid({ uid: -1, id, x, row }, g, R)) return decorAdd(id, { x, row });
+  for (const row of DECOR[id].rows || [0, 1, 2]) for (let d = 0; d < R.w / 2; d += 12) for (const x of d ? [mid + d, mid - d] : [mid]) if (decorValid({ uid: -1, id, x, row }, g, R)) return decorAdd(id, { x, row });
   return null;
 }
 function decorEnsure() {
@@ -147,6 +174,18 @@ function decorTray() {
   for (const s of S.shelf) if (!placedCount('sv:' + s.id)) out.push({ id: 'sv:' + s.id, n: 1 });
   return out;
 }
+// furniture from the shop sets itself out somewhere free (floor things from the middle outwards; wall things high up first)
+function autoPlaceFurn(id, mid) {
+  const d = decorDef(id); if (d.kind === 'floor' && mid == null) return autoPlaceFloor(id);
+  return findSpot(id, mid == null ? roomR().w / 2 : mid);
+}
+function findSpot(id, mid) {
+  const g = roomGeom(), R = roomR(), d = decorDef(id), xs = [];
+  for (let k = 0; k < 60; k++) xs.push(mid + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 14);
+  const tries = d.kind === 'floor' ? (d.rows || [1, 0, 2]).flatMap(row => xs.map(x => ({ x, row }))) : [110, 90, 130, 70, 150, 170, 50, 190, 210, 230, 30].flatMap(yc => xs.map(x => ({ x, yc })));
+  for (const p of tries) if (decorValid({ uid: -1, id, ...p }, g, R)) return decorAdd(id, p);
+  return null;
+}
 function decorBed() { return decorItems().find(r => r.id === 'bed') || null; }
 
 // ---------- drawing (called by drawRoom, camera already applied) ----------
@@ -154,18 +193,20 @@ function drawDecorScene(g, R, drawParker) {
   const items = decorItems(), held = DECO.held && DECO.held.rec, put = (r) => {
     if (r === held) return; const a = decorAnchor(r, g); if (!a) return; const d = decorDef(r.id);
     const sn = DECO.snap && DECO.snap.uid === r.uid ? [1.08, 0.96, 1][Math.min(2, Math.floor((TT - DECO.snap.t0) * 12))] : 1;
-    const wig = ROOMV.wiggle && ROOMV.wiggle.id === r.id ? Math.sin((TT - ROOMV.wiggle.t0) * 24) * 0.12 * clamp(1 - (TT - ROOMV.wiggle.t0) / 0.6) : 0;
+    const wig = ROOMV.wiggle && (ROOMV.wiggle.uid ? ROOMV.wiggle.uid === r.uid : ROOMV.wiggle.id === r.id) ? Math.sin((TT - ROOMV.wiggle.t0) * 24) * 0.12 * clamp(1 - (TT - ROOMV.wiggle.t0) / 0.6) : 0;
     if (isSmall(r.id)) { const s = S.shelf.find(q => 'sv:' + q.id === r.id); if (s && s.isNew) ART.draw('fx.glow', ctx, a[0], a[1] - 16, 30, '255,236,170', 0.5 + 0.15 * Math.sin(TT * 2)); }
-    drawSprite(sprite(d.key), a[0], a[1], { sx: r.f ? -1 : 1, scale: a[2] * sn, rot: wig, shA: d.kind === 'wall' ? 0.25 : 0.2 });
+    drawSprite(sprite(decorKey(r)), a[0], a[1], { sx: r.f && !d.noFlip ? -1 : 1, scale: a[2] * sn, rot: wig, shA: d.flat ? 0.12 : d.kind === 'wall' ? 0.25 : 0.2 });
     if (r.id === 'catbed' || r.id === 'sqnest') drawHomeOverlay(r, a);           // who lives in it (js/homes.js)
+    if (r.id === 'clock' && !wig) ART.draw('live.clockHands', ctx, a[0] + CLOCK_C[0] * a[2] * sn, a[1] + CLOCK_C[1] * a[2] * sn, a[2] * sn, new Date(Clock.now()));      // the real time
     if (DECO.on && DECO.sel === r) { const rc = decorRect(r, g, a); ctx.save(); ctx.setLineDash([4, 3]); ctx.strokeStyle = 'rgba(255,250,235,0.95)'; ctx.lineWidth = 1.6; ctx.strokeRect(rc[0] - 3, rc[1] - 3, rc[2] - rc[0] + 6, rc[3] - rc[1] + 6); ctx.restore(); }
     for (const o of items) if (o.surf === 'on:' + r.uid) put(o);          // what sits on it
   };
   for (const r of items) if (decorDef(r.id).kind === 'wall') put(r);
   for (const r of items) if ((r.surf || '').startsWith('sill:')) put(r);
   const prow = P.inRoom && P.present ? (P.onBed && decorBed() ? decorBed().row : 1) : -1;
+  for (let row = 0; row < 3; row++) for (const r of items) if (decorDef(r.id).flat && r.row === row) put(r);     // rugs lie under everything
   for (let row = 0; row < 3; row++) {
-    for (const r of items.filter(o => decorDef(o.id).kind === 'floor' && o.row === row).sort((a, b) => a.x - b.x)) put(r);
+    for (const r of items.filter(o => decorDef(o.id).kind === 'floor' && !decorDef(o.id).flat && o.row === row).sort((a, b) => a.x - b.x)) put(r);
     for (const r of items) if (r.surf === 'row:' + row) put(r);
     if (row === prow) drawParker(row);
     if (HOMEV.run && HOMEV.run.row === row) drawHomeRun(g);
@@ -177,11 +218,11 @@ function drawDecorScene(g, R, drawParker) {
   }
   if (held) {                          // the thing in your hand: a little bigger, a deeper shadow, see-through where it can't go
     const a = DECO.held.free || decorAnchor(held, g); if (!a) return;
-    const d = decorDef(held.id), sp = sprite(d.key);
+    const d = decorDef(held.id), sp = sprite(decorKey(held));
     ctx.save(); ctx.globalAlpha = DECO.held.ok ? 1 : 0.5;
     ART.draw('live.shadow.parker', ctx, a[0], a[1] + 10, 40 * a[2] * d.k * (d.kind === 'small' ? 0.6 : 1.4), 6, 0.9);
-    drawSprite(sp, a[0], a[1] - 8, { sx: held.f ? -1 : 1, scale: a[2] * 1.08, shA: 0.45 });
-    for (const o of items) if (o.surf === 'on:' + held.uid) { const b = decorAnchor(o, g); if (b) drawSprite(sprite(decorDef(o.id).key), b[0], b[1] - 8, { sx: o.f ? -1 : 1, scale: 1.08 }); }
+    drawSprite(sp, a[0], a[1] - 8, { sx: held.f && !d.noFlip ? -1 : 1, scale: a[2] * 1.08, shA: 0.45 });
+    for (const o of items) if (o.surf === 'on:' + held.uid) { const b = decorAnchor(o, g); if (b) drawSprite(sprite(decorKey(o)), b[0], b[1] - 8, { sx: o.f ? -1 : 1, scale: b[2] * 1.08 }); }
     ctx.restore();
   }
 }
@@ -189,6 +230,7 @@ function drawDecorScene(g, R, drawParker) {
 function decorHit(rx, y, g = roomGeom()) {
   const items = decorItems(), order = [];
   for (let row = 2; row >= 0; row--) { for (const r of items) if (r.surf === 'row:' + row) order.push(r); for (const r of items.filter(o => decorDef(o.id).kind === 'floor' && o.row === row)) { for (const o of items) if (o.surf === 'on:' + r.uid) order.push(o); order.push(r); } }
+  order.sort((a, b) => !!decorDef(a.id).flat - !!decorDef(b.id).flat);       // rugs last: anything standing on one is picked first
   for (const r of items) if ((r.surf || '').startsWith('sill:')) order.push(r);
   for (const r of items.filter(o => decorDef(o.id).kind === 'wall')) { for (const o of items) if (o.surf === 'on:' + r.uid) order.push(o); order.push(r); }
   return order.find(r => { const rc = decorRect(r, g); return rc && rx > rc[0] - 4 && rx < rc[2] + 4 && y > rc[1] - 4 && y < rc[3] + 4; }) || null;
@@ -271,9 +313,48 @@ function decorDrop(x, y) {
   renderTray(); writeSave(S);
 }
 
+// ---------- the furniture shop (stage 5) ----------
+// bought: it sets itself out in his room if there's a free spot, else it waits in the tray. → 'placed' | 'tray' | 'later'
+function furnBought(id) {
+  if (houseLevel() < 2) return 'later';
+  decorEnsure();
+  const r = placedCount(id) < (S.furn[id] || 0) ? autoPlaceFurn(id) : decorItems().filter(o => o.id === id).pop();
+  if (r && P.inRoom && P.present && decorDef(id).kind !== 'wall') P.newThing = r.uid;      // (stage 6: he'll come and sniff it)
+  writeSave(S); if (DECO.on) renderTray();
+  return r ? 'placed' : 'tray';
+}
+// the wallpaper / floor: a style you own, or 'base' (the house's own). Indoors the room changes behind a puff of paper.
+const lookOwned = (kind, st) => st === 'base' || !!S.furn[kind + ':' + st];
+const lookOn = kind => (S.roomLook && S.roomLook[kind]) || 'base';
+function setLook(kind, st) {
+  if (!lookOwned(kind, st)) return;
+  const go = () => { S.roomLook = S.roomLook || { wall: null, floor: null }; S.roomLook[kind] = st === 'base' ? null : st; writeSave(S); if (DECO.on) renderTray(); };
+  SFX.paper(3); if (ROOMV.on && !ROOMV.trans) roomTransition(go); else go();
+}
+// a postcard frame: the cards you can put in it (places, festivals, friends you met), its name, and the picker
+function frameCards() {
+  const out = [];
+  for (const d of DESTS) if (S.album[d.id]) { const fr = S.albumFriend[d.id]; if (!fr || S.albumSolo[d.id]) out.push(d.id + '~~'); if (fr) out.push(d.id + '~~' + fr); }
+  for (const f of FESTIVALS) { const ys = (S.festAlbum[f.id] || []).slice().sort(); for (const y of ys) out.push(festCard(f.id) + '~' + y + '~'); }
+  for (const f of FRIENDS) if (S.friends[f.id] && S.friends[f.id].card) out.push('meet-' + f.id + '~~');
+  return out;
+}
+function frameCardName(pc) {
+  const [id, y] = pc.split('~');
+  return id.startsWith('fest-') ? T('fest.' + id.slice(5)) + ' ' + y : T('pc.' + id + '.name');
+}
+function framePick(r) { if (!r) return; UI.frameUid = r.uid; openPanel('frame'); }
+function frameSet(uid, pc) {
+  const r = decorByUid(uid); if (!r) return;
+  r.pc = pc || ''; S.decor.custom = true; DECO.snap = { uid: r.uid, t0: TT }; SFX.snap(); writeSave(S);
+}
+
 // ---------- the tray and the tools ----------
 function renderTray() {
   const box = document.getElementById('decorTray'); if (!box) return; box.innerHTML = '';
+  const tabs = document.getElementById('decorTabs');
+  if (tabs) { tabs.innerHTML = ''; for (const t of ['things', 'wall', 'floor']) { const b = el('button', 'tab' + ((DECO.tab || 'things') === t ? ' on' : ''), T('decor.tab.' + t)); b.onclick = () => { DECO.tab = t; DECO.sel = null; placeTools(); renderTray(); }; tabs.append(b); } }
+  if (DECO.tab === 'wall' || DECO.tab === 'floor') return renderLooks(box, DECO.tab);
   const list = decorTray();
   if (!list.length) { box.append(el('p', 'decor-empty', T('decor.empty'))); return; }
   for (const it of list) {
@@ -286,6 +367,24 @@ function renderTray() {
     trayItemInput(b, it.id);
     box.append(b);
   }
+}
+// the wallpapers / floors you own: tap one to put it on
+function lookSwatch(kind, st, sz) {
+  const c = document.createElement('canvas'), dpr = Math.min(2, window.devicePixelRatio || 1); c.width = c.height = sz * dpr; c.style.width = c.style.height = sz + 'px';
+  const x = c.getContext('2d'), R = ROOMS[Math.max(2, houseLevel())], k = sz * dpr / 104;
+  x.scale(k, k); x.beginPath(); x.rect(0, 0, 104, 104); x.clip();
+  if (kind === 'wall') ART.paint('room.wall', x, st === 'base' ? R.wall : st, 0, -40, 104, 144); else ART.paint('room.floor', x, st === 'base' ? R.floor : st, -6, 0, 116, 104);
+  return c;
+}
+function renderLooks(box, kind) {
+  const mine = LOOKS[kind].filter(st => lookOwned(kind, st));
+  for (const st of mine) {
+    const b = el('button', 'decor-item' + (lookOn(kind) === st ? ' on' : ''));
+    b.append(lookSwatch(kind, st, 52), el('span', 'decor-name', T('look.' + kind + '.' + st)));
+    b.onclick = () => { if (lookOn(kind) !== st) setLook(kind, st); };
+    box.append(b);
+  }
+  if (mine.length < 2) box.append(el('p', 'decor-empty', T('decor.looks.none')));
 }
 // a tap puts it somewhere free in view; pulling it up out of the tray lets you place it yourself
 function trayItemInput(b, id) {
@@ -308,13 +407,7 @@ function trayPull(id, e) {
 }
 function trayTap(id) {
   const g = roomGeom(), R = roomR(), d = decorDef(id), mid = ROOMV.cam + SCENE_W / 2;
-  let r = null;
-  if (d.kind === 'small') r = autoPlaceSmall(id);
-  else {
-    const xs = []; for (let k = 0; k < 40; k++) xs.push(mid + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 14);
-    const tries = d.kind === 'floor' ? [1, 0, 2].flatMap(row => xs.map(x => ({ x, row }))) : [70, 150, 230, 30].flatMap(yc => xs.map(x => ({ x, yc })));
-    for (const p of tries) { const t = { uid: -1, id, ...p }; if (decorValid(t, g, R)) { r = decorAdd(id, p); break; } }
-  }
+  const r = d.kind === 'small' ? autoPlaceSmall(id) : findSpot(id, mid);
   if (!r) { toastText(T('decor.noRoom'), 2400); return; }
   S.decor.custom = true; DECO.snap = { uid: r.uid, t0: TT }; SFX.snap(); renderTray(); writeSave(S);
   const a = decorAnchor(r, g); if (a && (a[0] < ROOMV.cam + 20 || a[0] > ROOMV.cam + SCENE_W - 20)) ROOMV.cam = clamp(a[0] - SCENE_W / 2, 0, R.w - SCENE_W);
@@ -325,9 +418,12 @@ function placeTools() {
   const r = DECO.on && DECO.sel; if (!r || !decorItems().includes(r)) { t.classList.add('hidden'); return; }
   const rc = decorRect(r, roomGeom()), c = cv.getBoundingClientRect(), k = c.width / SCENE_W;
   t.classList.remove('hidden');
+  document.getElementById('toolFlip').classList.toggle('hidden', !!decorDef(r.id).noFlip);       // a clock or a postcard would read backwards
+  document.getElementById('toolCard').classList.toggle('hidden', r.id !== 'frame');
   t.style.left = clamp(((rc[0] + rc[2]) / 2 - ROOMV.cam) * k - t.offsetWidth / 2, 6, c.width - t.offsetWidth - 6) + 'px';
   t.style.top = Math.max(60, rc[1] * k - t.offsetHeight - 8) + 'px';
 }
+function toolCard() { const r = DECO.sel; if (r && r.id === 'frame') framePick(r); }
 function toolFlip() { const r = DECO.sel; if (!r) return; r.f = r.f ? 0 : 1; S.decor.custom = true; DECO.snap = { uid: r.uid, t0: TT }; SFX.paper(3); writeSave(S); }
 function toolStore() { const r = DECO.sel; if (!r) return; if (P.onBed && r.id === 'bed') { P.onBed = false; pickNext(); } decorRemove(r); DECO.sel = null; S.decor.custom = true; SFX.flutter(0.6); renderTray(); placeTools(); writeSave(S); }
 

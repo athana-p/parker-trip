@@ -20,7 +20,15 @@ const ITEMS = [
   { id: 'temari', cat: 'toy', friend: 'kinako' },
 ];
 const ITEM = Object.fromEntries(ITEMS.map(i => [i.id, i]));
-const CATS = ['food', 'charm', 'toy', 'snack'];
+const CATS = ['food', 'charm', 'toy', 'snack', 'furn'];
+// the furniture shop (house plan, stage 5): things for his room (cabin and big house). max = how many you can have of
+// each (the short shelf counts the three that come with the cabin). Wallpapers and floors: the house's own is free.
+const FURN_SHOP = [
+  { id: 'rug', price: 20, max: 2 }, { id: 'cushion', price: 16, max: 3 }, { id: 'plant', price: 14, max: 4 },
+  { id: 'floorlamp', price: 26, max: 2 }, { id: 'lowtable', price: 24, max: 2 }, { id: 'bookcase', price: 36, max: 2 },
+  { id: 'clock', price: 20, max: 1 }, { id: 'tapestry', price: 18, max: 2 }, { id: 'shelfS', price: 16, max: 8 }, { id: 'frame', price: 10, max: 12 },
+];
+const LOOKS = { wall: ['base', 'stripe', 'gingham', 'paw'], floor: ['base', 'herring', 'checker', 'terra'], price: 18 };
 
 // real places; ★ rare ones are more likely with a charm
 const DESTS = [

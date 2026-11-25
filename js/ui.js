@@ -19,7 +19,7 @@ function buildBar() {
   $('btnYard').onclick = () => leaveRoom(); $('btnHouse').onclick = () => openPanel('shelf');
   $('btnDecor').prepend(iconCanvas(c => ART.paint('ui.icon.decor', c), 34)); $('btnDecor').onclick = () => startDecor();
   wirePaperView();
-  $('decorDone').onclick = () => endDecor(); $('toolFlip').onclick = () => toolFlip(); $('toolStore').onclick = () => toolStore();
+  $('decorDone').onclick = () => endDecor(); $('toolFlip').onclick = () => toolFlip(); $('toolCard').onclick = () => toolCard(); $('toolStore').onclick = () => toolStore();
   $('btnAlbum').onclick = () => openPanel('album');
   // top-right: sound on/off and settings, drawn in code like everything else
   const drawMute = () => { const b = $('muteBtn'); b.innerHTML = ''; b.append(iconCanvas(c => ART.paint('ui.icon.sound', c, SFX.muted), 26)); b.setAttribute('aria-label', T(SFX.muted ? 'ui.soundOff' : 'ui.soundOn')); };
@@ -42,9 +42,9 @@ function closePanel() {
 }
 function renderPanel() {
   const body = $('panelBody'); body.innerHTML = '';
-  const titles = { shop: 'ui.shop', pack: 'ui.pack', mail: 'ui.mail', shelf: 'ui.shelf', album: 'ui.album', settings: 'ui.settings', gifts: 'ui.gifts' };
+  const titles = { shop: 'ui.shop', pack: 'ui.pack', mail: 'ui.mail', shelf: 'ui.shelf', album: 'ui.album', settings: 'ui.settings', gifts: 'ui.gifts', frame: 'frame.title' };
   $('panelTitle').textContent = T(titles[UI.panel]);
-  ({ shop: renderShop, pack: renderPack, mail: renderMail, shelf: renderShelf, album: renderAlbum, settings: renderSettings, gifts: renderGifts })[UI.panel](body);
+  ({ shop: renderShop, pack: renderPack, mail: renderMail, shelf: renderShelf, album: renderAlbum, settings: renderSettings, gifts: renderGifts, frame: renderFramePick })[UI.panel](body);
 }
 function refreshCoins() { shown = S.dandelions; updateHUD(false); }
 
@@ -52,6 +52,7 @@ function renderShop(body) {
   const tabs = el('div', 'tabs');
   for (const c of CATS) { const b = el('button', 'tab' + (UI.cat === c ? ' on' : ''), T('ui.cat.' + c)); b.onclick = () => { UI.cat = c; renderPanel(); }; tabs.append(b); }
   body.append(tabs);
+  if (UI.cat === 'furn') return renderFurnShop(body);
   const list = el('div', 'items');
   for (const it of ITEMS.filter(i => i.cat === UI.cat && !i.friend)) {
     const row = el('div', 'item'), owned = it.cat === 'toy' && S.toys.includes(it.id), have = S.inv[it.id] || 0;
@@ -68,6 +69,71 @@ function renderShop(body) {
     row.append(itemIcon(it.id), txt, right); list.append(row);
   }
   body.append(list);
+}
+// the furniture shop (house plan, stage 5): floor things, wall things, wallpapers, floors — and, not for sale, the
+// little visitors' homes (they bring those themselves). Bought furniture sets itself out in his room.
+function furnIcon(id, sz = 52) {
+  const c = document.createElement('canvas'), dpr = Math.min(2, window.devicePixelRatio || 1); c.width = c.height = sz * dpr; c.style.width = c.style.height = sz + 'px'; c.className = 'furn-ico';
+  const x = c.getContext('2d'), sp = sprite(decorDef(id).key), k = Math.min(sz * 1.5 / sp.w, sz * 1.05 / sp.h) * dpr;
+  x.drawImage(sp.img, (sz * dpr - sp.w * k) / 2, (sz * dpr - sp.h * k) / 2, sp.w * k, sp.h * k); return c;
+}
+function renderFurnShop(body) {
+  const room = houseLevel() >= 2;
+  if (!room) body.append(el('p', 'note', T('furn.noHouse')));
+  const row = (ico, name, desc, right, soft) => { const r = el('div', 'item' + (soft ? ' soft' : '')), txt = el('div', 'item-text'); txt.append(el('div', 'item-name', name)); if (desc) txt.append(el('div', 'item-desc', desc)); r.append(ico, txt, right); return r; };
+  const priceBtn = (price, label, onBuy, disabled) => {
+    const right = el('div', 'item-buy'), pr = el('span', 'price'); pr.append(coinMini(), document.createTextNode(price));
+    if (!room) { right.append(pr); return right; }                     // no room yet: just the price
+    const b = el('button', 'pill btn buy', label); b.disabled = !!disabled; if (!disabled && S.dandelions < price) b.classList.add('poor');
+    b.onclick = () => { if (S.dandelions < price) { showToast('ui.notEnough', 2000); return; } onBuy(); };
+    right.append(pr, b); return right;
+  };
+  const sec = (key, ids) => {
+    body.append(el('h3', 'shop-sec', T(key))); const list = el('div', 'items');
+    for (const it of FURN_SHOP.filter(f => ids.includes(f.id))) {
+      const have = S.furn[it.id] || 0, full = have >= it.max, txt = T('decor.' + it.id + '.d') + (have ? '　' + T('ui.have', LANG, { n: have }) : '');
+      list.append(row(furnIcon(it.id), T('decor.' + it.id), txt, priceBtn(it.price, full ? T('furn.full') : T('ui.buy'), () => {
+        S.dandelions -= it.price; S.furn[it.id] = have + 1; refreshCoins(); SFX.paper(2);
+        const where = furnBought(it.id), nm = T('decor.' + it.id);
+        toastText(it.id === 'frame' && where === 'placed' ? T('furn.frameHint') : T('furn.' + where, LANG, { name: nm }), 3200); writeSave(S); renderPanel();
+      }, !room || full)));
+    }
+    body.append(list);
+  };
+  sec('furn.sec.floor', ['rug', 'cushion', 'plant', 'floorlamp', 'lowtable', 'bookcase']);
+  sec('furn.sec.wall', ['clock', 'tapestry', 'shelfS', 'frame']);
+  for (const kind of ['wall', 'floor']) {
+    body.append(el('h3', 'shop-sec', T('furn.sec.' + kind + 'look'))); const list = el('div', 'items');
+    for (const st of LOOKS[kind]) {
+      const own = lookOwned(kind, st), on = room && lookOn(kind) === st, ico = lookSwatch(kind, st, 52); ico.className = 'furn-ico';
+      let right;
+      if (own && !room) right = el('div', 'item-buy');
+      else if (own) { right = el('div', 'item-buy'); const b = el('button', 'pill btn buy', on ? T('look.on') : T('look.use')); b.disabled = on || !room; b.onclick = () => { setLook(kind, st); toastText(T('look.changed'), 2600); renderPanel(); }; right.append(b); }
+      else right = priceBtn(LOOKS.price, T('ui.buy'), () => { S.dandelions -= LOOKS.price; S.furn[kind + ':' + st] = 1; refreshCoins(); setLook(kind, st); toastText(T('look.changed'), 2600); renderPanel(); }, !room);
+      list.append(row(ico, T('look.' + kind + '.' + st), st === 'base' ? T('look.base.d') : '', right));
+    }
+    body.append(list);
+  }
+  body.append(el('h3', 'shop-sec', T('furn.sec.homes'))); const list = el('div', 'items');
+  for (const [id, pal] of [['sqnest', 'squirrel'], ['catbed', 'cat']]) { const have = !!S.furn[id]; list.append(row(furnIcon(id), T('decor.' + id), capFirst(T('furn.home.' + (have ? 'have' : 'not'), LANG, { who: palWho(pal) })), el('div', 'item-note', T(have ? 'furn.home.in' : 'furn.home.free')), !have)); }
+  body.append(list);
+}
+// which postcard goes in a frame: every card you have, the one in it now marked; or take it out
+function renderFramePick(body) {
+  const r = decorByUid(UI.frameUid); if (!r) { closePanel(); return; }
+  const cards = frameCards();
+  if (!cards.length) { body.append(el('p', 'note', T('frame.none'))); return; }
+  body.append(el('p', 'note', T('frame.note')));
+  const grid = el('div', 'frame-grid'), jobs = [];
+  for (const pc of cards) {
+    const b = el('button', 'frame-cell' + (r.pc === pc ? ' on' : '')), c = document.createElement('canvas'); c.width = 180; c.height = 120;
+    const [id, y, fr] = pc.split('~'); jobs.push(() => c.getContext('2d').drawImage(ART.card(id, 'front', 0.4, y ? +y : undefined, fr || undefined), 0, 0, 180, 120));
+    b.append(c, el('span', '', frameCardName(pc) + (fr ? ' ♥' : ''))); b.onclick = () => { frameSet(r.uid, pc); closePanel(); };
+    grid.append(b);
+  }
+  body.append(grid);
+  if (r.pc) { const out = el('button', 'pill btn wide', T('frame.empty')); out.onclick = () => { frameSet(r.uid, ''); closePanel(); }; body.append(out); }
+  const next = () => { const j = jobs.shift(); if (j) { j(); setTimeout(next, 16); } }; setTimeout(next, 30);
 }
 function renderPack(body) {
   if (S.trip) { body.append(el('p', 'note', T('ui.pack.away'))); renderSnacks(body); return; }
@@ -405,6 +471,7 @@ function buildDebug(force) {
   const hr = el('div', 'dbg-row'); hr.append(el('b', '', T('dbg.house')));
   for (const lv of [1, 2, 3]) { const b = el('button', 'dbg-b', String(lv)); b.onclick = () => { finishHouseBuild(); S.house = lv; S.houseSeen = lv; applyHouse(lv); writeSave(S); LAY = null; buildStatic(TOD); if (UI.panel) renderPanel(); }; hr.append(b); }
   const hb = el('button', 'dbg-b', T('dbg.houseFx')); hb.onclick = () => { if (HOUSEFX.on) return; const lv = houseLevel(), from = lv < HOUSE_MAX ? lv : lv - 1; S.house = from + 1; writeSave(S); startHouseBuild(from, from + 1); }; hr.append(hb);
+  const fa = el('button', 'dbg-b', T('dbg.allFurn')); fa.onclick = () => { for (const f of FURN_SHOP) if (!S.furn[f.id] || f.id === 'frame') { S.furn[f.id] = (S.furn[f.id] || 0) + 1; furnBought(f.id); } for (const k of ['wall', 'floor']) for (const st of LOOKS[k]) if (st !== 'base') S.furn[k + ':' + st] = 1; writeSave(S); if (UI.panel) renderPanel(); }; hr.append(fa);
   const dr = el('button', 'dbg-b', T('dbg.decorReset')); dr.onclick = () => { if (DECO.on) endDecor(); S.decor = null; if (ROOMV.on) decorEnsure(); writeSave(S); }; hr.append(dr);
   const nr = el('div', 'dbg-row'); nr.append(el('b', '', T('book.title')));
   const nn = el('button', 'dbg-b', T('dbg.noteNow')); nn.onclick = () => { if (S.notes.waiting) { showToast('dbg.noteWaiting', 2000); return; } S.notes.nextAt = 0; if (!notesTick(Clock.now())) showToast('dbg.noteNone', 2500); }; nr.append(nn);

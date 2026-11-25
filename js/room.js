@@ -28,19 +28,50 @@ function roomWall(c, style, x, y, w, h) {
   if (style === 'logs') {             // the cabin: the inside of the log walls, a little lighter
     piece(c, rectP(x, y, w, h), '#e7b67c', { mul: 0.5, scr: 0.1 });
     for (let k = 0; k * 22 < h; k++) { const yy = y + h - 22 - k * 22; if (k % 2) piece(c, rectP(x, yy, w, 22), '#dda96f', { mul: 0.4, scr: 0 }); piece(c, rectP(x, yy - 1.2, w, 2.6), '#bf884f', { mul: 0.4, scr: 0 }); piece(c, rectP(x, yy + 1.6, w, 2), '#f2ca95', { mul: 0.2, scr: 0.2 }); }
+  } else if (style === 'stripe') {    // shop wallpapers (stage 5): soft blue stripes with a thin pink line
+    piece(c, rectP(x, y, w, h), '#f3f6f4', { mul: 0.4, scr: 0.15 });
+    for (let xx = x + 6; xx < x + w; xx += 30) { piece(c, rectP(xx, y, 14, h), '#cfe0ef', { mul: 0.3 }); piece(c, rectP(xx + 21, y, 2, h), '#f3c4bb', { mul: 0.2 }); }
+    wainscot(c, x, y, w, h, '#d5e4f1', '#b7cde2');
+  } else if (style === 'gingham') {   // butter-yellow gingham
+    piece(c, rectP(x, y, w, h), '#fbf2d4', { mul: 0.4, scr: 0.15 });
+    for (let xx = x + 4; xx < x + w; xx += 22) piece(c, rectP(xx, y, 11, h), '#f6e2a2', { mul: 0.2 });
+    for (let yy = y + 4; yy < y + h; yy += 22) { piece(c, rectP(x, yy, w, 11), '#f6e2a2', { mul: 0.2 }); for (let xx = x + 4; xx < x + w; xx += 22) piece(c, rectP(xx, yy, 11, 11), '#efcf78', { mul: 0.2 }); }
+    wainscot(c, x, y, w, h, '#ecd6a0', '#d9bd7c');
+  } else if (style === 'paw') {       // pale pink with little paw prints
+    piece(c, rectP(x, y, w, h), '#f9e3dc', { mul: 0.4, scr: 0.15 });
+    for (let yy = y + 22, n = 0; yy < y + h - 70; yy += 36, n++) for (let xx = x + 16 + (n % 2) * 20; xx < x + w; xx += 40) pawPrint(c, xx, yy, 0.34, n % 2 ? '#f0bfb4' : '#ecb3a7');
+    wainscot(c, x, y, w, h, '#efcbc2', '#e0afa4');
   } else {                            // the big house: cream wallpaper with little sprigs, a wainscot below
     piece(c, rectP(x, y, w, h), '#f7ead2', { mul: 0.4, scr: 0.15 });
     const r = rng(31); for (let yy = y + 18; yy < y + h - 70; yy += 34) for (let xx = x + 14 + ((yy / 34) % 2) * 17; xx < x + w; xx += 34) { leaf(c, xx - 3, yy + 2, 7, 2.4, -0.9 + r() * 0.3, '#c9d8b0'); leaf(c, xx + 3, yy + 2, 7, 2.4, -2.2 + r() * 0.3, '#c9d8b0'); piece(c, circ(xx, yy - 2, 1.8), '#f2b9b0', { mul: 0.2 }); }
-    pp(c, rectP(x, y + h - 64, w, 64), '#e9cfa6', 0.12); for (let xx = x + 10; xx < x + w; xx += 26) piece(c, rectP(xx, y + h - 60, 2, 56), '#d9b98c', { mul: 0.3 }); pp(c, rectP(x, y + h - 68, w, 6), '#fff6e6', 0.15);
+    wainscot(c, x, y, w, h, '#e9cfa6', '#d9b98c');
   }
 }
+// the panelling along the bottom of a papered wall
+function wainscot(c, x, y, w, h, base, line) { pp(c, rectP(x, y + h - 64, w, 64), base, 0.12); for (let xx = x + 10; xx < x + w; xx += 26) piece(c, rectP(xx, y + h - 60, 2, 56), line, { mul: 0.3 }); pp(c, rectP(x, y + h - 68, w, 6), '#fff6e6', 0.15); }
 function roomFloor(c, style, x, y, w, h) {
+  if (style === 'herring') {          // shop floors (stage 5): herringbone parquet
+    piece(c, rectP(x, y, w, h), '#c98f58', { mul: 0.5, scr: 0.1 });
+    const bh = h / 5; for (let k = 0; k < 5; k++) { const yy = y + k * bh, dir = k % 2 ? 1 : -1; for (let xx = x - 30, i = 0; xx < x + w + 30; xx += 15, i++) piece(c, poly([[xx, yy + bh], [xx + 13, yy + bh], [xx + 13 + dir * bh * 0.7, yy], [xx + dir * bh * 0.7, yy]]), i % 2 ? '#d9a467' : '#cf9a5e', { mul: 0.35 }); piece(c, rectP(x, yy, w, 1.4), '#a8713f', { mul: 0.4 }); }
+    return;
+  }
+  if (style === 'checker') {          // cream and sage tiles
+    const n = 4, th = h / n; piece(c, rectP(x, y, w, h), '#f1e8d2', { mul: 0.4, scr: 0.12 });
+    for (let k = 0; k < n; k++) for (let xx = x, i = 0; xx < x + w; xx += 24, i++) if ((i + k) % 2) piece(c, rectP(xx, y + k * th, 24, th), '#b9cfa6', { mul: 0.35 });
+    for (let k = 1; k < n; k++) piece(c, rectP(x, y + k * th - 0.6, w, 1.2), '#e2d6bb', { mul: 0.2 });
+    return;
+  }
+  if (style === 'terra') {            // terracotta tiles, staggered, with pale grout
+    const n = 3, th = h / n; piece(c, rectP(x, y, w, h), '#f1d9c0', { mul: 0.4, scr: 0.12 });
+    const r = rng(43); for (let k = 0; k < n; k++) for (let xx = x - (k % 2) * 16; xx < x + w; xx += 32) piece(c, rectP(xx + 1.2, y + k * th + 1.2, 29.6, th - 2.4), r() < 0.5 ? '#d98b62' : '#d1815a', { mul: 0.4, scr: 0.08 });
+    return;
+  }
   const base = style === 'honey' ? '#dcaa6c' : '#c98f58', line = style === 'honey' ? '#c08e55' : '#a8713f', lite = style === 'honey' ? '#ecc48c' : '#dca46c';
   piece(c, rectP(x, y, w, h), base, { mul: 0.5, scr: 0.1 });
   const r = rng(style === 'honey' ? 41 : 42);
   for (let k = 0; k < 5; k++) { const yy = y + k * h / 5; piece(c, rectP(x, yy, w, 1.6), line, { mul: 0.4 }); for (let xx = x + r() * 60; xx < x + w; xx += 70 + r() * 40) piece(c, rectP(xx, yy, 1.6, h / 5), line, { mul: 0.4 }); if (k % 2) piece(c, rectP(x, yy + 2, w, 2), lite, { mul: 0.2, scr: 0.2 }); }
 }
-function roomShell(lv, H, res, look) {
+function roomShell(lv, H, res, look, wall, floor) {
   const R = ROOMS[lv], w = R.w;
   const F1 = H - 118, F0 = F1 - 92, C = F0 - 300, ground = F1 + 22;
   const L = makeLayer(-16, C - 140, w + 16, H, Math.min(res, lv === 3 ? 2 : 3)), c = L.ctx, K = YARD_LOOK[look] || YARD_LOOK.spring;
@@ -54,8 +85,8 @@ function roomShell(lv, H, res, look) {
   for (const s of [-1, 1]) { const a = [w / 2, peakY], b = [w / 2 + s * (w / 2 + 16), C + 6]; pp(c, slab(a, b, 20), R.roof, 0.25); for (let k = 1; k < 12; k++) { const u = k / 12; piece(c, circ(lerp(a[0], b[0], u), lerp(a[1], b[1], u) - 6, 4.6), R.roofD, { mul: 0.3 }); } }
   pp(c, rectP(-8, C - 4, w + 16, 12), '#8a5e3c', 0.25);
   // back wall, skirting, floor
-  roomWall(c, R.wall, 14, C + 8, w - 28, F0 - C - 8);
-  roomFloor(c, R.floor, 0, F0, w, F1 - F0);
+  roomWall(c, wall || R.wall, 14, C + 8, w - 28, F0 - C - 8);
+  roomFloor(c, floor || R.floor, 0, F0, w, F1 - F0);
   pp(c, rectP(14, F0 - 9, w - 28, 9), '#fff6e6', 0.15);
   // windows: a hole for the view, then the frame, glazing bars, sill and curtains
   for (const win of R.windows) {
@@ -71,9 +102,9 @@ function roomShell(lv, H, res, look) {
   pp(c, rectP(-4, F1, w + 8, 12), '#8a5e3c', 0.3); pp(c, rectP(-8, F1 + 12, w + 16, 12), '#d9cdb9', 0.25); for (let x = -4; x < w; x += 24) piece(c, rectP(x, F1 + 14, 18, 8), '#cbbca7', { mul: 0.3 });
   return L;
 }
-ART.def('room.shell', { kind: 'layer', group: 'room', note: 'the cut-away room without the things in it: (level, H, res, season look); x = room x', draw: (lv, H, res, look) => roomShell(lv, H, res, look) });
-ART.def('room.wall', { kind: 'paint', group: 'room', note: 'a back wall: (c, style logs | cream, x, y, w, h)', draw: (c, st, x, y, w, h) => roomWall(c, st, x, y, w, h) });
-ART.def('room.floor', { kind: 'paint', group: 'room', note: 'a floor: (c, style planks | honey, x, y, w, h)', draw: (c, st, x, y, w, h) => roomFloor(c, st, x, y, w, h) });
+ART.def('room.shell', { kind: 'layer', group: 'room', note: 'the cut-away room without the things in it: (level, H, res, season look, wall style, floor style — null: the house\'s own); x = room x', draw: (lv, H, res, look, wall, floor) => roomShell(lv, H, res, look, wall, floor) });
+ART.def('room.wall', { kind: 'paint', group: 'room', note: 'a back wall: (c, style logs | cream | stripe | gingham | paw, x, y, w, h)', draw: (c, st, x, y, w, h) => roomWall(c, st, x, y, w, h) });
+ART.def('room.floor', { kind: 'paint', group: 'room', note: 'a floor: (c, style planks | honey | herring | checker | terra, x, y, w, h)', draw: (c, st, x, y, w, h) => roomFloor(c, st, x, y, w, h) });
 ART.def('room.window', { kind: 'paint', group: 'room', note: 'a window frame round a hole: (c, x, y, w, h)', draw: (c, x, y, w, h) => {
   const f = '#fff6e6', fr = new Path2D(); fr.addPath(rectP(x - 6, y - 6, w + 12, 6)); fr.addPath(rectP(x - 6, y + h, w + 12, 6)); fr.addPath(rectP(x - 6, y, 6, h)); fr.addPath(rectP(x + w, y, 6, h));
   pp(c, fr, f, 0.2); piece(c, rectP(x + w / 2 - 2, y, 4, h), f, { mul: 0.2 }); piece(c, rectP(x, y + h / 2 - 2, w, 4), f, { mul: 0.2 });
@@ -214,8 +245,8 @@ function roomPickNext() {
 // ---------- drawing ----------
 const ROOMLAY = { key: null, L: null, view: null };
 function roomLayer() {
-  const lv = Math.max(2, houseLevel()), key = [lv, V.H, V.res, WX.look].join('|');
-  if (ROOMLAY.key !== key) { ROOMLAY.key = key; ROOMLAY.L = ART.layer('room.shell', lv, V.H, V.res, WX.look); ROOMLAY.view = ART.layer('scene.yard', V.H, Math.min(V.res, 2), WX.look, lv, true); }   // the yard as seen from inside: without the house
+  const lv = Math.max(2, houseLevel()), look = S.roomLook || {}, key = [lv, V.H, V.res, WX.look, look.wall, look.floor].join('|');
+  if (ROOMLAY.key !== key) { ROOMLAY.key = key; ROOMLAY.L = ART.layer('room.shell', lv, V.H, V.res, WX.look, look.wall, look.floor); ROOMLAY.view = ART.layer('scene.yard', V.H, Math.min(V.res, 2), WX.look, lv, true); }   // the yard as seen from inside: without the house
   return ROOMLAY.L;
 }
 function roomParkerScreen() { const g = roomGeom(), bed = P.onBed && decorBed(), row = bed ? bed.row : 1; return [P.x - ROOMV.cam, g.rows[row] - (bed ? 10 : 0), ROOM_K * ROW_K[row]]; }
@@ -243,6 +274,7 @@ function drawRoom() {
   // indoor light at dusk / night (over the house only)
   const area = new Path2D(); area.rect(-cam - 20, g.C - 140, R.w + 40, V.H);
   ART.draw('live.roomLight', ctx, L.p, R.lamp - cam, g.C + 56, area);
+  if (L.p.lamp) for (const r of decorItems()) if (r.id === 'floorlamp') { const a = decorAnchor(r, g); if (a) ART.draw('live.lampGlow', ctx, a[0] - cam, a[1] - DECOR.floorlamp.glow * a[2], L.p.lamp); }   // standing lamps at night
   drawFX();
 }
 // his middle, in screen units, when he's indoors (hearts, Zs and taps use it)
@@ -264,6 +296,8 @@ function roomTap(x, y) {
   if (r.id === 'book') { ROOMV.wiggle = { id: r.id, t0: TT }; return openBook(); }                                  // his book: open it
   if (isSmall(r.id)) { const id = r.id.slice(3); ROOMV.wiggle = { id: r.id, t0: TT }; SFX.pop(); toastText(`${T('sv.' + id)} · ${T('pc.' + id + '.name')}`, 2200); return; }   // a souvenir: it wiggles and says what it is
   if (r.id === 'bed' && P.present && P.inRoom && !/sleep|nap|stir/.test(P.mode)) return roomBed('lie');         // his bed: come and lie down
+  if (r.id === 'frame') { if (!r.pc) return framePick(r); ROOMV.wiggle = { uid: r.uid, t0: TT }; SFX.pop(); toastText(frameCardName(r.pc), 2200); return; }   // a postcard frame: its card's name (empty: choose one)
+  if (SHOP_FURN.includes(r.id)) { ROOMV.wiggle = { uid: r.uid, t0: TT }; SFX.pop(); }                                  // the other furniture: a little wobble
 }
 function roomMove(e, x, y) {
   if (DECO.on && decorMove(e, x, y)) return true;
