@@ -544,23 +544,24 @@ const BOX_BACK = { w: 220, h: 260, ox: 110, oy: 248 };
 // ---- at the window (house plan, stage 6): seen from behind, up on his hind legs, front paws on the sill, looking out.
 // reach = how high the sill is above his feet (in puppet units); wag = tail swing; look = head turned (-1..1)
 function drawSillB(c, reach = 240, wag = 0, look = 0) {
-  const hip = -56, sh = -reach + 66, hy = -reach - 32;                                                    // hips, shoulders, the middle of his head
+  const hip = -56, sh = -reach + 70, hy = -reach - 30, cy = hy + 50;                                       // hips, shoulders, the middle of his head, his collar
   for (const d of [-1, 1]) fp(c, union(limb([d * 24, hip + 14], [d * 27, -8], 22, 18), ell(d * 29, -6, 15, 8)), PK.furS, { sh: 0.16 });   // hind legs, standing
-  const body = union(ell(0, hip - 8, 50, 44), ell(0, (hip + sh) / 2, 44, (hip - sh) / 2 + 10), ell(0, sh + 8, 50, 34));
+  // one piece from rump to the back of his neck, so his head sits on him (not floating above his shoulders)
+  const body = union(ell(0, hip - 8, 50, 44), ell(0, (hip + sh) / 2, 44, (hip - sh) / 2 + 12), ell(0, sh + 4, 50, 38), ell(0, (sh + hy) / 2 + 8, 38, (sh - hy) / 2 + 6));
   fp(c, body, PK.fur, { sh: 0.18 });
   clipped(c, body, () => {
-    c.save(); c.globalAlpha = 0.45; piece(c, ell(0, sh + 40, 22, 40), PK.cream, { mul: 0.4, scr: 0.1 }); c.restore();
-    band(c, [0, sh - 10], [0, sh + 46], 8, PK.hNavy, { sh: 0.12 });
-    band(c, [-52, sh + 46], [52, sh + 46], 10, PK.hKhaki, { sh: 0.14 }); band(c, [-16, sh + 46], [16, sh + 46], 10, PK.hRed, { sh: 0.12 });
+    c.save(); c.globalAlpha = 0.45; piece(c, ell(0, sh + 36, 22, 44), PK.cream, { mul: 0.4, scr: 0.1 }); c.restore();
+    band(c, [0, cy + 4], [0, sh + 50], 8, PK.hNavy, { sh: 0.12 });                                          // the strap down his back, from the collar to the girth
+    band(c, [-52, sh + 50], [52, sh + 50], 10, PK.hKhaki, { sh: 0.14 }); band(c, [-16, sh + 50], [16, sh + 50], 10, PK.hRed, { sh: 0.12 });
   });
   fp(c, union(ell(-30, hip + 4, 27, 24), ell(30, hip + 4, 27, 24)), PK.fur, { sh: 0.16 });                 // haunches
   c.save(); c.translate(0, hip - 4); c.rotate(wag); tail(c, -4, -12, 21); c.restore();                     // the curl on his rump, wagging
-  const nl = new Path2D(); nl.moveTo(-42, sh - 8); nl.quadraticCurveTo(0, sh + 8, 42, sh - 8); nl.lineTo(42, sh + 2); nl.quadraticCurveTo(0, sh + 18, -42, sh + 2); nl.closePath();
-  twoTone(c, nl, 0, PK.hGreen, PK.hYellow);
-  for (const d of [-1, 1]) fp(c, union(limb([d * 32, sh + 6], [d * 52, -reach + 3], 21, 17), ell(d * 54, -reach + 1, 15, 8.5)), PK.fur, { sh: 0.15 });   // front legs up on the sill, paws resting on it either side of his head
-  c.save(); c.translate(look * 8, hy); c.rotate(look * 0.16); c.translate(0, 148);                        // the back of his head, looking out; turned a little as he follows something
+  for (const d of [-1, 1]) fp(c, union(limb([d * 34, sh + 6], [d * 50, -reach + 3], 22, 17), ell(d * 52, -reach + 1, 15, 8.5)), PK.fur, { sh: 0.15 });   // front legs up from his shoulders, paws on the sill either side of his head
+  const nl = new Path2D(); nl.moveTo(-34, cy - 6); nl.quadraticCurveTo(0, cy + 8, 34, cy - 6); nl.lineTo(34, cy + 3); nl.quadraticCurveTo(0, cy + 17, -34, cy + 3); nl.closePath();
+  clipped(c, body, () => twoTone(c, nl, 0, PK.hGreen, PK.hYellow));                                       // the collar, at the base of his neck
+  c.save(); c.translate(look * 7, hy); c.rotate(look * 0.14); c.translate(0, 148);                        // the back of his head, looking out; turned a little as he follows something
   for (const d of [-1, 1]) ear(c, { b1: [d * 44, -158], b2: [d * 8, -184], tip: [d * 38, -226 + (d === Math.sign(look) ? 4 : 0)], r: 11 }, { inner: false });
-  fp(c, union(circ(0, -148, 44), ell(0, -128, 46, 28)), PK.fur, { sh: 0.2 });
+  fp(c, union(circ(0, -148, 44), ell(0, -126, 44, 30)), PK.fur, { sh: 0.2 });
   clipped(c, circ(0, -148, 44), () => { c.save(); c.globalAlpha = 0.35; piece(c, ell(0, -182, 26, 10), PK.cream, { mul: 0.3 }); c.restore(); });
   c.restore();
 }
