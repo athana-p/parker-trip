@@ -149,8 +149,10 @@ function autoPlaceBook() {
 }
 // a floor thing finds itself a free spot: the back row first, from the middle of the room outwards
 function autoPlaceFloor(id) {
-  const g = roomGeom(), R = roomR(), mid = R.w / 2;
-  for (const row of DECOR[id].rows || [0, 1, 2]) for (let d = 0; d < R.w / 2; d += 12) for (const x of d ? [mid + d, mid - d] : [mid]) if (decorValid({ uid: -1, id, x, row }, g, R)) return decorAdd(id, { x, row });
+  const g = roomGeom(), R = roomR(), mid = R.w / 2, flat = DECOR[id].flat;
+  const offRug = (x, row) => flat || (!decorItems().some(r => r.id === 'rug' && r.row === row && Math.abs(r.x - x) < 130)       // (stage 6) keep the middle of a rug free for him to roll on,
+    && !(row === 0 && R.windows.some(w => Math.abs(w.x - x) < 90)));                                                             // and the floor under the windows free for him to look out — if there's room elsewhere
+  for (const row of DECOR[id].rows || [0, 1, 2]) for (const pass of [0, 1]) for (let d = 0; d < R.w / 2; d += 12) for (const x of d ? [mid + d, mid - d] : [mid]) if ((pass || offRug(x, row)) && decorValid({ uid: -1, id, x, row }, g, R)) return decorAdd(id, { x, row });
   return null;
 }
 function decorEnsure() {
@@ -161,9 +163,9 @@ function decorEnsure() {
   // whatever no longer fits (a different room, the door or a window moved) goes back to the tray
   const g = roomGeom(), R = roomR(); let back = 0;
   for (const kind of ['wall', 'floor', 'small']) for (const r of decorItems().filter(o => decorDef(o.id).kind === kind)) if (!S.decor.items.includes(r)) continue; else if (!decorValid(r, g, R)) { decorRemove(r); back++; }
-  for (const s of S.shelf) if (!S.decor.seen[s.id]) { S.decor.seen[s.id] = true; if (!placedCount('sv:' + s.id)) autoPlaceSmall('sv:' + s.id); }   // new souvenirs set themselves out
-  if (S.furn.book && !S.decor.seen.book) { S.decor.seen.book = true; if (!placedCount('book')) autoPlaceBook(); }                      // so does his book
-  for (const id of ['sqnest', 'catbed']) if (S.furn[id] && !S.decor.seen[id]) { S.decor.seen[id] = true; if (!placedCount(id)) autoPlaceFloor(id); }   // and a visitor's new home
+  for (const s of S.shelf) if (!S.decor.seen[s.id]) { S.decor.seen[s.id] = true; if (!placedCount('sv:' + s.id)) markFresh(autoPlaceSmall('sv:' + s.id)); }   // new souvenirs set themselves out
+  if (S.furn.book && !S.decor.seen.book) { S.decor.seen.book = true; if (!placedCount('book')) markFresh(autoPlaceBook()); }                      // so does his book
+  for (const id of ['sqnest', 'catbed']) if (S.furn[id] && !S.decor.seen[id]) { S.decor.seen[id] = true; if (!placedCount(id)) markFresh(autoPlaceFloor(id)); }   // and a visitor's new home
   if (back) toastText(T('decor.back'), 3500);
   writeSave(S);
 }
@@ -187,6 +189,8 @@ function findSpot(id, mid) {
   return null;
 }
 function decorBed() { return decorItems().find(r => r.id === 'bed') || null; }
+// new in the room (stage 6): he goes over to sniff it, or to look up at it, the next time he's free in there (newest first, at most 3)
+function markFresh(r) { if (!r || !S.decor) return r; const f = (S.decor.fresh || []).filter(u => u !== r.uid); f.unshift(r.uid); S.decor.fresh = f.slice(0, 3); return r; }
 
 // ---------- drawing (called by drawRoom, camera already applied) ----------
 function drawDecorScene(g, R, drawParker) {
@@ -203,7 +207,7 @@ function drawDecorScene(g, R, drawParker) {
   };
   for (const r of items) if (decorDef(r.id).kind === 'wall') put(r);
   for (const r of items) if ((r.surf || '').startsWith('sill:')) put(r);
-  const prow = P.inRoom && P.present ? (P.onBed && decorBed() ? decorBed().row : 1) : -1;
+  const sp = P.inRoom && P.present && roomSpot(), prow = P.inRoom && P.present ? (sp ? sp.row : Math.min(2, Math.floor(roomRowF() + 1e-6))) : -1;
   for (let row = 0; row < 3; row++) for (const r of items) if (decorDef(r.id).flat && r.row === row) put(r);     // rugs lie under everything
   for (let row = 0; row < 3; row++) {
     for (const r of items.filter(o => decorDef(o.id).kind === 'floor' && !decorDef(o.id).flat && o.row === row).sort((a, b) => a.x - b.x)) put(r);
@@ -279,7 +283,7 @@ function decorUp(e, x, y) {
 function pickUp(rec, off, fromTray) {
   const snapshot = { x: rec.x, yc: rec.yc, row: rec.row, surf: rec.surf, dx: rec.dx };
   DECO.held = { rec, off, from: snapshot, fromTray, ok: true, free: null }; DECO.sel = null; placeTools();
-  if (P.onBed && rec.id === 'bed') { P.onBed = false; pickNext(); }          // his bed is being moved: he hops off
+  if (P.onBed && typeof roomSpot === 'function' && roomSpot() === rec) { P.onBed = false; pickNext(); }          // his bed / cushion is being moved: he hops off
   SFX.paper(1);
 }
 // follow the finger: furniture snaps to the nearest floor row, wall things stay on the wall, small things float free
@@ -307,7 +311,7 @@ function decorDrop(x, y) {
   if (decorValid(r, g, R)) {           // pat: it lands with a little bounce and a few scraps of paper
     S.decor.custom = true; DECO.snap = { uid: r.uid, t0: TT }; SFX.snap();
     const a = decorAnchor(r, g); for (let i = 0; i < 6; i++) { const t = (i / 5 - 0.5) * 2.4; fx({ type: 'spr', key: `fx.confetti|${['#f5c04a', '#f3b9b0', '#9cc2e6', '#fff6e6'][i % 4]}`, x: a[0] - ROOMV.cam + Math.sin(t) * 12, y: a[1] - 4, vx: Math.sin(t) * 50, vy: -30 - Math.random() * 20, g: 140, life: 0.6, rot: t, vr: 6 }); }
-    if (P.inRoom && P.present && decorDef(r.id).kind !== 'wall') P.newThing = r.uid;      // (stage 6: he'll come and sniff it)
+    markFresh(r);                                                                            // he'll come and have a look
   } else if (H.fromTray) { decorRemove(r); SFX.bounce(0.3); }                               // can't go there: back to the tray
   else { Object.assign(r, H.from); SFX.bounce(0.3); }                                         // can't go there: back where it was
   renderTray(); writeSave(S);
@@ -319,7 +323,7 @@ function furnBought(id) {
   if (houseLevel() < 2) return 'later';
   decorEnsure();
   const r = placedCount(id) < (S.furn[id] || 0) ? autoPlaceFurn(id) : decorItems().filter(o => o.id === id).pop();
-  if (r && P.inRoom && P.present && decorDef(id).kind !== 'wall') P.newThing = r.uid;      // (stage 6: he'll come and sniff it)
+  markFresh(r);                                                                               // he'll come and have a look (now, or next time he's in)
   writeSave(S); if (DECO.on) renderTray();
   return r ? 'placed' : 'tray';
 }
@@ -346,7 +350,7 @@ function frameCardName(pc) {
 function framePick(r) { if (!r) return; UI.frameUid = r.uid; openPanel('frame'); }
 function frameSet(uid, pc) {
   const r = decorByUid(uid); if (!r) return;
-  r.pc = pc || ''; S.decor.custom = true; DECO.snap = { uid: r.uid, t0: TT }; SFX.snap(); writeSave(S);
+  r.pc = pc || ''; S.decor.custom = true; DECO.snap = { uid: r.uid, t0: TT }; SFX.snap(); if (pc) markFresh(r); writeSave(S);
 }
 
 // ---------- the tray and the tools ----------
@@ -409,7 +413,7 @@ function trayTap(id) {
   const g = roomGeom(), R = roomR(), d = decorDef(id), mid = ROOMV.cam + SCENE_W / 2;
   const r = d.kind === 'small' ? autoPlaceSmall(id) : findSpot(id, mid);
   if (!r) { toastText(T('decor.noRoom'), 2400); return; }
-  S.decor.custom = true; DECO.snap = { uid: r.uid, t0: TT }; SFX.snap(); renderTray(); writeSave(S);
+  S.decor.custom = true; DECO.snap = { uid: r.uid, t0: TT }; SFX.snap(); markFresh(r); renderTray(); writeSave(S);
   const a = decorAnchor(r, g); if (a && (a[0] < ROOMV.cam + 20 || a[0] > ROOMV.cam + SCENE_W - 20)) ROOMV.cam = clamp(a[0] - SCENE_W / 2, 0, R.w - SCENE_W);
 }
 // flip / put back, floating above the thing you tapped
@@ -425,7 +429,7 @@ function placeTools() {
 }
 function toolCard() { const r = DECO.sel; if (r && r.id === 'frame') framePick(r); }
 function toolFlip() { const r = DECO.sel; if (!r) return; r.f = r.f ? 0 : 1; S.decor.custom = true; DECO.snap = { uid: r.uid, t0: TT }; SFX.paper(3); writeSave(S); }
-function toolStore() { const r = DECO.sel; if (!r) return; if (P.onBed && r.id === 'bed') { P.onBed = false; pickNext(); } decorRemove(r); DECO.sel = null; S.decor.custom = true; SFX.flutter(0.6); renderTray(); placeTools(); writeSave(S); }
+function toolStore() { const r = DECO.sel; if (!r) return; if (P.onBed && roomSpot() === r) { P.onBed = false; pickNext(); } decorRemove(r); DECO.sel = null; S.decor.custom = true; SFX.flutter(0.6); renderTray(); placeTools(); writeSave(S); }
 
 // ---------- art ----------
 for (const [id, half] of [['long', 80], ['short', 48]]) ART.def('furn.shelf.' + id, { group: 'furn', box: { w: half * 2 + 8, h: 20, ox: half + 4, oy: 2 }, stick: false, note: 'a wall shelf; origin on the middle of its top', draw: c => ART.paint('furn.shelf', c, -half, half, 0) });

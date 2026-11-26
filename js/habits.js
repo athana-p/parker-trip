@@ -73,6 +73,10 @@ const HABITS = {
   sprinkPlay: [7, 11],                 // seconds of jumping about in the spray before he runs out to shake                   // the snowman you built: he goes to sniff it now and then
   // the neighbour's cat comes by while he's home: they say hello (nose boop / he play-bows, she pats his nose / sit side by side)
   catPlay: { boop: 3, bow: 2, side: 2 }, catPlayChance: 0.8,                      // a visitor's gift lying in the yard: he goes over to sniff it (stage 4)
+  // in his room (house plan stage 6): what he picks when he's free indoors, and how long things last
+  //   window: up on his hind legs, paws on the sill, watching the weather · rug: a roll on the rug · bed: a lie-down / nap on his bed or a cushion
+  //   catnap: a nap beside the cat in her bed (when she's in) · catsniff: a sniff at her empty bed (when she's out)
+  room: { pick: { walk: 3, sniff: 2.4, sit: 1.6, bed: 1.6, window: 1.5, rug: 1.3, sigh: 0.5, catnap: 1.4, catsniff: 0.5 }, sill: [5, 9], roll: 3.6, peekLook: 0.6 },
   printEvery: 13,                      // a paw print every this many scene units walked in snow
 };
 

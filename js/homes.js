@@ -184,14 +184,14 @@ function homeTick() {
   }
   if (!ROOMV.on) return;
   // in his room: the squirrel peeks out of its stump now and then; now and then it comes in with a nut to hide
-  if (palAtHome('squirrel', now) && TT > HOMEV.peekAt) { HOMEV.peekAt = TT + rand([7, 18]); HOMEV.peekT0 = TT; }
+  if (palAtHome('squirrel', now) && TT > HOMEV.peekAt) { HOMEV.peekAt = TT + rand([7, 18]); HOMEV.peekT0 = TT; const st = decorItems().find(r => r.id === 'sqnest'); if (st) parkerNotices(st.x, 'tilt'); }   // he turns and tilts his head at it
   if (palLives('squirrel') && !HOMEV.run && TT > HOMEV.stashAt) { const first = !HOMEV.stashAt; HOMEV.stashAt = TT + rand([50, 110]); if (!first && Math.random() < 0.6 && !visitorsSleep(now) && !(VIS.on && VIS.kind === 'squirrel')) squirrelBringsNut(); }
   if (HOMEV.run) squirrelRun();
 }
 function squirrelBringsNut() {
   const R = roomR(), st = decorItems().find(r => r.id === 'sqnest'); if (!st) return;
   HOMEV.run = { x: R.door.x + 10, tx: st.x - 18 * (st.f ? -1 : 1), row: st.row, t0: TT, phase: 'in' };
-  ROOMV.doorOpenUntil = TT + 1.2; SFX.chitter();
+  ROOMV.doorOpenUntil = TT + 1.2; SFX.chitter(); parkerNotices(st.x, 'wag');     // he turns to watch it come home, wagging
 }
 function squirrelRun() {
   const r = HOMEV.run, dt = 1 / 60, dx = r.tx - r.x;
@@ -234,6 +234,11 @@ function drawNestYard() {
   if (houseLevel() < 3 || !hasHome('sparrow') || HOUSEFX.on) return;
   const now = Clock.now(), home = palAtHome('sparrow', now), st = !home ? 'empty' : visitorsSleep(now) ? 'sleep' : TT < HOMEV.singUntil ? 'sing' : 'in';
   const [x, y] = nestAt(); drawSprite(sprite('home.nest|' + st), x, y, { scale: 0.9, shA: 0.18 });
+}
+// Parker in his room notices one of them (the squirrel peeking out, coming in with a nut): if he's just sitting about, he turns and looks
+function parkerNotices(x, mode) {
+  if (!P.inRoom || !P.present || P.onBed || !/^(sit|lie|sniff|look|wag|admire|sigh|tilt)$/.test(P.mode) || Math.random() > HABITS.room.peekLook || Math.abs(x - P.x) > 320) return;
+  faceThen(Math.sign(x - P.x) || P.face, () => setMode(mode, mode === 'tilt' ? HABITS.reactionTime.tilt + 0.4 : HABITS.reactionTime.wag));
 }
 // the cat in her bed: sometimes he comes and naps beside her
 function catNapSpot() {

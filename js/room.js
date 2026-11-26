@@ -156,6 +156,21 @@ ART.def('live.roomLight', { kind: 'live', group: 'room', note: '(ctx, palette, l
   ctx.save(); ctx.globalCompositeOperation = 'screen'; glow(ctx, lx, ly, 190, '255,214,150', 0.32 * p.lamp); glow(ctx, lx, ly, 40, '255,236,190', 0.6 * p.lamp); ctx.restore();
 } });
 
+// a sunny morning or day: soft patches of sun on the floor under the windows, leaning with the hour (stage 6: he naps in one)
+ART.def('live.sunPatch', { kind: 'live', group: 'room', note: '(ctx, windows, room geometry, hour)', draw: (ctx, wins, g, hr) => {
+  const lean = clamp((12.5 - hr) * 9, -50, 50);
+  ctx.save(); ctx.globalCompositeOperation = 'screen';
+  for (const w of wins) {
+    const y0 = g.F0 + 6, y1 = g.F0 + 70, a = w.w * 0.42, b = w.w * 0.52, cx = w.x + lean * 0.4, cx1 = w.x + lean * 1.3;
+    const beam = new Path2D(); beam.moveTo(w.x - w.w / 2 + 6, g.C + w.top + w.h); beam.lineTo(w.x + w.w / 2 - 6, g.C + w.top + w.h); beam.lineTo(cx1 + b, y1); beam.lineTo(cx1 - b, y1); beam.closePath();
+    ctx.globalAlpha = 0.07; ctx.fillStyle = '#fff0c8'; ctx.fill(beam);                                  // the light in the air
+    const patch = new Path2D(); patch.moveTo(cx - a, y0); patch.lineTo(cx + a, y0); patch.lineTo(cx1 + b, y1); patch.lineTo(cx1 - b, y1); patch.closePath();
+    const gr = ctx.createLinearGradient(0, y0, 0, y1); gr.addColorStop(0, 'rgba(255,232,180,0.10)'); gr.addColorStop(0.5, 'rgba(255,236,190,0.30)'); gr.addColorStop(1, 'rgba(255,236,190,0.12)');
+    ctx.globalAlpha = 1; ctx.fillStyle = gr; ctx.fill(patch);
+  }
+  ctx.restore();
+} });
+
 // ---------- going in and out ----------
 const PAPER = '#f6ead6';
 function roomTransition(mid) { ROOMV.trans = { t0: TT, mid, done: false }; }
@@ -178,11 +193,11 @@ function enterRoom() {
     FX.length = 0;                       // hearts and Zs from outside stay outside
     ROOMV.on = true; ROOMV.cam = 0; ROOMV.followAt = null; showBars(); hideToast(); decorEnsure();      // (after the toast is cleared: it may want to say something went back to the tray)
     if (!P.present || P.pack || P.carrying || /packup|departLook|arrive|gift/.test(P.mode)) return;
-    if (/^(inhouse|goin)$/.test(P.mode)) { const left = Math.max(20, P.until - TT), bed = decorBed(); putInRoom(bed ? bed.x : roomR().door.x + 90); P.onBed = !!bed; P.face = 1; setMode('nap', left); return; }   // already napping inside: on his bed (or on the floor if his bed is put away)
+    if (/^(inhouse|goin)$/.test(P.mode)) { const left = Math.max(20, P.until - TT), bed = decorBed(); putInRoom(bed ? bed.x : roomR().door.x + 90); P.onBed = !!bed; if (bed) { P.bedUid = bed.uid; P.d = rowD(bed.row); } P.face = 1; setMode('nap', left); return; }   // already napping inside: on his bed (or on the floor if his bed is put away)
     ROOMV.followAt = TT + 0.9;          // he follows you in
   });
 }
-function putInRoom(x) { P.inRoom = true; P.onBed = false; P.x = x; P.d = ROOM_D; }
+function putInRoom(x) { P.inRoom = true; P.onBed = false; P.x = x; P.d = ROOM_D; P.dOff = 0; }
 function stopYardPlay() {               // whatever he was doing in the yard stops when he comes in
   if (P.hold) dropHeld(); P.hold = null;
   if (KITE.on) { KITE.on = false; KITE.drag = null; KITE.landing = false; }
@@ -191,7 +206,7 @@ function stopYardPlay() {               // whatever he was doing in the yard sto
   FETCH.drag = null; press = null;
 }
 function roomTick() {
-  const dt = Math.min(0.05, TT - (ROOMV.lastT || TT)); ROOMV.lastT = TT; decorTick(dt);
+  const dt = Math.min(0.05, TT - (ROOMV.lastT || TT)); ROOMV.lastT = TT; decorTick(dt); roomAvoidTick(dt);
   if (ROOMV.on && !S.decor && houseLevel() > 1) decorEnsure();          // the room is never shown without its things
   if (!ROOMV.on || ROOMV.followAt == null || TT < ROOMV.followAt) return;
   ROOMV.followAt = null;
@@ -220,26 +235,116 @@ function leaveRoomNow() {
 }
 
 // ---------- what he does indoors ----------
-function roomBed(kind) {
-  const bed = decorBed(), dur = () => rand(kind === 'sleep' ? HABITS.duration.sleep : kind === 'nap' ? HABITS.duration.nap : HABITS.duration.lie);
-  if (!bed) return setMode(kind === 'sleep' ? 'sleep' : kind, dur());          // no bed in the room: he curls up where he is
-  goTo(bed.x - 10, ROOM_D, () => faceThen(1, () => { if (!decorItems().includes(bed)) return pickNext(); P.onBed = true; P.x = bed.x; kind === 'sleep' ? setMode('sleep', rand(HABITS.duration.sleep)) : setMode(kind, rand(kind === 'nap' ? HABITS.duration.nap || [20, 40] : HABITS.duration.lie)); }));
+// Where he is: P.d indoors is his depth — ROOM_D is the middle floor row, 30 a row (60 the back row, 120 the front).
+// P.dOff is a step forward (or back) he takes on his own while he passes something standing in his row, so he goes
+// round the furniture instead of through it (stage 6). On his bed or a cushion, P.onBed + P.bedUid say which.
+const rowD = r => ROOM_D + (r - 1) * 30;
+const NAP_LIFT = { bed: 10, cushion: 15 };                    // what he sleeps on indoors, and how high its top is
+function roomRowF() { return clamp(1 + (P.d - ROOM_D) / 30 + (P.dOff || 0), 0, 2); }
+function roomSpot() { if (!P.onBed) return null; const r = (P.bedUid && decorByUid(P.bedUid)) || decorBed(); return r && NAP_LIFT[r.id] != null ? r : null; }
+const napSpots = () => decorItems().filter(r => NAP_LIFT[r.id] != null);
+// things standing on the floor that he walks round (rugs lie flat: he walks on them)
+function roomBlockers(skip) {
+  const g = roomGeom(), out = [];
+  for (const r of decorItems()) { const d = decorDef(r.id); if (r === skip || d.kind !== 'floor' || d.flat) continue; const rc = decorRect(r, g), c = (rc[0] + rc[2]) / 2, h = (rc[2] - rc[0]) / 2 * 0.85; out.push({ r, row: r.row, x0: c - h, x1: c + h }); }
+  return out;
+}
+const PK_ROOM = { pass: 40, stand: 46 };                      // how close his middle comes to a thing as he passes it / where he stops
+function roomAvoidTick(dt) {
+  if (!P.inRoom || !P.present) { P.dOff = 0; return; }
+  const base = 1 + (P.d - ROOM_D) / 30; let want = 0;
+  if (!roomSpot() && P.mode !== 'sill') for (const b of roomBlockers()) if (Math.abs(b.row - base) < 0.6 && P.x > b.x0 - PK_ROOM.pass && P.x < b.x1 + PK_ROOM.pass) { want = base > 1.5 ? -0.55 : 0.55; break; }
+  P.dOff = (P.dOff || 0) + (want - (P.dOff || 0)) * Math.min(1, dt * 7);
+}
+// the nearest spot to x (in a row) where he can stand without standing in something
+function roomFreeX(x, row = 1, skip) {
+  const R = roomR(), bl = roomBlockers(skip).filter(b => Math.abs(b.row - row) < 0.6), ok = v => bl.every(b => v < b.x0 - PK_ROOM.stand || v > b.x1 + PK_ROOM.stand);
+  for (let d = 0; d < R.w; d += 8) for (const v of d ? [x + d, x - d] : [x]) if (v >= 44 && v <= R.w - 44 && ok(v)) return v;
+  return clamp(x, 44, R.w - 44);
+}
+// walk over in his usual row, then step back or forward into another one
+function roomGo(x, row, then) { if (row == null || row === 1) return goTo(x, ROOM_D, then); goTo(x, ROOM_D, () => setMode('trot', null, { x, d: rowD(row), then })); }
+
+function roomBed(kind, spot) {
+  const spots = napSpots(), bed = spot || (kind === 'sleep' ? decorBed() || spots[0] : spots[Math.floor(Math.random() * spots.length)]);
+  const dur = () => rand(kind === 'sleep' ? HABITS.duration.sleep : kind === 'nap' ? HABITS.duration.nap || [20, 40] : HABITS.duration.lie);
+  if (!bed) return setMode(kind === 'sleep' ? 'sleep' : kind, dur());          // nothing to sleep on in the room: he curls up where he is
+  const face = bed.id === 'bed' ? 1 : bed.x < 140 ? 1 : bed.x > roomR().w - 140 ? -1 : (Math.random() < 0.5 ? 1 : -1);      // (his head not against a wall)
+  roomGo(bed.x - 10 * face, bed.row, () => faceThen(face, () => { if (!decorItems().includes(bed)) return pickNext(); P.onBed = true; P.bedUid = bed.uid; P.x = bed.x; P.d = rowD(bed.row); P.dOff = 0; setMode(kind, dur()); }));
+}
+// a rug to roll on: a spot on it with nothing standing there
+function rugSpot(only) {
+  const rugs = only ? [only] : decorItems().filter(r => r.id === 'rug').sort(() => Math.random() - 0.5);
+  for (const rug of rugs) { const k = ROW_K[rug.row], bl = roomBlockers().filter(b => b.row === rug.row);
+    for (let d = 0; d <= 80 * k; d += 10) for (const x of d ? [rug.x + d, rug.x - d] : [rug.x]) if (x > 50 && x < roomR().w - 50 && bl.every(b => x < b.x0 - 46 || x > b.x1 + 46)) return { x, row: rug.row, rug }; }   // (towards the edge of the rug if something stands in the middle)
+  return null;
+}
+function rugRoll(sp = rugSpot()) {
+  if (!sp) return false;
+  roomGo(sp.x, sp.row, () => { SFX.paper(2); setMode('roll', HABITS.room.roll); });
+  return true;
+}
+// a window to look out of: he stands up with his front paws on the sill (from the back row under it if that's free, else from the middle row)
+function windowSpot() {
+  const R = roomR(), ws = R.windows.slice().sort(() => Math.random() - 0.5);
+  for (const row of [0, 1]) for (const w of ws) { const bl = roomBlockers().filter(b => b.row === row);
+    for (const dx of [0, -14, 14, -28, 28]) { const x = w.x + dx; if (bl.every(b => x < b.x0 - 34 || x > b.x1 + 34)) return { w, row, x }; } }
+  return null;
+}
+function lookOut(sp = windowSpot()) {
+  if (!sp) return false;
+  const g = roomGeom(), { w, row } = sp, sill = g.C + w.top + w.h + 6;
+  const reach = Math.round((g.rows[row] - sill + 4) / (ROOM_K * ROW_K[row] * K_DOG) / 4) * 4;
+  const kind = WX.hot ? 'hot' : /night/.test(currentTod()) ? 'night' : WX.kind;
+  roomGo(sp.x, row, () => setMode('sill', rand(HABITS.room.sill), { reach, kind, w }));
+  return true;
+}
+// what he does once he gets down from the window, by the weather he was watching
+function sillEnd() {
+  const { kind, w } = P.data;
+  if (kind === 'snow') { SFX.pop(); return setMode('hop', HABITS.reactionTime.hop); }               // snow! a little bounce
+  if (kind === 'rain') return setMode('sigh', HABITS.sighTime, { lie: false });                       // a long look at the rain, a sigh
+  if (kind === 'night') return setMode('sigh', HABITS.sighTime, { lie: true });
+  if (kind === 'hot') return roomGo(roomFreeX(w.x + 110), 1, () => setMode('flat', rand(HABITS.wxTime.flat)));     // too warm: flat out on the floor
+  if (kind === 'sunny' && /morning|day/.test(currentTod())) return roomGo(roomFreeX(w.x + 10), 1, () => faceThen(Math.random() < 0.5 ? 1 : -1, () => setMode('sunnap', rand(HABITS.wxTime.sunnap))));   // a nap in the patch of sun under the window
+  setMode('tilt', HABITS.reactionTime.tilt);
+}
+// something new in the room (bought, taken out of the tray, moved, a new souvenir): he goes to have a look
+function freshNext() {
+  const f = (S.decor && S.decor.fresh) || [];
+  while (f.length) { const r = decorByUid(f[0]); if (r && !(DECO.held && DECO.held.rec === r)) return r; f.shift(); }
+  return null;
+}
+function checkThing(r) {
+  S.decor.fresh = S.decor.fresh.filter(u => u !== r.uid); writeSave(S);
+  const g = roomGeom(), a = decorAnchor(r, g), d = decorDef(r.id); if (!a) return pickNext();
+  const rc = decorRect(r, g, a), half = (rc[2] - rc[0]) / 2 * 0.85, done = () => { setMode('wag', HABITS.reactionTime.wag); SFX.pop(); };
+  const row = d.kind === 'floor' ? r.row : (r.surf || '').startsWith('row:') ? +r.surf.slice(4) : null;
+  if (row == null) { const x = roomFreeX(a[0]); return goTo(x, ROOM_D, () => faceThen(Math.sign(a[0] - x) || P.face, () => setMode('admire', 2.6, { next: done }))); }   // up on the wall or a shelf: he looks up at it
+  if (d.flat) return roomGo(clamp(a[0] + (P.x < a[0] ? -30 : 30), 44, roomR().w - 44), row, () => setMode('sniff', 2.4, { next: done }));   // a rug: he steps on and sniffs it
+  let side = a[0] > P.x ? 1 : -1, x = a[0] - side * (half + 42);
+  if (x < 44 || x > roomR().w - 44 || roomFreeX(x, row, r) !== x) { side = -side; x = a[0] - side * (half + 42); }
+  roomGo(clamp(x, 44, roomR().w - 44), row, () => faceThen(side, () => setMode('sniff', 2.4, { next: done })));
 }
 function roomPickNext() {
-  const R = roomR(), g = roomGeom(), was = P.onBed; P.onBed = false;
+  const R = roomR(), was = P.onBed; P.onBed = false;
   if (P.wet) { P.wet = false; SFX.shake(); return setMode('shakeoff', HABITS.wxTime.shakeOff); }
   if (sleepTime() && TT >= (P.awakeUntil || 0)) return roomBed('sleep');
-  if (was) return setMode('sigh', HABITS.sighTime, { lie: false });            // just hopped off his bed
-  const things = [[R.door.x, 'door'], ...R.windows.map(w => [w.x, 'window']), ...decorItems().map(r => [decorAnchor(r, g) || [0], r]).filter(([a, r]) => a[0] && (decorDef(r.id).kind !== 'wall' || r.yc > 150)).map(([a]) => [a[0], 'thing'])];
-  const cn = catNapSpot(), k = pickWeighted({ walk: 3, sniff: 2.6, sit: 1.6, bed: decorBed() ? 1.6 : 0.4, window: 1, sigh: 0.5, catnap: cn ? 1.4 : 0 });
-  if (k === 'catnap') return goTo(clamp(cn[0], 44, R.w - 44), ROOM_D, () => faceThen(cn[1], () => { setMode('nap', rand([20, 40])); const [hx, hy] = roomParkerCenter(); fx({ type: 'spr', key: 'fx.heart', x: hx, y: hy - 30, vy: -20, sway: 1, life: 1.6, scale: 0.8 }); }));   // a nap next to the cat in her bed
+  if (was) { P.dOff = roomBlockers().some(b => Math.abs(b.row - roomRowF()) < 0.6 && P.x > b.x0 - PK_ROOM.pass && P.x < b.x1 + PK_ROOM.pass) ? (roomRowF() > 1.5 ? -0.55 : 0.55) : 0; return setMode('sigh', HABITS.sighTime, { lie: false }); }   // just hopped off his bed: down in front of it, a sigh
+  const fresh = freshNext(); if (fresh) return checkThing(fresh);               // something new to have a look at
+  const g = roomGeom(), things = [[R.door.x, 'door'], ...R.windows.map(w => [w.x, 'window']), ...decorItems().map(r => [decorAnchor(r, g) || [0], r]).filter(([a, r]) => a[0] && (decorDef(r.id).kind !== 'wall' || r.yc > 150)).map(([a]) => [a[0], 'thing'])];
+  const cn = catNapSpot(), cb = !cn && hasHome('cat') && decorItems().find(r => r.id === 'catbed'), wp = HABITS.room.pick, rug = rugSpot(), win = windowSpot();
+  const k = pickWeighted({ walk: wp.walk, sniff: wp.sniff, sit: wp.sit, bed: napSpots().length ? wp.bed : wp.bed / 4, window: wp.window * (win ? 1 : 0.4), rug: rug ? wp.rug : 0, sigh: wp.sigh, catnap: cn ? wp.catnap : 0, catsniff: cb ? wp.catsniff : 0 });
+  if (k === 'catnap') { const b = decorItems().find(r => r.id === 'catbed'); return roomGo(clamp(cn[0], 44, R.w - 44), b ? b.row : 1, () => faceThen(cn[1], () => { setMode('nap', rand([20, 40])); const [hx, hy] = roomParkerCenter(); fx({ type: 'spr', key: 'fx.heart', x: hx, y: hy - 30, vy: -20, sway: 1, life: 1.6, scale: 0.8 }); })); }   // a nap next to the cat in her bed
+  if (k === 'catsniff') return checkThing(cb);                                  // she's out: her bed still smells of her
   const lo = 44, hi = R.w - 44;
-  if (k === 'walk') { const x = clamp(P.x + (Math.random() < 0.5 ? -1 : 1) * (60 + Math.random() * 180), lo, hi); return goTo(x, ROOM_D, Math.random() < 0.4 ? () => setMode('sniff', rand(HABITS.duration.sniff)) : null); }
-  if (k === 'sniff') { const [tx] = things[Math.floor(Math.random() * things.length)], side = tx > P.x ? 1 : -1; return goTo(clamp(tx - 46 * side, lo, hi), ROOM_D, () => faceThen(side, () => setMode('sniff', rand([2, 3.5])))); }
+  if (k === 'walk') { const x = roomFreeX(clamp(P.x + (Math.random() < 0.5 ? -1 : 1) * (60 + Math.random() * 180), lo, hi)); return goTo(x, ROOM_D, Math.random() < 0.4 ? () => setMode('sniff', rand(HABITS.duration.sniff)) : null); }
+  if (k === 'sniff') { const [tx] = things[Math.floor(Math.random() * things.length)], side = tx > P.x ? 1 : -1, x = roomFreeX(clamp(tx - 46 * side, lo, hi)); return goTo(x, ROOM_D, () => faceThen(Math.sign(tx - x) || side, () => setMode('sniff', rand([2, 3.5])))); }
   if (k === 'bed') return roomBed(Math.random() < 0.5 ? 'lie' : 'nap');
-  if (k === 'window') { const w = R.windows[Math.floor(Math.random() * R.windows.length)]; return goTo(clamp(w.x - 20, lo, hi), ROOM_D, () => faceThen(1, () => setMode('admire', rand([2.5, 4])))); }
+  if (k === 'window') { if (lookOut(win)) return; const w = R.windows[Math.floor(Math.random() * R.windows.length)], x = roomFreeX(w.x - 20); return goTo(x, ROOM_D, () => faceThen(Math.sign(w.x - x) || 1, () => setMode('admire', rand([2.5, 4])))); }   // something under every window: he looks up at one from where he can
+  if (k === 'rug') return rugRoll(rug);
   if (k === 'sigh') return setMode('sigh', HABITS.sighTime, { lie: false });
-  setMode('sit', rand([3, 6]));
+  P.dOff ? goTo(roomFreeX(P.x), ROOM_D, () => setMode('sit', rand([3, 6]))) : setMode('sit', rand([3, 6]));     // (not sitting in the middle of something)
 }
 
 // ---------- drawing ----------
@@ -249,7 +354,11 @@ function roomLayer() {
   if (ROOMLAY.key !== key) { ROOMLAY.key = key; ROOMLAY.L = ART.layer('room.shell', lv, V.H, V.res, WX.look, look.wall, look.floor); ROOMLAY.view = ART.layer('scene.yard', V.H, Math.min(V.res, 2), WX.look, lv, true); }   // the yard as seen from inside: without the house
   return ROOMLAY.L;
 }
-function roomParkerScreen() { const g = roomGeom(), bed = P.onBed && decorBed(), row = bed ? bed.row : 1; return [P.x - ROOMV.cam, g.rows[row] - (bed ? 10 : 0), ROOM_K * ROW_K[row]]; }
+function roomParkerScreen() {
+  const g = roomGeom(), sp = roomSpot(); if (sp) return [P.x - ROOMV.cam, g.rows[sp.row] - NAP_LIFT[sp.id], ROOM_K * ROW_K[sp.row]];      // on his bed or a cushion
+  const f = roomRowF(), i = Math.min(1, Math.floor(f)), u = f - i;
+  return [P.x - ROOMV.cam, lerp(g.rows[i], g.rows[i + 1], u), ROOM_K * lerp(ROW_K[i], ROW_K[i + 1], u)];
+}
 function drawRoom() {
   const L = LAY, R = roomR(), g = roomGeom(), cam = ROOMV.cam;
   ctx.setTransform(cv.width / SCENE_W, 0, 0, cv.width / SCENE_W, 0, 0);
@@ -269,6 +378,7 @@ function drawRoom() {
     ART.draw('live.shadow.parker', ctx, x, sy + 1, (isLying() ? 70 : 52) * k * Math.max(0.6, Math.abs(dr.sx)), 6 * k, 1 / (1 + dr.lift / 34));
     drawSprite(sprite(dr.key), x, sy - dr.lift, { sx: dr.sx, scale: k });
   });
+  if (WX.kind === 'sunny' && /morning|day/.test(currentTod())) ART.draw('live.sunPatch', ctx, R.windows, g, new Date(Clock.now()).getHours());   // the sun through the windows
   if (noteOnBed()) { const a = decorAnchor(decorBed(), g); drawNoteAt(ctx, a[0] + 28, a[1] - 14, a[2]); }      // a note waiting on his bed
   ctx.restore();
   // indoor light at dusk / night (over the house only)
@@ -295,7 +405,9 @@ function roomTap(x, y) {
   if (homeTapRoom(r)) return;                                                                                       // the cat's bed, the squirrel's stump
   if (r.id === 'book') { ROOMV.wiggle = { id: r.id, t0: TT }; return openBook(); }                                  // his book: open it
   if (isSmall(r.id)) { const id = r.id.slice(3); ROOMV.wiggle = { id: r.id, t0: TT }; SFX.pop(); toastText(`${T('sv.' + id)} · ${T('pc.' + id + '.name')}`, 2200); return; }   // a souvenir: it wiggles and says what it is
-  if (r.id === 'bed' && P.present && P.inRoom && !/sleep|nap|stir/.test(P.mode)) return roomBed('lie');         // his bed: come and lie down
+  const free = P.present && P.inRoom && !/sleep|nap|stir|sill|roll/.test(P.mode);
+  if ((r.id === 'bed' || r.id === 'cushion') && free) { if (r.id === 'cushion') { ROOMV.wiggle = { uid: r.uid, t0: TT }; SFX.pop(); } return roomBed('lie', r); }     // his bed, a cushion: he comes and lies down
+  if (r.id === 'rug' && free) { ROOMV.wiggle = { uid: r.uid, t0: TT }; SFX.pop(); return void rugRoll(rugSpot(r)); }      // a rug: he comes and rolls on it (if there's room on it)
   if (r.id === 'frame') { if (!r.pc) return framePick(r); ROOMV.wiggle = { uid: r.uid, t0: TT }; SFX.pop(); toastText(frameCardName(r.pc), 2200); return; }   // a postcard frame: its card's name (empty: choose one)
   if (SHOP_FURN.includes(r.id)) { ROOMV.wiggle = { uid: r.uid, t0: TT }; SFX.pop(); }                                  // the other furniture: a little wobble
 }

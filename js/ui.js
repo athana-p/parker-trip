@@ -475,6 +475,9 @@ function buildDebug(force) {
   const na = el('button', 'dbg-b', T('dbg.notesOpen')); na.onclick = () => { S.notes.allOpen = true; writeSave(S); showToast('dbg.notesOpenDone', 2000); }; nr.append(na);
   const nb = el('button', 'dbg-b', T('dbg.notesReset')); nb.onclick = () => { S.notes.got = []; S.notes.waiting = null; S.notes.nextAt = Clock.now() + 864e5; writeSave(S); }; nr.append(nb);
   const hs = el('button', 'dbg-b', T('dbg.houseSniff')); hs.onclick = () => { if (houseLevel() > 1) { S.houseSeen = houseLevel() - 1; writeSave(S); if (P.present) pickNext(); } }; hr.append(hs);
+  const rr = el('div', 'dbg-row'); rr.append(el('b', '', T('dbg.room')));     // Parker in his room (stage 6)
+  const inRoom = fn => () => { if (!ROOMV.on || !P.inRoom || !P.present) return toastText(T('dbg.roomNeed'), 2200); P.onBed = false; if (fn() === false) toastText(T('dbg.roomNone'), 2200); };
+  for (const [k, fn] of [['dbg.sill', () => lookOut()], ['dbg.roll', () => rugRoll()], ['dbg.cushion', () => { const c = decorItems().find(r => r.id === 'cushion'); if (!c) return false; roomBed('nap', c); }], ['dbg.fresh', () => { const it = decorItems().filter(r => SHOP_FURN.includes(r.id) || isSmall(r.id)).pop(); if (!it) return false; markFresh(it); pickNext(); }]]) { const b = el('button', 'dbg-b', T(k)); b.onclick = inRoom(fn); rr.append(b); }
   const ml = el('button', 'dbg-b', T('dbg.melt')); ml.onclick = () => { const m = S.snowman; if (m && !m.twig) { m.meltFrom = Clock.now() - MELT_MS * 0.6; m.melt = 0.6; } }; acts.append(ml);
   const vr = el('div', 'dbg-row'); vr.append(el('b', '', T('dbg.visit')));
   for (const v of ['sparrow', 'cat', 'squirrel']) { const b = el('button', 'dbg-b', T('vis.' + v)); b.onclick = () => { VIS.on = false; startVisit(v, true); }; vr.append(b); }
@@ -501,7 +504,7 @@ function buildDebug(force) {
   const hm = el('div', 'dbg-row'); hm.append(el('b', '', T('dbg.homes')));
   for (const k of PALS.order) { const b = el('button', 'dbg-b', T('vis.' + k) + ' ' + T('dbg.moveIn')); b.onclick = () => { if (houseLevel() < 3) { finishHouseBuild(); S.house = 3; S.houseSeen = 3; applyHouse(3); LAY = null; buildStatic(TOD); } palSetLevel(k, 3); delete S.homes[k]; VIS.on = false; MOVEIN.on = false; if (moveInCan()) startMoveIn(k); else { Object.assign(MOVEIN, { on: true, k, x: moveInSpot()[0], d: moveInSpot()[1], phase: 'wait', done: false }); moveInDone(); } }; hm.append(b); }
   const hr0 = el('button', 'dbg-b', T('dbg.homesReset')); hr0.onclick = () => { S.homes = {}; for (const id of ['sqnest', 'catbed']) { S.furn[id] = 0; if (S.decor) { S.decor.items = S.decor.items.filter(r => r.id !== id); delete S.decor.seen[id]; } } writeSave(S); if (UI.panel) renderPanel(); }; hm.append(hr0);
-  d.append(el('div', 'dbg-title', T('dbg.title')), row, acts, dates, fests, wxr, vr, pr, hm, hr, el('div', 'dbg-status'));
+  d.append(el('div', 'dbg-title', T('dbg.title')), row, acts, dates, fests, wxr, vr, pr, hm, hr, rr, el('div', 'dbg-status'));
   d.insertBefore(nr, d.querySelector('.dbg-status'));
   window.debugRefresh = () => {
     d.querySelectorAll('[data-sp]').forEach(b => b.classList.toggle('on', +b.dataset.sp === Clock.speed));

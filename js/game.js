@@ -202,7 +202,7 @@ function dustPuff(x, y, n = 6) {
 }
 // ---- weather behaviours (stage 3) ----
 const SHELTER = [118, 244], SHADE = [100, 238];
-const isLying = () => /lie|sleep|nap|stir|belly|chew|flat|pant|catsun/.test(P.mode) || (P.mode === 'sigh' && P.data.lie);
+const isLying = () => /lie|sleep|nap|stir|belly|chew|flat|pant|catsun|roll/.test(P.mode) || (P.mode === 'sigh' && P.data.lie);
 const WX_ACTS = {
   shelter: () => goTo(SHELTER[0], SHELTER[1], () => faceThen(1, () => setMode('shelter', rand(HABITS.wxTime.shelter)))),
   splash: () => { const [x, d] = randomSpot(); goTo(clamp(x, 170, 350), Math.min(d, 190), () => { P.wet = true; setMode('wet', rand(HABITS.wxTime.wet)); }); },
@@ -289,6 +289,8 @@ function updateParker(dt) {
   else if (P.mode === 'shake') { S.toyPos.duck = { x: clamp(P.x + 34 * P.face, 30, 370), d: clamp(P.d - 6, 96, 226) }; P.hold = null; writeSave(S); setMode('sigh', HABITS.sighTime, { lie: false }); }
   else if (P.mode === 'chew') { S.toyPos.bone = { x: clamp(P.x + 64 * P.face, 30, 370), d: P.d }; P.hold = null; writeSave(S); setMode('sigh', HABITS.sighTime, { lie: true }); }
   else if (P.mode === 'belly') setMode('sigh', HABITS.sighTime, { lie: true });
+  else if (P.mode === 'roll') { setMode('sigh', HABITS.sighTime, { lie: true }); const [hx, hy] = parkerCenter(); fx({ type: 'spr', key: 'fx.heart', x: hx, y: hy - 26, vy: -22, sway: 1, life: 1.4, scale: 0.75 }); }   // a good roll: a happy sigh
+  else if (P.mode === 'sill') sillEnd();
   else if (/^cat(boop|bow|side|sun)$/.test(P.mode)) catPlayEnd();
   else if (P.mode === 'snack') snackDone();
   else if (P.mode === 'headbird') { setMode('wag', HABITS.reactionTime.wag); SFX.pop(); }
@@ -303,7 +305,7 @@ function updateParker(dt) {
   else if (P.mode === 'pant') { setMode('wag', HABITS.reactionTime.wag); SFX.pop(); }       // rested: ready to play again
   else if (P.mode === 'wet') shakeOff();
   else if (P.mode === 'shakeoff') { P.wet = false; const then = P.data.then; then ? then() : setMode('sigh', HABITS.sighTime, { lie: false }); }
-  else if (P.mode === 'sunnap') { setMode('sunbelly', HABITS.wxTime.sunbelly); fx({ type: 'glow', x: P.x, y: Y(P.d) - 30, life: 0.8, r: 70, rgb: '255,236,180' }); }
+  else if (P.mode === 'sunnap') { const [gx, gy] = parkerCenter(); setMode('sunbelly', HABITS.wxTime.sunbelly); fx({ type: 'glow', x: gx, y: gy + 4, life: 0.8, r: 70, rgb: '255,236,180' }); }
   else if (P.mode === 'sunbelly') setMode('sigh', HABITS.sighTime, { lie: true });
   else if (P.mode === 'chase') { setMode('hop', HABITS.reactionTime.hop); SFX.pop(); }
   else if (P.mode === 'snap') { P.noseSnowUntil = TT + HABITS.noseSnow; setMode('tilt', HABITS.reactionTime.tilt + 0.6); }
@@ -476,6 +478,16 @@ function parkerDrawing() {
     case 'shakeoff': key = `parker.shake|${f % 4 < 2 ? 0 : 1}`; sx = 1; break;
     case 'sunnap': { const b = [0, 1.2, 2.4, 1.2][Math.floor(TT / 0.9) % 4]; key = `parker.lie|sleepy|${b}`; break; }
     case 'sunbelly': key = `parker.belly|${Math.floor(f / 6) % 2}`; break;
+    case 'roll': { const ph = Math.floor((TT - P.t0) / 0.3) % 4; key = ph % 2 ? `parker.belly|${Math.floor(f / 2) % 2}` : 'parker.lie|happy|0'; sx = ph === 2 ? -P.face : P.face; lift = ph % 2 ? 3 : 0; break; }   // rolling on the rug: side, back, other side, back
+    case 'sill': {                     // up at the window, from behind: how he watches depends on the weather (stage 6)
+      const k = P.data.kind, u = TT - P.t0; let wag = 0, look = 0;
+      if (k === 'snow') { wag = f % 2 ? 0.3 : -0.3; lift = Math.floor(u / 0.5) % 3 === 0 ? 5 : 0; }      // snow! fast wag, little bounces
+      else if (k === 'wind') look = Math.round(Math.sin(u * 1.4) * 4) / 4;                                // following the blown leaves
+      else if (k === 'rain') look = [0, -0.5, 0, 0.5][Math.floor(u / 2.4) % 4];                          // still, watching the drops
+      else if (k === 'fog') look = [0, 0.6, 0, -0.6][Math.floor(u / 1.6) % 4];                           // where did everything go?
+      else if (k !== 'night') wag = f % 6 < 3 ? 0.18 : -0.12;                                            // sun, clouds: a slow happy wag
+      key = `parker.sill|${P.data.reach}|${wag}|${look}`; sx = 1; break;
+    }
     case 'flat': key = `parker.flat|${Math.floor(TT * 4) % 2}`; break;
     case 'snap': { const u = ((TT - P.t0) / (HABITS.wxTime.snap / 3)) % 1; lift = 18 * Math.max(0, Math.sin(Math.PI * clamp((u - 0.15) / 0.6))); key = lift > 4 ? 'parker.sit|happy|0|-0.34' : 'parker.sit|calm|0|-0.24'; break; }
     case 'turn': key = `parker.stand|calm${pk}`; sx = (f < 1 ? 0.55 : -0.55) * P.face; lift = 8 * Math.sin(Math.PI * clamp((TT - P.t0) / (2 / 12))); break;

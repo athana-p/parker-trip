@@ -541,6 +541,30 @@ function drawBackSitB(c, o = {}) {
   tail(c, -8, -46, 22);                                                                                    // curl resting on his rump
 }
 const BOX_BACK = { w: 220, h: 260, ox: 110, oy: 248 };
+// ---- at the window (house plan, stage 6): seen from behind, up on his hind legs, front paws on the sill, looking out.
+// reach = how high the sill is above his feet (in puppet units); wag = tail swing; look = head turned (-1..1)
+function drawSillB(c, reach = 240, wag = 0, look = 0) {
+  const hip = -56, sh = -reach + 66, hy = -reach - 32;                                                    // hips, shoulders, the middle of his head
+  for (const d of [-1, 1]) fp(c, union(limb([d * 24, hip + 14], [d * 27, -8], 22, 18), ell(d * 29, -6, 15, 8)), PK.furS, { sh: 0.16 });   // hind legs, standing
+  const body = union(ell(0, hip - 8, 50, 44), ell(0, (hip + sh) / 2, 44, (hip - sh) / 2 + 10), ell(0, sh + 8, 50, 34));
+  fp(c, body, PK.fur, { sh: 0.18 });
+  clipped(c, body, () => {
+    c.save(); c.globalAlpha = 0.45; piece(c, ell(0, sh + 40, 22, 40), PK.cream, { mul: 0.4, scr: 0.1 }); c.restore();
+    band(c, [0, sh - 10], [0, sh + 46], 8, PK.hNavy, { sh: 0.12 });
+    band(c, [-52, sh + 46], [52, sh + 46], 10, PK.hKhaki, { sh: 0.14 }); band(c, [-16, sh + 46], [16, sh + 46], 10, PK.hRed, { sh: 0.12 });
+  });
+  fp(c, union(ell(-30, hip + 4, 27, 24), ell(30, hip + 4, 27, 24)), PK.fur, { sh: 0.16 });                 // haunches
+  c.save(); c.translate(0, hip - 4); c.rotate(wag); tail(c, -4, -12, 21); c.restore();                     // the curl on his rump, wagging
+  const nl = new Path2D(); nl.moveTo(-42, sh - 8); nl.quadraticCurveTo(0, sh + 8, 42, sh - 8); nl.lineTo(42, sh + 2); nl.quadraticCurveTo(0, sh + 18, -42, sh + 2); nl.closePath();
+  twoTone(c, nl, 0, PK.hGreen, PK.hYellow);
+  for (const d of [-1, 1]) fp(c, union(limb([d * 32, sh + 6], [d * 52, -reach + 3], 21, 17), ell(d * 54, -reach + 1, 15, 8.5)), PK.fur, { sh: 0.15 });   // front legs up on the sill, paws resting on it either side of his head
+  c.save(); c.translate(look * 8, hy); c.rotate(look * 0.16); c.translate(0, 148);                        // the back of his head, looking out; turned a little as he follows something
+  for (const d of [-1, 1]) ear(c, { b1: [d * 44, -158], b2: [d * 8, -184], tip: [d * 38, -226 + (d === Math.sign(look) ? 4 : 0)], r: 11 }, { inner: false });
+  fp(c, union(circ(0, -148, 44), ell(0, -128, 46, 28)), PK.fur, { sh: 0.2 });
+  clipped(c, circ(0, -148, 44), () => { c.save(); c.globalAlpha = 0.35; piece(c, ell(0, -182, 26, 10), PK.cream, { mul: 0.3 }); c.restore(); });
+  c.restore();
+}
+const BOX_SILL = { w: 220, h: 440, ox: 110, oy: 424 };
 
 // ---- digging, facing you: head down at the hole, forelegs braced wide, one paw scooping, rump and tail high (k = 0/1 paw) ----
 function drawDigB(c, k = 0, o = {}) {
@@ -690,6 +714,7 @@ scarfFront = ART.part('parker.part.scarfFront', { group: 'parker.part', flex: tr
   pose('belly', BOX_BELLY, (c, a) => drawBellyB(c, +a[0]), 'frame 0–1');
   pose('bow', BOX_BOW, (c, a) => drawPlayBowB(c, a[0], { wag: +(a[1] || 0) }), 'expr | wag');
   pose('shake', BOX_SHAKE, (c, a) => drawShakeB(c, +a[0]), 'frame 0–1');
+  pose('sill', BOX_SILL, (c, a) => drawSillB(c, +a[0], +(a[1] || 0), +(a[2] || 0)), 'at the window, from behind (stage 6): sill height | tail wag | head turn');
   ART.def('parker.door', { group: 'parker', box: BOX_DOOR, k: 1, stick: false, draw: (c, a) => drawDoorNap(c, a[0], +a[1]), note: 'his face in the doghouse door: expr | breath' });
   // poses that so far only the postcards use (they call the drawing directly; entered so the list is complete)
   pose('back', BOX_BACK, (c, a) => drawBackSitB(c, {}), 'postcards');
