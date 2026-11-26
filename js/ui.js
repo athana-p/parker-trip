@@ -471,7 +471,7 @@ function buildDebug(force) {
   const fa = el('button', 'dbg-b', T('dbg.allFurn')); fa.onclick = () => { for (const f of FURN_SHOP) if (!S.furn[f.id] || f.id === 'frame') { S.furn[f.id] = (S.furn[f.id] || 0) + 1; furnBought(f.id); } for (const k of ['wall', 'floor']) for (const st of LOOKS[k]) if (st !== 'base') S.furn[k + ':' + st] = 1; writeSave(S); if (UI.panel) renderPanel(); }; hr.append(fa);
   const dr = el('button', 'dbg-b', T('dbg.decorReset')); dr.onclick = () => { if (DECO.on) endDecor(); S.decor = null; if (ROOMV.on) decorEnsure(); writeSave(S); }; hr.append(dr);
   const nr = el('div', 'dbg-row'); nr.append(el('b', '', T('book.title')));
-  const nn = el('button', 'dbg-b', T('dbg.noteNow')); nn.onclick = () => { if (S.notes.waiting) { showToast('dbg.noteWaiting', 2000); return; } S.notes.nextAt = 0; if (!notesTick(Clock.now())) showToast('dbg.noteNone', 2500); }; nr.append(nn);
+  const nn = el('button', 'dbg-b', T('dbg.noteNow')); nn.onclick = () => { if (S.notes.waiting) { showToast('dbg.noteWaiting', 2000); return; } S.notes.nextAt = 0; if (!notesTick(Clock.now())) showToast('dbg.noteNone', 2500); else noteHint(); }; nr.append(nn);
   const na = el('button', 'dbg-b', T('dbg.notesOpen')); na.onclick = () => { S.notes.allOpen = true; writeSave(S); showToast('dbg.notesOpenDone', 2000); }; nr.append(na);
   const nb = el('button', 'dbg-b', T('dbg.notesReset')); nb.onclick = () => { S.notes.got = []; S.notes.waiting = null; S.notes.nextAt = Clock.now() + 864e5; writeSave(S); }; nr.append(nb);
   const hs = el('button', 'dbg-b', T('dbg.houseSniff')); hs.onclick = () => { if (houseLevel() > 1) { S.houseSeen = houseLevel() - 1; writeSave(S); if (P.present) pickNext(); } }; hr.append(hs);

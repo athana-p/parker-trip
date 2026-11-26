@@ -813,7 +813,7 @@ function worldTick() {
   }
   visitTick();
   festGiftTick();
-  notesTick(Clock.now());                     // a note from him, once or twice a week
+  if (notesTick(Clock.now())) noteHint();      // a note from him, once or twice a week (while you're playing: you're told straight away)
   if (window.debugRefresh) debugRefresh();
 }
 // ---------- festival cards handed over in person ----------
@@ -1363,6 +1363,7 @@ function palNewsOnOpen(at) {
   msgs.push(...[...new Set(OFFLINE_ATE)].map(k => () => toastText(capFirst(T_('pal.ateAway').replace('{who}', palWho(k, true)).replace('{what}', T_('item.' + PALS.snack[k] + '.a'))), 4200)));
   for (const k of PALS.order) { const up = palLevelUp(k); if (up) msgs.push(() => palAnnounce(k, up)); }
   OFFLINE_ATE.length = 0;
+  if (S.notes && S.notes.waiting) msgs.push(noteHint);                       // a note from him is waiting somewhere: go and find it
   msgs.forEach((m, i) => setTimeout(m, at + i * 4800));
 }
 // Parker and the snacks: fish and nuts put out while he was away are fair game if he gets home before the visitor

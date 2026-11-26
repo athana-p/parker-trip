@@ -53,6 +53,7 @@ function noteYardSpot() {
   if (s.where === 'door' || s.where === 'bed') return { x: DOOR.x + 26, d: DOOR.d - 12 };
   return { x: s.x, d: s.d };
 }
+function noteHint() { if (S.notes && S.notes.waiting && !(typeof PV !== 'undefined' && PV.mode)) toastText(T_('book.hint'), 4500); }   // "Parker wrote a little note…" (it doesn't say where)
 const noteOnBed = () => { const w = S.notes && S.notes.waiting; return !!(w && w.spot.where === 'bed' && houseLevel() > 1 && S.decor && decorBed()); };
 function keepNote() {                       // read: into the book
   const N = S.notes, w = N.waiting; if (!w) return;
